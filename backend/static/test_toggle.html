@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Toggle Button Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            cursor: pointer;
+        }
+
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            background: #333;
+        }
+
+        canvas {
+            max-width: 400px;
+            max-height: 400px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Toggle Button Test</h1>
+    <div id="status">Status: Not started</div>
+    <button id="allocation-toggle-btn" onclick="toggleAllocationMode()">View by Strategy</button>
+    <div style="width: 400px; height: 400px;">
+        <canvas id="allocation-chart"></canvas>
+    </div>
+
+    <script>
+        // Simulate the portfolio.js logic
+        let currentRefreshedPositions = [];
+        let allocationMode = 'ticker';
+        let allocationChart = null;
+
+        function log(msg) {
+            document.getElementById('status').innerHTML += '<br>' + msg;
+            console.log(msg);
+        }
+
+        function toggleAllocationMode() {
+            log('Toggle clicked. Current mode: ' + allocationMode);
+
+            // Safety check - empty array is truthy, so check length
+            if (!currentRefreshedPositions || currentRefreshedPositions.length === 0) {
+                log('⚠️ No positions data available to toggle.');
+                return;
+            }
+
+            allocationMode = allocationMode === 'ticker' ? 'category' : 'ticker';
+            log('✅ Mode changed to: ' + allocationMode);
+            updateAllocationChart(currentRefreshedPositions);
+
+            // Update button text
+            const btn = document.getElementById('allocation-toggle-btn');
+            if (btn) btn.textContent = allocationMode === 'ticker' ? 'View by Strategy' : 'View by Ticker';
+        }
+
+        function updateAllocationChart(positions) {
+            const ctx = document.getElementById('allocation-chart');
+            if (!ctx) return;
+
+            if (allocationChart) {
+                allocationChart.destroy();
+            }
+
+            if (positions.length === 0) return;
+
+            const totalValue = positions.reduce((sum, p) => sum + p.value, 0);
+            let chartData = [];
+
+            if (allocationMode === 'ticker') {
+                chartData = positions.map(p => ({ label: p.ticker, value: p.value }));
+                log('📊 Chart mode: By Ticker (' + chartData.length + ' items)');
+            } else {
+                // Group by Category
+                const categories = {};
+                positions.forEach(p => {
+                    const cat = p.category || 'Stock';
+                    categories[cat] = (categories[cat] || 0) + p.value;
+                });
+
+                chartData = Object.keys(categories)
+                    .map(k => ({ label: k, value: categories[k] }))
+                    .sort((a, b) => b.value - a.value);
+                log('📊 Chart mode: By Category (' + chartData.length + ' items)');
+            }
+
+            allocationChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: chartData.map(d => d.label),
+                    datasets: [{
+                        data: chartData.map(d => d.value),
+                        backgroundColor: ['#38bdf8', '#22c55e', '#eab308', '#ef4444', '#a855f7'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+
+        // Initialize with test data
+        setTimeout(() => {
+            log('🔄 Loading test data...');
+            currentRefreshedPositions = [
+                { ticker: 'AAPL', value: 10000, category: 'Growth' },
+                { ticker: 'MSFT', value: 15000, category: 'Growth' },
+                { ticker: 'BRK-B', value: 8000, category: 'Value' },
+                { ticker: 'JNJ', value: 5000, category: 'Value' },
+                { ticker: 'TLT', value: 3000, category: 'Bond' }
+            ];
+            log('✅ Loaded ' + currentRefreshedPositions.length + ' positions');
+            updateAllocationChart(currentRefreshedPositions);
+            log('✅ Initial chart rendered. Try clicking the button!');
+        }, 1000);
+    </script>
+</body>
+
+</html>

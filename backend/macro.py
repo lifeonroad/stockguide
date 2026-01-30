@@ -1,0 +1,142 @@
+
+import yfinance as yf
+
+# Sector Map for Macro Impacts
+SECTOR_MAP = {
+    "Technology": "XLK",
+    "Financials": "XLF",
+    "Healthcare": "XLV",
+    "Consumer Discretionary": "XLY",
+    "Industrials": "XLI",
+    "Energy": "XLE",
+    "Consumer Staples": "XLP",
+    "Materials": "XLB",
+    "Utilities": "XLU",
+    "Real Estate": "XLRE",
+    "Communication Services": "XLC",
+    "Defense": "ITA" # Special mention, though not in our main ETF list yet, mapped to Industrials usually.
+}
+
+def get_macro_trends():
+    """
+    Fetches macro indicators and returns a 'Weather Report' for sectors.
+    """
+    # Tickers:
+    # ^TNX: 10-Year Treasury Yield
+    # CL=F: Crude Oil Futures
+    # GC=F: Gold Futures
+    # ^VIX: CBOE Volatility Index
+    tickers = ["^TNX", "CL=F", "GC=F", "^VIX"]
+    data = yf.download(tickers, period="5d", progress=False)['Close']
+    
+    # Calculate % change over last 5 days to determine "Trend"
+    # Handling potential multi-index columns in recent pandas/yfinance versions
+    trends = {}
+    
+    for ticker in tickers:
+        try:
+            series = data[ticker]
+            if len(series) < 2:
+                trends[ticker] = {"current": 0, "change_pct": 0, "trend": "Neutral"}
+                continue
+                
+            current = series.iloc[-1]
+            start = series.iloc[0] # 5 days ago approx
+            change = (current - start) / start
+            
+            # Label
+            if change > 0.01: direction = "Up" # Lower threshold for sensitivity (1%)
+            elif change < -0.01: direction = "Down"
+            else: direction = "Flat"
+            
+            trends[ticker] = {
+                "current": round(current, 2),
+                "change_pct": round(change * 100, 2),
+                "direction": direction
+            }
+        except Exception as e:
+            # Fallback
+            trends[ticker] = {"current": 0, "change_pct": 0, "direction": "Flat"}
+
+    # --- Heuristics Engine ---
+    
+    # 1. Interest Rates (^TNX)
+    # Up: Bad for Tech, Real Estate, Utilities (Yield competition). Good for Financials (NIM).
+    # Down: Good for Tech, Real Estate. Bad for Financials.
+    rate_dir = trends["^TNX"]["direction"]
+    
+    # 2. Oil (CL=F)
+    # Up: Good for Energy. Bad for Airlines/Transport/Consumer (Inflation tax).
+    oil_dir = trends["CL=F"]["direction"]
+    
+    # 3. Fear/Geopolitics (^VIX + Gold)
+    # VIX Up or Gold Up: Flight to safety. Good for Staples, Defense, Gold Miners.
+    fear_level = "Normal"
+    if trends["^VIX"]["current"] > 20 or trends["^VIX"]["direction"] == "Up":
+        fear_level = "High"
+        
+    # Build Tailwinds/Headwinds Maps
+    sector_impacts = {}
+    
+    for sector in SECTOR_MAP.keys():
+        impact = "Neutral"
+        reason = []
+        
+        # Rate Logic
+        if sector in ["Technology", "Real Estate", "Utilities"]:
+            if rate_dir == "Up": 
+                impact = "Headwind"
+                reason.append("Rising Rates hurt valuations")
+            elif rate_dir == "Down": 
+                impact = "Tailwind"
+                reason.append("Falling Rates boost valuations")
+                
+        if sector == "Financials":
+            if rate_dir == "Up": 
+                impact = "Tailwind"
+                reason.append("Higher Rates aid margins")
+            elif rate_dir == "Down": 
+                impact = "Headwind"
+                reason.append("Lower Rates squeeze margins")
+                
+        # Oil Logic
+        if sector == "Energy":
+            if oil_dir == "Up": 
+                impact = "Tailwind"
+                reason.append("Rising Oil Prices")
+            elif oil_dir == "Down": 
+                impact = "Headwind"
+                reason.append("Falling Oil Prices")
+                
+        if sector == "Consumer Discretionary":
+            if oil_dir == "Up":
+                # Only override if not already set by rates or if oil is major factor
+                if impact != "Headwind":
+                    impact = "Headwind"
+                    reason.append("Energy costs squeeze consumers")
+
+        # Fear Logic
+        if sector in ["Consumer Staples", "Healthcare"]:
+            if fear_level == "High":
+                impact = "Tailwind"
+                reason.append("Defensive rotation due to Volatility")
+                
+        sector_impacts[sector] = {
+            "impact": impact,
+            "reasons": reason
+        }
+        
+    # Alias Mapping (Manual Fixes for yfinance variances)
+    # Consumer Cyclical -> Consumer Discretionary
+    if "Consumer Discretionary" in sector_impacts:
+        sector_impacts["Consumer Cyclical"] = sector_impacts["Consumer Discretionary"]
+
+    return {
+        "indicators": {
+            "rates": trends["^TNX"],
+            "oil": trends["CL=F"],
+            "gold": trends["GC=F"],
+            "vix": trends["^VIX"]
+        },
+        "sector_impacts": sector_impacts
+    }

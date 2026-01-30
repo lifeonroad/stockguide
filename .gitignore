@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment Variables (Secrets)
+.env
+.env.local
+
+# Database
+# Ignore all .db files in the data directory to protect user financial data
+backend/data/*.db
+*.sqlite3
+
+# Pycharm / VSCode
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Logs
+*.log
+
+# Artifacts
+.pytest_cache/
+.coverage
+htmlcov/
