@@ -1,6 +1,7 @@
 
 import yfinance as yf
 import pandas as pd
+import numpy as np
 from cache_utils import timed_cache
 
 # Sector Map for Macro Impacts
@@ -65,14 +66,14 @@ def get_macro_trends():
             start = series.iloc[0] # 5 days ago approx
             
             # Handle NaN, infinity, and zero values
-            if pd.isna(current) or pd.isna(start) or start == 0 or not pd.isfinite(current) or not pd.isfinite(start):
+            if pd.isna(current) or pd.isna(start) or start == 0 or not np.isfinite(current) or not np.isfinite(start):
                 trends[ticker] = {"current": 0, "change_pct": 0, "direction": "Flat"}
                 continue
             
             change = (current - start) / start
             
             # Ensure change is finite
-            if not pd.isfinite(change):
+            if not np.isfinite(change):
                 trends[ticker] = {"current": round(float(current), 2), "change_pct": 0, "direction": "Flat"}
                 continue
             
