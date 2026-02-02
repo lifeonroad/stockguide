@@ -44,7 +44,18 @@ def get_macro_trends():
                 
             current = series.iloc[-1]
             start = series.iloc[0] # 5 days ago approx
+            
+            # Handle NaN, infinity, and zero values
+            if pd.isna(current) or pd.isna(start) or start == 0 or not pd.isfinite(current) or not pd.isfinite(start):
+                trends[ticker] = {"current": 0, "change_pct": 0, "direction": "Flat"}
+                continue
+            
             change = (current - start) / start
+            
+            # Ensure change is finite
+            if not pd.isfinite(change):
+                trends[ticker] = {"current": round(float(current), 2), "change_pct": 0, "direction": "Flat"}
+                continue
             
             # Label
             if change > 0.01: direction = "Up" # Lower threshold for sensitivity (1%)
@@ -52,8 +63,8 @@ def get_macro_trends():
             else: direction = "Flat"
             
             trends[ticker] = {
-                "current": round(current, 2),
-                "change_pct": round(change * 100, 2),
+                "current": round(float(current), 2),
+                "change_pct": round(float(change * 100), 2),
                 "direction": direction
             }
         except Exception as e:
