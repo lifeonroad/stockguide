@@ -1,5 +1,6 @@
 
 from fastapi import FastAPI, HTTPException
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from market_data import get_buffett_indicator
 from screener import get_industry_rankings, analyze_sector_fundamentals
@@ -19,11 +20,14 @@ app.add_middleware(
 )
 
 # Serve Static Files (Frontend)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, '..', 'frontend')
+
+app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 @app.get("/")
 async def read_index():
-    return FileResponse('static/index.html')
+    return FileResponse(os.path.join(FRONTEND_DIR, 'index.html'))
 
 @app.get("/api/market-status")
 def market_status():
