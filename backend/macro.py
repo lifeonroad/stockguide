@@ -1,5 +1,6 @@
 
 import yfinance as yf
+import pandas as pd
 from cache_utils import timed_cache
 
 # Sector Map for Macro Impacts
@@ -29,17 +30,35 @@ def get_macro_trends():
     # GC=F: Gold Futures
     # ^VIX: CBOE Volatility Index
     tickers = ["^TNX", "CL=F", "GC=F", "^VIX"]
-    data = yf.download(tickers, period="5d", progress=False)['Close']
+    
+    # Download data - returns multi-index DataFrame
+    raw_data = yf.download(tickers, period="5d", progress=False)
+    
+    # Extract Close prices - handle multi-index structure
+    if isinstance(raw_data.columns, pd.MultiIndex):
+        # Multi-index: columns are like ('Close', 'CL=F')
+        close_data = raw_data['Close']
+    else:
+        # Single ticker or already flattened
+        close_data = raw_data
     
     # Calculate % change over last 5 days to determine "Trend"
-    # Handling potential multi-index columns in recent pandas/yfinance versions
     trends = {}
     
     for ticker in tickers:
         try:
-            series = data[ticker]
+            # Access the series for this ticker
+            series = close_data[ticker] if ticker in close_data.columns else None
+            
+            if series is None or len(series) < 2:
+                trends[ticker] = {"current": 0, "change_pct": 0, "direction": "Flat"}
+                continue
+            
+            # Drop NaN values and get valid data
+            series = series.dropna()
+            
             if len(series) < 2:
-                trends[ticker] = {"current": 0, "change_pct": 0, "trend": "Neutral"}
+                trends[ticker] = {"current": 0, "change_pct": 0, "direction": "Flat"}
                 continue
                 
             current = series.iloc[-1]
@@ -68,6 +87,7 @@ def get_macro_trends():
                 "direction": direction
             }
         except Exception as e:
+            print(f"Error processing {ticker}: {e}")
             # Fallback
             trends[ticker] = {"current": 0, "change_pct": 0, "direction": "Flat"}
 
