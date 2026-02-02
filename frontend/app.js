@@ -969,6 +969,7 @@ async function runScreen(strategyId) {
 
 
 // Tab Switching
+// Tab Switching
 window.switchTab = (tabName) => {
     // Buttons
     const btnDash = document.getElementById('tab-dashboard');
@@ -976,6 +977,7 @@ window.switchTab = (tabName) => {
     const btnCopy = document.getElementById('tab-copycat');
     const btnMoon = document.getElementById('tab-moonshots');
     const btnScreen = document.getElementById('tab-screeners');
+    const btnPort = document.getElementById('tab-portfolio');
 
     // Views
     const viewDash = document.getElementById('dashboard-view');
@@ -983,16 +985,17 @@ window.switchTab = (tabName) => {
     const viewCopy = document.getElementById('copycat-view');
     const viewMoon = document.getElementById('moonshot-view');
     const viewScreen = document.getElementById('screeners-view');
+    const viewPort = document.getElementById('portfolio-view');
 
     // Reset All
-    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen].forEach(btn => {
+    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen, btnPort].forEach(btn => {
         if (btn) {
             btn.classList.remove('bg-warren-accent', 'text-white', 'shadow-lg');
             btn.classList.add('text-gray-400');
         }
     });
 
-    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen].forEach(view => {
+    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen, viewPort].forEach(view => {
         if (view) view.classList.add('hidden');
     });
 
@@ -1021,8 +1024,6 @@ window.switchTab = (tabName) => {
         btnScreen.classList.remove('text-gray-400');
         viewScreen.classList.remove('hidden');
     } else if (tabName === 'portfolio') {
-        const btnPort = document.getElementById('tab-portfolio');
-        const viewPort = document.getElementById('portfolio-view');
         btnPort.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
         btnPort.classList.remove('text-gray-400');
         viewPort.classList.remove('hidden');

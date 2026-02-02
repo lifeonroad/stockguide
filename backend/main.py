@@ -8,7 +8,7 @@ from screener import get_industry_rankings, analyze_sector_fundamentals
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-app = FastAPI(title="Warren Indicator API")
+app = FastAPI(title="Rational Equity API")
 
 # Enable CORS for frontend (if running separately, though we serve static now)
 app.add_middleware(
