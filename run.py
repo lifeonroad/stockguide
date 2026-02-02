@@ -4,6 +4,18 @@ import sys
 import webbrowser
 import time
 from threading import Timer
+from pathlib import Path
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent / '.env'
+    load_dotenv(dotenv_path=env_path)
+    print(f"✓ Loaded environment variables from .env")
+except ImportError:
+    print("⚠️  python-dotenv not installed. Run: pip3 install python-dotenv")
+except Exception as e:
+    print(f"⚠️  Could not load .env file: {e}")
 
 def open_browser():
     """Wait 1.5s then open browser"""
@@ -16,7 +28,7 @@ def main():
     root_dir = os.path.dirname(os.path.abspath(__file__))
     backend_dir = os.path.join(root_dir, 'backend')
     
-    print(f"🚀 Starting Warren Indicator from {backend_dir}...")
+    print(f"🚀 Starting Rational Equity from {backend_dir}...")
     print("---------------------------------------------------")
     
     # Change to backend dir so local imports (market_data, etc.) work correctly
