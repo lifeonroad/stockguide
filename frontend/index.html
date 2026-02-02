@@ -307,6 +307,14 @@
                                 class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                                 Pro Screeners <span class="ml-1 text-xs">📡</span>
                             </button>
+                            <button id="tab-economics" onclick="switchTab('economics')"
+                                class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                Economics <span class="ml-1 text-xs">📊</span>
+                            </button>
+                            <button id="tab-news" onclick="switchTab('news')"
+                                class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                News <span class="ml-1 text-xs">📰</span>
+                            </button>
                             <button id="tab-portfolio" onclick="switchTab('portfolio')"
                                 class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                                 My Portfolios <span class="ml-1 text-xs">💼</span>
@@ -718,6 +726,26 @@
                                     </a>
                                 </div>
 
+                            </div>
+                        </div>
+
+                        <!-- Economics View -->
+                        <div id="economics-view" class="hidden animate-fade-in">
+                            <h2 class="text-2xl font-bold text-white mb-6">📊 Economic Indicators</h2>
+                            <div id="economics-source" class="text-xs text-gray-500 mb-4">Loading...</div>
+
+                            <div id="indicators-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <!-- Indicators will be loaded here -->
+                            </div>
+                        </div>
+
+                        <!-- News View -->
+                        <div id="news-view" class="hidden animate-fade-in">
+                            <h2 class="text-2xl font-bold text-white mb-6">📰 Market News</h2>
+                            <div id="news-source" class="text-xs text-gray-500 mb-4">Loading...</div>
+
+                            <div id="news-feed" class="space-y-3">
+                                <!-- News items will be loaded here -->
                             </div>
                         </div>
 

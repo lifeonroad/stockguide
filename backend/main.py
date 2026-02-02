@@ -77,11 +77,29 @@ async def macro_analysis():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+from economic import get_economic_indicators
+from news import get_market_news
 from superinvestors_live import get_live_superinvestors
 from copycat import get_copycat_performance
 from moonshots import MoonshotScanner
 from screeners import ScreenerEngine
 from updater import update_universe_file
+
+@app.get("/api/economic-indicators")
+async def economic_indicators():
+    try:
+        data = await asyncio.to_thread(get_economic_indicators)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/news")
+async def market_news():
+    try:
+        data = await asyncio.to_thread(get_market_news)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/superinvestors")
 def superinvestors_endpoint():

@@ -977,6 +977,8 @@ window.switchTab = (tabName) => {
     const btnCopy = document.getElementById('tab-copycat');
     const btnMoon = document.getElementById('tab-moonshots');
     const btnScreen = document.getElementById('tab-screeners');
+    const btnEcon = document.getElementById('tab-economics');
+    const btnNews = document.getElementById('tab-news');
     const btnPort = document.getElementById('tab-portfolio');
 
     // Views
@@ -985,17 +987,19 @@ window.switchTab = (tabName) => {
     const viewCopy = document.getElementById('copycat-view');
     const viewMoon = document.getElementById('moonshot-view');
     const viewScreen = document.getElementById('screeners-view');
+    const viewEcon = document.getElementById('economics-view');
+    const viewNews = document.getElementById('news-view');
     const viewPort = document.getElementById('portfolio-view');
 
     // Reset All
-    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen, btnPort].forEach(btn => {
+    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen, btnEcon, btnNews, btnPort].forEach(btn => {
         if (btn) {
             btn.classList.remove('bg-warren-accent', 'text-white', 'shadow-lg');
             btn.classList.add('text-gray-400');
         }
     });
 
-    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen, viewPort].forEach(view => {
+    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen, viewEcon, viewNews, viewPort].forEach(view => {
         if (view) view.classList.add('hidden');
     });
 
@@ -1023,6 +1027,16 @@ window.switchTab = (tabName) => {
         btnScreen.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
         btnScreen.classList.remove('text-gray-400');
         viewScreen.classList.remove('hidden');
+    } else if (tabName === 'economics') {
+        btnEcon.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
+        btnEcon.classList.remove('text-gray-400');
+        viewEcon.classList.remove('hidden');
+        loadEconomicIndicators();
+    } else if (tabName === 'news') {
+        btnNews.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
+        btnNews.classList.remove('text-gray-400');
+        viewNews.classList.remove('hidden');
+        loadMarketNews();
     } else if (tabName === 'portfolio') {
         btnPort.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
         btnPort.classList.remove('text-gray-400');
@@ -1030,6 +1044,102 @@ window.switchTab = (tabName) => {
         if (typeof initPortfolioView === 'function') {
             initPortfolioView();
         }
+    }
+}
+
+// Economic Indicators
+async function loadEconomicIndicators() {
+    const grid = document.getElementById('indicators-grid');
+    const source = document.getElementById('economics-source');
+
+    grid.innerHTML = '<div class="col-span-full text-center text-warren-accent">Loading indicators...</div>';
+
+    try {
+        const res = await fetch(`${API_BASE}/economic-indicators`);
+        const data = await res.json();
+
+        source.textContent = `Source: ${data.source} | Last Updated: ${new Date(data.last_updated).toLocaleString()}`;
+
+        const indicators = data.indicators;
+        const labels = {
+            'unemployment': { name: 'Unemployment Rate', unit: '%', goodTrend: 'down' },
+            'inflation': { name: 'Inflation (CPI)', unit: '%', goodTrend: 'down' },
+            'fed_rate': { name: 'Fed Funds Rate', unit: '%', goodTrend: 'stable' },
+            'gdp_growth': { name: 'GDP Growth', unit: '%', goodTrend: 'up' }
+        };
+
+        grid.innerHTML = '';
+
+        Object.keys(indicators).forEach(key => {
+            const indicator = indicators[key];
+            const label = labels[key];
+            const monthChangeClass = indicator.month_change >= 0 ? 'text-red-400' : 'text-green-400';
+            const trendIcon = indicator.trend;
+
+            const card = document.createElement('div');
+            card.className = 'glass-panel p-6 rounded-xl';
+            card.innerHTML = `
+                <div class="text-xs text-gray-400 uppercase tracking-wide mb-2">${label.name}</div>
+                <div class="flex items-end justify-between">
+                    <div>
+                        <div class="text-3xl font-bold text-white">${indicator.value}${label.unit}</div>
+                        <div class="${monthChangeClass} text-sm mt-1">
+                            ${indicator.month_change > 0 ? '+' : ''}${indicator.month_change}${label.unit} (1M)
+                        </div>
+                    </div>
+                    <div class="text-4xl opacity-50">${trendIcon}</div>
+                </div>
+                <div class="mt-3 text-xs text-gray-500">
+                    YoY: ${indicator.year_change > 0 ? '+' : ''}${indicator.year_change}${label.unit}
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+
+    } catch (err) {
+        console.error('Failed to load economic indicators', err);
+        grid.innerHTML = '<div class="col-span-full text-center text-red-400">Failed to load indicators</div>';
+    }
+}
+
+// Market News
+async function loadMarketNews() {
+    const feed = document.getElementById('news-feed');
+    const source = document.getElementById('news-source');
+
+    feed.innerHTML = '<div class="text-center text-warren-accent">Loading news...</div>';
+
+    try {
+        const res = await fetch(`${API_BASE}/news`);
+        const data = await res.json();
+
+        source.textContent = `Sources: ${data.sources.join(', ')} | Last Updated: ${new Date(data.last_updated).toLocaleString()}`;
+
+        feed.innerHTML = '';
+
+        data.news.forEach(item => {
+            const newsCard = document.createElement('a');
+            newsCard.href = item.link;
+            newsCard.target = '_blank';
+            newsCard.className = 'block glass-panel p-4 rounded-xl hover:border-warren-accent border border-transparent transition-all';
+            newsCard.innerHTML = `
+                <div class="flex justify-between items-start gap-4">
+                    <div class="flex-1">
+                        <h3 class="font-bold text-white mb-1 hover:text-warren-accent">${item.title}</h3>
+                        ${item.summary ? `<p class="text-xs text-gray-400 line-clamp-2">${item.summary}</p>` : ''}
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-xs text-gray-500">${item.published}</div>
+                        <div class="text-xs text-gray-600 mt-1">${item.source}</div>
+                    </div>
+                </div>
+            `;
+            feed.appendChild(newsCard);
+        });
+
+    } catch (err) {
+        console.error('Failed to load news', err);
+        feed.innerHTML = '<div class="text-center text-red-400">Failed to load news</div>';
     }
 }
 
