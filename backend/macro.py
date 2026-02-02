@@ -1,5 +1,6 @@
 
 import yfinance as yf
+from cache_utils import timed_cache
 
 # Sector Map for Macro Impacts
 SECTOR_MAP = {
@@ -17,6 +18,7 @@ SECTOR_MAP = {
     "Defense": "ITA" # Special mention, though not in our main ETF list yet, mapped to Industrials usually.
 }
 
+@timed_cache(ttl_seconds=3600)  # Cache for 1 hour
 def get_macro_trends():
     """
     Fetches macro indicators and returns a 'Weather Report' for sectors.

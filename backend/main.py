@@ -1,6 +1,7 @@
 
 from fastapi import FastAPI, HTTPException
 import os
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from market_data import get_buffett_indicator
 from screener import get_industry_rankings, analyze_sector_fundamentals
@@ -30,9 +31,9 @@ async def read_index():
     return FileResponse(os.path.join(FRONTEND_DIR, 'index.html'))
 
 @app.get("/api/market-status")
-def market_status():
+async def market_status():
     try:
-        data = get_buffett_indicator()
+        data = await asyncio.to_thread(get_buffett_indicator)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -69,9 +70,9 @@ def analyze_stock_endpoint(symbol: str, strategy: str = "buffett"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/macro")
-def macro_analysis():
+async def macro_analysis():
     try:
-        data = get_macro_trends()
+        data = await asyncio.to_thread(get_macro_trends)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -118,6 +119,13 @@ def get_screeners(strategy_id: str):
 # Portfolio Management Endpoints
 from portfolio import PortfolioManager
 from pydantic import BaseModel
+from fastapi import Depends
+from functools import lru_cache
+
+@lru_cache()
+def get_portfolio_manager() -> PortfolioManager:
+    """Dependency that returns singleton PortfolioManager instance."""
+    return PortfolioManager()
 
 class PortfolioCreate(BaseModel):
     name: str
@@ -138,26 +146,22 @@ class PositionUpdate(BaseModel):
     category: str = None
 
 @app.get("/api/portfolios")
-def list_portfolios():
-    pm = PortfolioManager()
+def list_portfolios(pm: PortfolioManager = Depends(get_portfolio_manager)):
     return pm.list_portfolios()
 
 @app.post("/api/portfolios")
-def create_portfolio(portfolio: PortfolioCreate):
-    pm = PortfolioManager()
+def create_portfolio(portfolio: PortfolioCreate, pm: PortfolioManager = Depends(get_portfolio_manager)):
     return pm.create_portfolio(portfolio.name, portfolio.description)
 
 @app.get("/api/portfolios/{portfolio_id}")
-def get_portfolio(portfolio_id: str):
-    pm = PortfolioManager()
+def get_portfolio(portfolio_id: str, pm: PortfolioManager = Depends(get_portfolio_manager)):
     result = pm.get_portfolio(portfolio_id)
     if not result:
         raise HTTPException(status_code=404, detail="Portfolio not found")
     return result
 
 @app.put("/api/portfolios/{portfolio_id}")
-def update_portfolio(portfolio_id: str, portfolio: PortfolioCreate):
-    pm = PortfolioManager()
+def update_portfolio(portfolio_id: str, portfolio: PortfolioCreate, pm: PortfolioManager = Depends(get_portfolio_manager)):
     success = pm.update_portfolio(portfolio_id, portfolio.name, portfolio.description)
     if not success:
         raise HTTPException(status_code=404, detail="Portfolio not found")
@@ -178,16 +182,14 @@ def get_quotes(symbols: str):
     return get_batch_quotes(ticker_list)
 
 @app.delete("/api/portfolios/{portfolio_id}")
-def delete_portfolio(portfolio_id: str):
-    pm = PortfolioManager()
+def delete_portfolio(portfolio_id: str, pm: PortfolioManager = Depends(get_portfolio_manager)):
     success = pm.delete_portfolio(portfolio_id)
     if not success:
         raise HTTPException(status_code=404, detail="Portfolio not found")
     return {"success": True}
 
 @app.post("/api/portfolios/{portfolio_id}/positions")
-def add_position(portfolio_id: str, position: PositionCreate):
-    pm = PortfolioManager()
+def add_position(portfolio_id: str, position: PositionCreate, pm: PortfolioManager = Depends(get_portfolio_manager)):
     return pm.add_position(
         portfolio_id, 
         position.ticker, 
@@ -199,8 +201,7 @@ def add_position(portfolio_id: str, position: PositionCreate):
     )
 
 @app.put("/api/positions/{position_id}")
-def update_position(position_id: str, position: PositionUpdate):
-    pm = PortfolioManager()
+def update_position(position_id: str, position: PositionUpdate, pm: PortfolioManager = Depends(get_portfolio_manager)):
     success = pm.update_position(
         position_id,
         position.quantity,
@@ -212,8 +213,7 @@ def update_position(position_id: str, position: PositionUpdate):
     return {"success": True}
 
 @app.delete("/api/positions/{position_id}")
-def delete_position(position_id: str):
-    pm = PortfolioManager()
+def delete_position(position_id: str, pm: PortfolioManager = Depends(get_portfolio_manager)):
     success = pm.delete_position(position_id)
     if not success:
         raise HTTPException(status_code=404, detail="Position not found")

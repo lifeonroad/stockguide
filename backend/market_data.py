@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import os
 import requests
+from cache_utils import timed_cache
 
 # Fallback GDP if API fails
 FALLBACK_GDP = 28000000000000  # 28 Trillion USD
@@ -39,6 +40,7 @@ def get_gdp_from_fred():
     
     return None
 
+@timed_cache(ttl_seconds=1800)  # Cache for 30 minutes
 def get_market_cap():
     """
     Fetches the Total US Market Cap.
@@ -111,6 +113,7 @@ def get_market_cap():
         
     return base_market_cap
 
+@timed_cache(ttl_seconds=1800)  # Cache for 30 minutes
 def get_buffett_indicator():
     mkt_cap = get_market_cap()
     
@@ -139,6 +142,7 @@ def get_buffett_indicator():
     }
 
 
+@timed_cache(ttl_seconds=900)  # Cache for 15 minutes
 def get_batch_quotes(tickers: list):
     """
     Efficiently fetches current prices for multiple tickers.
