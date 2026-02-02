@@ -212,6 +212,8 @@ async function loadIndustries() {
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg>
                         Headwind
                     </div>`;
+                } else if (impact.impact === 'Neutral') {
+                    macroHtml = '<span class="text-gray-400 text-xs">Neutral</span>';
                 }
             }
 
