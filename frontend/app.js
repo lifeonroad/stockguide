@@ -980,7 +980,7 @@ window.switchTab = (tabName) => {
     const btnMoon = document.getElementById('tab-moonshots');
     const btnScreen = document.getElementById('tab-screeners');
     const btnEcon = document.getElementById('tab-economics');
-    const btnNews = document.getElementById('tab-news');
+    const btnContrarian = document.getElementById('tab-contrarian');
     const btnPort = document.getElementById('tab-portfolio');
 
     // Views
@@ -990,18 +990,18 @@ window.switchTab = (tabName) => {
     const viewMoon = document.getElementById('moonshot-view');
     const viewScreen = document.getElementById('screeners-view');
     const viewEcon = document.getElementById('economics-view');
-    const viewNews = document.getElementById('news-view');
+    const viewContrarian = document.getElementById('contrarian-view');
     const viewPort = document.getElementById('portfolio-view');
 
     // Reset All
-    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen, btnEcon, btnNews, btnPort].forEach(btn => {
+    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen, btnEcon, btnContrarian, btnPort].forEach(btn => {
         if (btn) {
             btn.classList.remove('bg-warren-accent', 'text-white', 'shadow-lg');
             btn.classList.add('text-gray-400');
         }
     });
 
-    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen, viewEcon, viewNews, viewPort].forEach(view => {
+    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen, viewEcon, viewContrarian, viewPort].forEach(view => {
         if (view) view.classList.add('hidden');
     });
 
@@ -1034,11 +1034,11 @@ window.switchTab = (tabName) => {
         btnEcon.classList.remove('text-gray-400');
         viewEcon.classList.remove('hidden');
         loadEconomicIndicators();
-    } else if (tabName === 'news') {
-        btnNews.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
-        btnNews.classList.remove('text-gray-400');
-        viewNews.classList.remove('hidden');
-        loadMarketNews();
+    } else if (tabName === 'contrarian') {
+        btnContrarian.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
+        btnContrarian.classList.remove('text-gray-400');
+        viewContrarian.classList.remove('hidden');
+        loadContrarianOpportunities();
     } else if (tabName === 'portfolio') {
         btnPort.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
         btnPort.classList.remove('text-gray-400');
@@ -1143,6 +1143,113 @@ async function loadMarketNews() {
         console.error('Failed to load news', err);
         feed.innerHTML = '<div class="text-center text-red-400">Failed to load news</div>';
     }
+}
+
+// Contrarian Opportunities
+
+let CONTRARIAN_DATA = [];
+
+async function loadContrarianOpportunities() {
+    try {
+        const response = await fetch('/api/contrarian/opportunities');
+        const data = await response.json();
+
+        CONTRARIAN_DATA = data.opportunities || [];
+
+        // Update scorecard
+        document.getElementById('total-opportunities').textContent = CONTRARIAN_DATA.length;
+        document.getElementById('high-conviction').textContent = CONTRARIAN_DATA.filter(o => o.score >= 70).length;
+        const avgScore = CONTRARIAN_DATA.reduce((sum, o) => sum + o.score, 0) / CONTRARIAN_DATA.length || 0;
+        document.getElementById('avg-score').textContent = Math.round(avgScore);
+
+        // Update VIX data (from macro trends)
+        if (MACRO_DATA && MACRO_DATA['rates']) {
+            const vix = MACRO_DATA['rates']?.volatility || 0;
+            document.getElementById('contrarian-vix').textContent = vix.toFixed(1);
+            let signal = 'Low Fear';
+            if (vix > 30) signal = 'Extreme Fear 🚨';
+            else if (vix > 25) signal = 'High Fear ⚠️';
+            else if (vix > 20) signal = 'Moderate Fear';
+            document.getElementById('contrarian-signal').textContent = signal;
+        }
+
+        // Display all opportunities
+        filterContrarian('all');
+
+    } catch (err) {
+        console.error('Failed to load contrarian opportunities', err);
+        document.getElementById('contrarian-table-body').innerHTML =
+            '<tr><td colspan="6" class="text-center py-8 text-red-400">Failed to load opportunities</td></tr>';
+    }
+}
+
+function filterContrarian(category) {
+    // Update filter buttons
+    const filters = ['all', 'fallen_angels', 'burry_orphans', 'insider_confidence'];
+    filters.forEach(f => {
+        const btn = document.getElementById(`contrarian-filter-${f}`);
+        if (btn) {
+            if (f === category) {
+                btn.classList.add('bg-warren-accent', 'text-white');
+                btn.classList.remove('text-gray-400', 'hover:bg-gray-800');
+            } else {
+                btn.classList.remove('bg-warren-accent', 'text-white');
+                btn.classList.add('text-gray-400', 'hover:bg-gray-800');
+            }
+        }
+    });
+
+    // Filter data
+    let filtered = CONTRARIAN_DATA;
+    if (category !== 'all') {
+        filtered = CONTRARIAN_DATA.filter(o => o.signal === category);
+    }
+
+    // Render table
+    renderContrarianTable(filtered);
+}
+
+function renderContrarianTable(opportunities) {
+    const tbody = document.getElementById('contrarian-table-body');
+
+    if (opportunities.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No opportunities found for this category</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = opportunities.slice(0, 20).map((opp, index) => {
+        const scoreClass = opp.score >= 75 ? 'text-green-400' : opp.score >= 60 ? 'text-yellow-400' : 'text-gray-400';
+        const changeClass = opp.price_change_52w < 0 ? 'text-red-400' : 'text-green-400';
+        const changePrefix = opp.price_change_52w > 0 ? '+' : '';
+
+        let signalBadge = '';
+        if (opp.signal === 'fallen_angels') signalBadge = '<span class="text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded">🔥 Fallen Angel</span>';
+        else if (opp.signal === 'burry_orphans') signalBadge = '<span class="text-xs bg-teal-500/20 text-teal-400 px-2 py-1 rounded">🦉 Orphan</span>';
+        else if (opp.signal === 'insider_confidence') signalBadge = '<span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">📈 Insider</span>';
+
+        return `
+            <tr class="border-b border-gray-800 hover:bg-gray-800/30 transition-colors">
+<td class="py-3 px-2 text-gray-400 text-sm">#${index + 1}</td>
+                <td class="py-3 px-2">
+                    <div class="font-semibold text-white">${opp.symbol}</div>
+                    <div class="text-xs text-gray-500">${opp.name}</div>
+                </td>
+                <td class="py-3 px-2">
+                    <span class="font-bold ${scoreClass}">${opp.score}</span>
+                    <span class="text-xs text-gray-500">/100</span>
+                </td>
+                <td class="py-3 px-2 ${changeClass} font-medium">
+                    ${changePrefix}${opp.price_change_52w.toFixed(1)}%
+                </td>
+                <td class="py-3 px-2 text-sm text-gray-300 max-w-xs truncate">
+                    ${opp.reason}
+                </td>
+                <td class="py-3 px-2">
+                    ${signalBadge}
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function closeModal() {

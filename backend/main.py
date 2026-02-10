@@ -79,6 +79,7 @@ async def macro_analysis():
 
 from economic import get_economic_indicators
 from news import get_market_news
+from contrarian import get_contrarian_opportunities
 from superinvestors_live import get_live_superinvestors
 from copycat import get_copycat_performance
 from moonshots import MoonshotScanner
@@ -89,6 +90,14 @@ from updater import update_universe_file
 async def economic_indicators():
     try:
         data = await asyncio.to_thread(get_economic_indicators)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/contrarian/opportunities")
+async def contrarian_opportunities():
+    try:
+        data = await asyncio.to_thread(get_contrarian_opportunities)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
