@@ -5,6 +5,7 @@ import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from market_data import get_buffett_indicator
 from screener import get_industry_rankings, analyze_sector_fundamentals
+from dip_hunter import scan_etf_dips, scan_stock_dips, get_dip_summary
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -142,6 +143,34 @@ def get_moonshots():
 def get_screeners(strategy_id: str):
     engine = ScreenerEngine()
     return engine.run_screen(strategy_id)
+
+# Dip Hunter Endpoints
+@app.get("/api/dip-hunter/etfs")
+async def dip_hunter_etfs():
+    """Get ETF dips with classifications"""
+    try:
+        data = await asyncio.to_thread(scan_etf_dips)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/dip-hunter/stocks")
+async def dip_hunter_stocks(min_quality: int = 0):
+    """Get quality stock dips with classifications"""
+    try:
+        data = await asyncio.to_thread(scan_stock_dips, min_quality)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/dip-hunter/summary")
+async def dip_hunter_summary():
+    """Get dip market summary statistics"""
+    try:
+        data = await asyncio.to_thread(get_dip_summary)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Portfolio Management Endpoints
 from portfolio import PortfolioManager

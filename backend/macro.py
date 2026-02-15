@@ -30,7 +30,7 @@ def get_macro_trends():
     # CL=F: Crude Oil Futures
     # GC=F: Gold Futures
     # ^VIX: CBOE Volatility Index
-    tickers = ["^TNX", "CL=F", "GC=F", "^VIX"]
+    tickers = ["^TNX", "CL=F", "GLD", "^VIX"]
     
     # Download data - returns multi-index DataFrame
     raw_data = yf.download(tickers, period="5d", progress=False)
@@ -169,7 +169,7 @@ def get_macro_trends():
         "indicators": {
             "rates": trends["^TNX"],
             "oil": trends["CL=F"],
-            "gold": trends["GC=F"],
+            "gold": trends["GLD"],
             "vix": trends["^VIX"]
         },
         "sector_impacts": sector_impacts

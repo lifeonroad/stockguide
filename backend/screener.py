@@ -19,25 +19,119 @@ SECTOR_ETFS = {
 }
 
 # Pre-defined list of top stocks per sector for MVP scanning
-# Fetching all stocks is too slow for yfinance without caching/batching
+# Expanded to ~20-25 per sector for deeper dip hunting
 SECTOR_STOCKS = {
-    "Technology": ["AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "ADBE", "CSCO", "CRM"],
-    "Financials": ["JPM", "BAC", "WFC", "GS", "MS", "AXP", "BLK", "C"],
-    "Healthcare": ["LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO", "PFE", "AMGN"],
-    "Energy": ["XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO"],
-    "Consumer Discretionary": ["AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "LOW", "BKNG"],
-    "Industrials": ["CAT", "UNP", "GE", "HON", "DE", "UPS", "LMT", "BA"],
-    "Consumer Staples": ["PG", "COST", "PEP", "KO", "WMT", "PM", "MO", "CL"],
-    "Materials": ["LIN", "SHW", "FCX", "APD", "ECL", "NEM", "DOW", "DD"],
-    "Utilities": ["NEE", "DUK", "SO", "AEP", "SRE", "D", "EXC", "PEG"],
-    "Real Estate": ["PLD", "AMT", "EQIX", "CCI", "PSA", "O", "VICI", "DLR"],
-    "Communication Services": ["GOOGL", "META", "NFLX", "DIS", "TMUS", "CMCSA", "VZ", "T"]
+    "Technology": [
+        "AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "ADBE", "CSCO", "CRM",
+        "AMD", "TXN", "QCOM", "INTU", "AMAT", "IBM", "MU", "NOW",
+        "PANW", "SNPS", "CDNS", "KLAC", "APH", "MSI", "TEL", "LRCX"
+    ],
+    "Financials": [
+        "JPM", "BAC", "WFC", "GS", "MS", "AXP", "BLK", "C",
+        "V", "MA", "SPGI", "PYPL", "FIS", "ICE", "CB", "PGR",
+        "MET", "AIG", "TRV", "PNC", "USB", "TFC", "SCHW", "BRK-B"
+    ],
+    "Healthcare": [
+        "LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO", "PFE", "AMGN",
+        "DHR", "ISRG", "SYK", "VRTX", "REGN", "BMY", "GILD", "ZTS",
+        "MDT", "BDX", "BSX", "HUM", "CI", "ELV", "MCK", "ABT"
+    ],
+    "Energy": [
+        "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO",
+        "OXY", "HAL", "BKR", "HES", "KMI", "WMB", "TRGP", "FANG",
+        "DVN", "CTRA", "OKE", "APA"
+    ],
+    "Consumer Discretionary": [
+        "AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "LOW", "BKNG",
+        "TJX", "LULU", "CMG", "F", "GM", "MAR", "HLT", "RCL",
+        "CCL", "AZO", "ORLY", "EBAY", "ETSY", "PHM", "LEN", "DHI"
+    ],
+    "Industrials": [
+        "CAT", "UNP", "GE", "HON", "DE", "UPS", "LMT", "BA",
+        "RTX", "MMM", "L3H", "NSC", "CSX", "FDX", "WM", "RSG",
+        "PH", "ITW", "ETN", "EMR", "ROP", "TDG", "GD", "NOC"
+    ],
+    "Consumer Staples": [
+        "PG", "COST", "PEP", "KO", "WMT", "PM", "MO", "CL",
+        "EL", "TGT", "KHC", "MDLZ", "GIS", "SYY", "ADM", "MNST",
+        "HSY", "KR", "STZ", "K", "MKC", "CHD"
+    ],
+    "Materials": [
+        "LIN", "SHW", "FCX", "APD", "ECL", "NEM", "DOW", "DD",
+        "ALB", "PPG", "VMC", "MLM", "CTVA", "CF", "MOS", "NUE",
+        "STLD", "FREE", "FMC", "CE"
+    ],
+    "Utilities": [
+        "NEE", "DUK", "SO", "AEP", "SRE", "D", "EXC", "PEG",
+        "XEL", "ED", "WEC", "ES", "PCG", "FE", "VST", "CEG",
+        "CNP", "CMS", "ATO", "NI"
+    ],
+    "Real Estate": [
+        "PLD", "AMT", "EQIX", "CCI", "PSA", "O", "VICI", "DLR",
+        "SPG", "WELL", "CBRE", "AVB", "EQR", "ARE", "WY", "IRM",
+        "VTR", "BXP", "HST", "MAA"
+    ],
+    "Communication Services": [
+        "GOOGL", "META", "NFLX", "DIS", "TMUS", "CMCSA", "VZ", "T",
+        "CHTR", "WBD", "FOXA", "PARA", "TTWO", "EA", "MTCH", "OMC",
+        "IPG", "LYV", "NFLX", "GOOG"
+    ]
 }
+
+# Specialized Lists
+GROWTH_STOCKS = [
+    "NVDA", "PLTR", "SNOW", "TSLA", "AMD", "ARM", "MSTR", "SQ", 
+    "SHOP", "MDB", "DDOG", "NET", "CRWD", "ZS", "OKTA", "PANW", 
+    "SMCI", "ANET", "U", "MELI", "COIN", "DKNG", "HOOD", "RBLX"
+]
+
+DIVIDEND_KINGS = [
+    "KO", "PEP", "PG", "JNJ", "MMM", "ABBV", "LOW", "TGT", 
+    "CVX", "XOM", "MCD", "SYY", "ADM", "CL", "GPC", "SPGI", 
+    "ITW", "EMR", "DOV", " Genuine Parts (GPC)", "SPG", "K", "MO", "PM"
+]
+
+def get_sector_metrics_from_constituents(sector_name):
+    """
+    Calculate sector average ROE and Debt/Equity from top constituent stocks.
+    Returns tuple: (avg_roe, avg_debt_equity)
+    """
+    stocks = SECTOR_STOCKS.get(sector_name, [])
+    if not stocks:
+        return 0, 0
+    
+    roe_values = []
+    debt_values = []
+    
+    # Sample top 5 stocks for speed (instead of all 8)
+    for symbol in stocks[:5]:
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            
+            roe = info.get('returnOnEquity', 0)
+            debt = info.get('debtToEquity', 0)
+            
+            # Only include valid values
+            if roe and roe > 0:
+                roe_values.append(roe * 100)  # Convert to percentage
+            if debt and debt >= 0:  # 0 debt is valid
+                debt_values.append(debt)
+        except Exception as e:
+            # Skip stocks with errors
+            continue
+    
+    # Calculate averages
+    avg_roe = sum(roe_values) / len(roe_values) if roe_values else 0
+    avg_debt = sum(debt_values) / len(debt_values) if debt_values else 0
+    
+    return round(avg_roe, 2), round(avg_debt, 2)
+
 
 def get_industry_rankings():
     """
-    Analyzes Sector ETFs to find the most 'Undervalued' and 'High Quality'.
-    Note: ETF 'info' in yfinance often contains aggregate PE, Yield, etc.
+    Analyzes Sector ETFs with real constituent-based metrics.
+    Calculates ROE and Debt/Equity from top holdings in each sector.
     """
     results = []
     
@@ -45,35 +139,26 @@ def get_industry_rankings():
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.info
         
-        # Extract metrics (fallback to 0 or estimates if missing)
-        # Note: ETF fields can be different from Stock fields
+        # Extract ETF-level metrics
         pe = info.get('trailingPE') or info.get('forwardPE') or 20
-        # PriceToSales is not always directly on ETF info, sometimes yield is better proxy for 'value' in sectors? 
-        # We will iterate through a few stocks to get a better sector average if ETF data is sparse.
-        
-        # Let's try to be simple for MVP:
-        # Use whatever ETF info we have.
-        
-        # Mocking or Approximate Logic if explicit aggregate fields missing:
-        # We prioritize: PE, Yield.
         div_yield = info.get('yield', 0) or info.get('trailingAnnualDividendYield', 0)
         
-        # Quality Proxy: ROE is hard to get for an ETF directly.
-        # We will simulate "Screener" logic by picking top 3 stocks and averaging.
+        # Calculate constituent-based metrics
+        avg_roe, avg_debt = get_sector_metrics_from_constituents(sector)
         
         results.append({
             "industry": sector,
             "etf": ticker_symbol,
             "pe": round(pe, 2),
             "dividend_yield": round(div_yield * 100, 2) if div_yield else 0,
-            # Placeholder for calculated aggregate metrics
-            "roe": 0, 
-            "debt_to_equity": 0
+            "roe": avg_roe,
+            "debt_to_equity": avg_debt
         })
 
-    # Sort by 'Value' (Low PE) for now
+    # Sort by 'Value' (Low PE)
     sorted_results = sorted(results, key=lambda x: x['pe'])
     return sorted_results
+
 
 def analyze_sector_fundamentals(sector_name):
     """

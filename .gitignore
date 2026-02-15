@@ -8,11 +8,10 @@ __pycache__/
 .env.local
 
 # Database
-# Ignore all .db files in the data directory to protect user financial data
 backend/data/*.db
 *.sqlite3
 
-# Pycharm / VSCode
+# IDEs
 .idea/
 .vscode/
 
@@ -28,7 +27,13 @@ env/
 # Logs
 *.log
 
-# Artifacts
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Deployment (local only)
+.requirements.md5
+
+# Artifacts
+.gemini/
