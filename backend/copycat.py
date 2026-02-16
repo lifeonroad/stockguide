@@ -59,5 +59,19 @@ def get_copycat_performance():
         return data
 
     except Exception as e:
-        print(f"Error fetching copycat data: {e}")
-        return []
+        error_msg = str(e)
+        print(f"Error fetching copycat data: {error_msg}")
+        
+        # Check if it's a rate limit error
+        if "rate" in error_msg.lower() or "too many" in error_msg.lower():
+            return {
+                "error": "Rate Limited",
+                "message": "Too many requests to Yahoo Finance. Please wait 5-10 minutes and try again.",
+                "data": []
+            }
+        
+        return {
+            "error": "Data Fetch Error", 
+            "message": f"Unable to fetch data: {error_msg}",
+            "data": []
+        }
