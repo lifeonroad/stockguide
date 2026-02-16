@@ -18,55 +18,70 @@ def get_copycat_performance():
     """
     Fetches real-time performance for the Superinvestor Copycat Portfolio.
     """
+    import time
     tickers = [h['symbol'] for h in COPYCAT_HOLDINGS]
     data = []
 
     try:
-        # Batch fetch for efficiency
-        tickers_str = " ".join(tickers)
-        stocks = yf.Tickers(tickers_str)
-
+        # Fetch one by one with delays to avoid 401 blocks
         for holding in COPYCAT_HOLDINGS:
             sym = holding['symbol']
-            stock = stocks.tickers[sym]
             
-            # Fast info access
-            info = stock.info
-            
-            # Get price data
-            price = info.get('currentPrice', info.get('regularMarketPrice', 0.0))
-            prev_close = info.get('regularMarketPreviousClose', price)
-            
-            # Daily Change
-            change_pct = ((price - prev_close) / prev_close) * 100 if prev_close else 0.0
-            
-            # YTD / 52W Change (YTD is often not direct, use 52WeekChange as proxy or calculate)
-            # info.get('ytdReturn') is sometimes available for ETFs, or '52WeekChange' for stocks
-            perf_year = info.get('52WeekChange', 0.0) * 100
+            try:
+                stock = yf.Ticker(sym)
+                info = stock.info
+                
+                # Get price data
+                price = info.get('currentPrice', info.get('regularMarketPrice', 0.0))
+                prev_close = info.get('regularMarketPreviousClose', price)
+                
+                # Daily Change
+                change_pct = ((price - prev_close) / prev_close) * 100 if prev_close else 0.0
+                
+                # YTD / 52W Change
+                perf_year = info.get('52WeekChange', 0.0) * 100
 
-            data.append({
-                "symbol": sym,
-                "name": holding['name'],
-                "held_by": holding['held_by'],
-                "price": price,
-                "daily_change": round(change_pct, 2),
-                "yearly_change": round(perf_year, 2),
-                "market_cap": info.get('marketCap', 0)
-            })
+                data.append({
+                    "symbol": sym,
+                    "name": holding['name'],
+                    "held_by": holding['held_by'],
+                    "price": price,
+                    "daily_change": round(change_pct, 2),
+                    "yearly_change": round(perf_year, 2),
+                    "market_cap": info.get('marketCap', 0)
+                })
+                
+                # Small delay between requests (0.5-1 second)
+                time.sleep(0.5)
+                
+            except Exception as stock_err:
+                print(f"Error fetching {sym}: {stock_err}")
+                continue
 
         # Sort by best daily performer
-        data.sort(key=lambda x: x['daily_change'], reverse=True)
-        return data
+        if data:
+            data.sort(key=lambda x: x['daily_change'], reverse=True)
+        return data if data else {
+            "error": "No Data",
+            "message": "Unable to fetch any stock data. Yahoo Finance may be blocking requests.",
+            "data": []
+        }
 
     except Exception as e:
         error_msg = str(e)
         print(f"Error fetching copycat data: {error_msg}")
         
-        # Check if it's a rate limit error
-        if "rate" in error_msg.lower() or "too many" in error_msg.lower():
+        # Check for specific error types
+        if "401" in error_msg or "unauthorized" in error_msg.lower():
+            return {
+                "error": "API Access Blocked",
+                "message": "Yahoo Finance is blocking automated requests. This is temporary - the dashboard will retry automatically.",
+                "data": []
+            }
+        elif "rate" in error_msg.lower() or "too many" in error_msg.lower():
             return {
                 "error": "Rate Limited",
-                "message": "Too many requests to Yahoo Finance. Please wait 5-10 minutes and try again.",
+                "message": "Too many requests. Please wait 5-10 minutes.",
                 "data": []
             }
         
