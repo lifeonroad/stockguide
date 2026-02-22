@@ -2022,12 +2022,12 @@ async function loadResearch(symbol) {
                                 <span class="px-3 py-1 bg-warren-accent/10 border border-warren-accent/20 rounded-full text-[10px] font-bold text-warren-accent uppercase tracking-widest">${data.sector}</span>
                             </div>
                             <h2 class="text-xl font-bold text-gray-400">${data.name}</h2>
-                            <p class="text-xs text-gray-500 mt-4 leading-relaxed max-w-2xl">${data.summary.substring(0, 300)}...</p>
+                            <p class="text-xs text-gray-500 mt-4 leading-relaxed max-w-2xl">${(data.summary || '').substring(0, 300)}${(data.summary || '').length > 300 ? '...' : ''}</p>
                         </div>
                         <div class="text-right">
-                            <div class="text-4xl font-black text-white mb-1">$${data.market_data.price.toFixed(2)}</div>
-                            <div class="text-sm font-bold ${data.market_data.change_pct >= 0 ? 'text-green-400' : 'text-red-400'}">
-                                ${data.market_data.change_pct >= 0 ? '▲' : '▼'} ${data.market_data.change_pct.toFixed(2)}% Today
+                            <div class="text-4xl font-black text-white mb-1">$${(data.market_data.price || 0).toFixed(2)}</div>
+                            <div class="text-sm font-bold ${(data.market_data.change_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}">
+                                ${(data.market_data.change_pct || 0) >= 0 ? '▲' : '▼'} ${(data.market_data.change_pct || 0).toFixed(2)}% Today
                             </div>
                             <div class="mt-4 flex gap-2 justify-end">
                                 ${linkTV(data.symbol, 'Technical Chart')}
@@ -2049,19 +2049,19 @@ async function loadResearch(symbol) {
                             <div>
                                 <div class="text-[10px] font-black text-warren-accent mb-3 uppercase">Buffett Logic</div>
                                 <ul class="space-y-2">
-                                    ${data.analysts.buffett.verdict.map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
+                                    ${(data.analysts.buffett.verdict || []).map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
                                 </ul>
                             </div>
                             <div>
                                 <div class="text-[10px] font-black text-warren-accent mb-3 uppercase">Burry Logic</div>
                                 <ul class="space-y-2">
-                                    ${data.analysts.burry.verdict.map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
+                                    ${(data.analysts.burry.verdict || []).map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
                                 </ul>
                             </div>
                             <div>
                                 <div class="text-[10px] font-black text-warren-accent mb-3 uppercase">Lynch Logic</div>
                                 <ul class="space-y-2">
-                                    ${data.analysts.lynch.verdict.map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
+                                    ${(data.analysts.lynch.verdict || []).map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
                                 </ul>
                             </div>
                         </div>
@@ -2094,11 +2094,11 @@ async function loadResearch(symbol) {
                     <div class="glass-panel p-6 rounded-2xl space-y-4">
                         <h3 class="text-sm font-black text-white uppercase tracking-widest mb-2 opacity-60">Scorecard</h3>
                         <div class="space-y-3">
-                            ${renderMetricWithContext('ROE', data.quality_scorecard.roe.toFixed(1), 15.0, '%')}
-                            ${renderMetricWithContext('P/E Ratio', data.valuation_scorecard.trailing_pe?.toFixed(1) || 'N/A', 22.0)}
-                            ${renderMetricWithContext('Price / Sales', data.valuation_scorecard.ps?.toFixed(2) || 'N/A', 2.0)}
-                            ${renderMetricWithContext('FCF Yield', data.valuation_scorecard.fcf_yield?.toFixed(1) || '0.0', 5.0, '%')}
-                            ${renderMetricWithContext('Debt / Equity', data.quality_scorecard.debt_to_equity?.toFixed(1) || '0.0', 100.0)}
+                            ${renderMetricWithContext('ROE', (data.quality_scorecard.roe || 0).toFixed(1), 15.0, '%')}
+                            ${renderMetricWithContext('P/E Ratio', (data.valuation_scorecard.trailing_pe || 0).toFixed(1), 22.0)}
+                            ${renderMetricWithContext('Price / Sales', (data.valuation_scorecard.ps || 0).toFixed(2), 2.0)}
+                            ${renderMetricWithContext('FCF Yield', (data.valuation_scorecard.fcf_yield || 0).toFixed(1), 5.0, '%')}
+                            ${renderMetricWithContext('Debt / Equity', (data.quality_scorecard.debt_to_equity || 0).toFixed(1), 100.0)}
                         </div>
                     </div>
 
