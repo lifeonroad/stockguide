@@ -4,13 +4,30 @@ import os
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from market_data import get_buffett_indicator
-from screener import get_industry_rankings, analyze_sector_fundamentals
+from screener import get_industry_rankings, analyze_sector_fundamentals, get_sector_stocks, get_sector_meta
+from screeners import get_screener_engine
+from superinvestors_live import get_live_superinvestors, get_next_filing_info
 from dip_hunter import scan_etf_dips, scan_stock_dips, get_dip_summary
+from cycle_analytics import get_cycle_intelligence
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 app = FastAPI(title="Rational Equity API")
+
+# Fire background universe scoring immediately on startup
+@app.on_event("startup")
+async def _startup_background_scoring():
+    """
+    Kick off async background scoring as soon as the server is ready.
+    Serves static SECTOR_STOCKS instantly while scoring runs (~30-45s).
+    """
+    try:
+        import dynamic_universe  # noqa: PLC0415
+        asyncio.create_task(dynamic_universe.background_score_all())
+    except Exception as exc:
+        import logging  # noqa: PLC0415
+        logging.getLogger(__name__).warning("Could not start background scoring: %s", exc)
 
 # Enable CORS for frontend (if running separately, though we serve static now)
 app.add_middleware(
@@ -43,7 +60,10 @@ async def market_status():
 def top_industries():
     try:
         data = get_industry_rankings()
-        return data
+        return {
+            "rankings": data,
+            "universe_meta": get_sector_meta(),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -56,6 +76,7 @@ def stock_picks(industry: str):
         data = analyze_sector_fundamentals(industry)
         if "error" in data:
              raise HTTPException(status_code=404, detail=data['error'])
+        data["universe_meta"] = get_sector_meta(industry)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -78,7 +99,16 @@ async def macro_analysis():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/alpha/cycle")
+async def alpha_cycle():
+    try:
+        data = await asyncio.to_thread(get_cycle_intelligence)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 from economic import get_economic_indicators
+from money_flow import get_money_flow_data
 from news import get_market_news
 from contrarian import get_contrarian_opportunities
 from superinvestors_live import get_live_superinvestors
@@ -86,12 +116,42 @@ from copycat import get_copycat_performance
 from moonshots import MoonshotScanner
 from screeners import ScreenerEngine
 from updater import update_universe_file
+from small_caps import get_small_cap_gems
+from research import get_comprehensive_research
 
 @app.get("/api/economic-indicators")
 async def economic_indicators():
     try:
         data = await asyncio.to_thread(get_economic_indicators)
         return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/money-flow")
+async def money_flow():
+    try:
+        data = await asyncio.to_thread(get_money_flow_data)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/small-caps")
+async def small_caps(min_growth: float = 0.05, max_pe: float = 25.0, min_roe: float = 0.10):
+    try:
+        data = await asyncio.to_thread(get_small_cap_gems, min_growth=min_growth, max_pe=max_pe, min_roe=min_roe)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/research/{symbol}")
+async def research(symbol: str):
+    try:
+        data = await asyncio.to_thread(get_comprehensive_research, symbol)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return data
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -114,17 +174,28 @@ async def market_news():
 @app.get("/api/superinvestors")
 def superinvestors_endpoint():
     try:
-        return get_live_superinvestors()
+        return {
+            "investors": get_live_superinvestors(),
+            "next_filing": get_next_filing_info()
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/admin/update-universe")
 def update_universe_endpoint():
-    """Triggers the weekly scraper for S&P 500 / Nasdaq 100 universe."""
+    """Triggers the weekly scraper for S&P 500 / Nasdaq 100 universe +
+    pre-warms the dynamic sector scoring cache on disk."""
     try:
         success = update_universe_file()
+        # Pre-warm dynamic sector rankings into sector_cache.json
+        try:
+            from dynamic_universe import get_dynamic_sector_stocks, write_disk_cache  # noqa: PLC0415
+            live_data = get_dynamic_sector_stocks.__wrapped__(25) if hasattr(get_dynamic_sector_stocks, '__wrapped__') else get_dynamic_sector_stocks(25)
+            write_disk_cache(live_data)
+        except Exception as cache_err:
+            pass  # Non-fatal; disk cache is best-effort
         if success:
-            return {"status": "success", "message": "Universe updated successfully"}
+            return {"status": "success", "message": "Universe updated and sector cache refreshed"}
         else:
             raise HTTPException(status_code=500, detail="Universe update failed")
     except Exception as e:
@@ -141,8 +212,12 @@ def get_moonshots():
 
 @app.get("/api/screeners/{strategy_id}")
 def get_screeners(strategy_id: str):
-    engine = ScreenerEngine()
-    return engine.run_screen(strategy_id)
+    engine = get_screener_engine()
+    stocks = engine.run_screen(strategy_id)
+    return {
+        "stocks": stocks,
+        "universe_meta": get_sector_meta(),
+    }
 
 # Dip Hunter Endpoints
 @app.get("/api/dip-hunter/etfs")
@@ -159,7 +234,10 @@ async def dip_hunter_stocks(min_quality: int = 0):
     """Get quality stock dips with classifications"""
     try:
         data = await asyncio.to_thread(scan_stock_dips, min_quality)
-        return data
+        return {
+            "results": data,
+            "universe_meta": get_sector_meta(),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -273,6 +351,40 @@ def delete_position(position_id: str, pm: PortfolioManager = Depends(get_portfol
     success = pm.delete_position(position_id)
     if not success:
         raise HTTPException(status_code=404, detail="Position not found")
+    return {"success": True}
+
+class TradeRequest(BaseModel):
+    ticker: str
+    type: str # BUY / SELL
+    quantity: float
+    price: float
+    currency: str = "USD"
+    notes: str = ""
+
+@app.post("/api/portfolios/{portfolio_id}/trade")
+def execute_trade(portfolio_id: str, trade: TradeRequest, pm: PortfolioManager = Depends(get_portfolio_manager)):
+    result = pm.execute_trade(
+        portfolio_id,
+        trade.ticker,
+        trade.type,
+        trade.quantity,
+        trade.price,
+        trade.currency,
+        trade.notes
+    )
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.get("/api/portfolios/{portfolio_id}/history")
+def get_trade_history(portfolio_id: str, pm: PortfolioManager = Depends(get_portfolio_manager)):
+    return pm.get_trade_history(portfolio_id)
+
+@app.post("/api/portfolios/{portfolio_id}/reset")
+def reset_portfolio_endpoint(portfolio_id: str, pm: PortfolioManager = Depends(get_portfolio_manager)):
+    success = pm.reset_portfolio(portfolio_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
     return {"success": True}
 
 # Import Endpoints

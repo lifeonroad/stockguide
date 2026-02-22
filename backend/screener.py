@@ -1,7 +1,10 @@
 
+import time
+from typing import Optional
 import yfinance as yf
 import pandas as pd
 import random
+from cache_utils import timed_cache, fetch_with_retry
 
 # Mapping Sectors to ETFs (Proxies)
 SECTOR_ETFS = {
@@ -91,35 +94,92 @@ DIVIDEND_KINGS = [
     "ITW", "EMR", "DOV", " Genuine Parts (GPC)", "SPG", "K", "MO", "PM"
 ]
 
+
+def get_sector_stocks(sector: Optional[str] = None, n: int = 25) -> dict:
+    """
+    Single source of truth for sector ticker lists.
+    Returns INSTANTLY — never blocks on network calls.
+    Triggers background scoring on first call so future requests get live data.
+
+    Returns
+    -------
+    If *sector* is given:
+        { "tickers": [...], "is_dynamic": bool, "scored_at": str }
+    If *sector* is None:
+        Full dict keyed by sector name.
+    """
+    try:
+        from dynamic_universe import (  # noqa: PLC0415
+            get_sector_stocks_cached,
+            trigger_background_score,
+        )
+        # Kick off background scoring (no-op if already running or cache fresh)
+        trigger_background_score(n=n)
+        universe = get_sector_stocks_cached(n=n)
+    except Exception:
+        from datetime import datetime, timezone  # noqa: PLC0415
+        now = datetime.now(timezone.utc).isoformat()
+        universe = {
+            s: {"tickers": t, "is_dynamic": False, "scored_at": now}
+            for s, t in SECTOR_STOCKS.items()
+        }
+
+    if sector is not None:
+        return universe.get(sector, {
+            "tickers": SECTOR_STOCKS.get(sector, []),
+            "is_dynamic": False,
+            "scored_at": None,
+        })
+    return universe
+
+
+def get_sector_meta(sector: Optional[str] = None) -> dict:
+    """
+    Return universe metadata (is_dynamic, scored_at, ttl_hours, partially_dynamic).
+    Instant — reads from cache only, never triggers network calls.
+    """
+    try:
+        from dynamic_universe import get_sector_meta as _get_meta  # noqa: PLC0415
+        return _get_meta(sector=sector)
+    except Exception:
+        return {
+            "is_dynamic": False,
+            "partially_dynamic": False,
+            "scored_at": None,
+            "ttl_hours": 24,
+        }
+
+
 def get_sector_metrics_from_constituents(sector_name):
     """
     Calculate sector average ROE and Debt/Equity from top constituent stocks.
     Returns tuple: (avg_roe, avg_debt_equity)
     """
-    stocks = SECTOR_STOCKS.get(sector_name, [])
+    stocks = get_sector_stocks(sector_name).get("tickers", [])
     if not stocks:
         return 0, 0
     
     roe_values = []
     debt_values = []
     
-    # Sample top 5 stocks for speed (instead of all 8)
-    for symbol in stocks[:5]:
+    # Sample top 5 stocks for speed (instead of all)
+    for symbol in stocks[:5]:  # noqa: E501
         try:
             ticker = yf.Ticker(symbol)
-            info = ticker.info
-            
+            info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=3, base_delay=1.5)
+
             roe = info.get('returnOnEquity', 0)
             debt = info.get('debtToEquity', 0)
-            
+
             # Only include valid values
             if roe and roe > 0:
                 roe_values.append(roe * 100)  # Convert to percentage
             if debt and debt >= 0:  # 0 debt is valid
                 debt_values.append(debt)
-        except Exception as e:
+        except Exception:
             # Skip stocks with errors
             continue
+        time.sleep(0.2)  # gentle throttle between per-stock calls
     
     # Calculate averages
     avg_roe = sum(roe_values) / len(roe_values) if roe_values else 0
@@ -128,6 +188,7 @@ def get_sector_metrics_from_constituents(sector_name):
     return round(avg_roe, 2), round(avg_debt, 2)
 
 
+@timed_cache(ttl_seconds=3600)  # Cache for 1 hour
 def get_industry_rankings():
     """
     Analyzes Sector ETFs with real constituent-based metrics.
@@ -137,8 +198,12 @@ def get_industry_rankings():
     
     for sector, ticker_symbol in SECTOR_ETFS.items():
         ticker = yf.Ticker(ticker_symbol)
-        info = ticker.info
-        
+        try:
+            info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=3, base_delay=1.5)
+        except Exception:
+            info = {}
+        time.sleep(0.2)  # gentle throttle between ETF calls
+
         # Extract ETF-level metrics
         pe = info.get('trailingPE') or info.get('forwardPE') or 20
         div_yield = info.get('yield', 0) or info.get('trailingAnnualDividendYield', 0)
@@ -175,7 +240,11 @@ def analyze_sector_fundamentals(sector_name):
     
     for symbol in stocks:
         t = yf.Ticker(symbol)
-        i = t.info
+        try:
+            i = fetch_with_retry(lambda _t=t: _t.info, max_attempts=3, base_delay=1.5)
+        except Exception:
+            i = {}
+        time.sleep(0.2)  # gentle throttle
         
         # Fundamental checks
         roe = i.get('returnOnEquity', 0)

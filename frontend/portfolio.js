@@ -114,6 +114,160 @@ function closePositionModal() {
     document.getElementById('position-modal').classList.add('hidden');
 }
 
+// Paper Trading Trade Modal
+let tradeState = {
+    ticker: '',
+    type: 'BUY',
+    currentPrice: 0,
+    availableCash: 0,
+    currency: 'USD'
+};
+
+async function openTradeModal(ticker) {
+    if (!currentPortfolioId) {
+        alert('Please create or select a Paper Trading portfolio first!');
+        switchTab('portfolio');
+        return;
+    }
+
+    ticker = ticker.toUpperCase();
+    tradeState.ticker = ticker;
+    tradeState.type = 'BUY'; // Default
+
+    document.getElementById('trade-ticker-badge').textContent = ticker;
+    document.getElementById('trade-modal').classList.remove('hidden');
+    document.getElementById('trade-quantity').value = '';
+
+    // UI reset
+    setTradeType('BUY');
+
+    // Fetch live price
+    document.getElementById('trade-current-price').textContent = 'Fetching...';
+    try {
+        const res = await fetch(`${API_BASE}/quotes?symbols=${ticker}`);
+        const prices = await res.json();
+        const price = prices[ticker] || 0;
+        tradeState.currentPrice = price;
+        document.getElementById('trade-current-price').textContent = `$${price.toFixed(2)}`;
+        document.getElementById('trade-price').value = price.toFixed(2);
+    } catch (e) {
+        console.error('Error fetching price for trade:', e);
+        document.getElementById('trade-current-price').textContent = 'N/A';
+    }
+
+    // Get available cash
+    try {
+        const res = await fetch(`${API_BASE}/portfolios/${currentPortfolioId}`);
+        const p = await res.json();
+        tradeState.availableCash = p.cash_usd; // For now default to USD
+        document.getElementById('trade-available-cash').textContent = `$${p.cash_usd.toLocaleString()}`;
+    } catch (e) {
+        console.error('Error fetching cash:', e);
+    }
+
+    updateTradeTotal();
+}
+
+function closeTradeModal() {
+    document.getElementById('trade-modal').classList.add('hidden');
+}
+
+function setTradeType(type) {
+    tradeState.type = type;
+    const buyBtn = document.getElementById('trade-buy-btn');
+    const sellBtn = document.getElementById('trade-sell-btn');
+
+    if (type === 'BUY') {
+        buyBtn.className = 'flex-1 py-3 rounded-lg text-sm font-bold transition-all bg-green-500 text-white shadow-lg shadow-green-900/20';
+        sellBtn.className = 'flex-1 py-3 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white';
+    } else {
+        sellBtn.className = 'flex-1 py-3 rounded-lg text-sm font-bold transition-all bg-red-500 text-white shadow-lg shadow-red-900/20';
+        buyBtn.className = 'flex-1 py-3 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white';
+    }
+    updateTradeTotal();
+}
+
+function updateTradeTotal() {
+    const qty = parseFloat(document.getElementById('trade-quantity').value) || 0;
+    const price = parseFloat(document.getElementById('trade-price').value) || 0;
+    const total = qty * price;
+    document.getElementById('trade-total').textContent = `$${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+async function submitTrade() {
+    const qty = parseFloat(document.getElementById('trade-quantity').value);
+    const price = parseFloat(document.getElementById('trade-price').value);
+
+    if (!qty || qty <= 0) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/portfolios/${currentPortfolioId}/trade`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ticker: tradeState.ticker,
+                type: tradeState.type,
+                quantity: qty,
+                price: price,
+                currency: 'USD'
+            })
+        });
+
+        const data = await res.json();
+        if (data.error) {
+            alert(`Trade Failed: ${data.error}`);
+            return;
+        }
+
+        closeTradeModal();
+        selectPortfolio(currentPortfolioId); // Refresh whole view
+        alert(`Successfully ${tradeState.type === 'BUY' ? 'purchased' : 'sold'} ${qty} shares of ${tradeState.ticker}`);
+    } catch (error) {
+        console.error('Error submitting trade:', error);
+        alert('Network error submitting trade');
+    }
+}
+
+async function loadTradeHistory(portfolioId = currentPortfolioId) {
+    if (!portfolioId) return;
+    try {
+        const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/history`);
+        const trades = await res.json();
+        renderTradeHistory(trades);
+    } catch (e) {
+        console.error('Error loading trade history:', e);
+    }
+}
+
+function renderTradeHistory(trades) {
+    const tbody = document.getElementById('trade-history-body');
+    if (!tbody) return;
+
+    if (!trades || trades.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No trades yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = trades.map(t => {
+        const date = new Date(t.timestamp).toLocaleDateString();
+        const typeClass = t.type === 'BUY' ? 'text-green-400' : 'text-red-400';
+        const total = t.quantity * t.price;
+        return `
+            <tr class="hover:bg-gray-800/20">
+                <td class="px-6 py-4 text-gray-400 text-xs">${date}</td>
+                <td class="px-6 py-4 font-bold text-white">${t.ticker}</td>
+                <td class="px-6 py-4"><span class="${typeClass} font-bold text-xs">${t.type}</span></td>
+                <td class="px-6 py-4 text-right font-mono text-gray-300">${t.quantity}</td>
+                <td class="px-6 py-4 text-right font-mono text-gray-300">$${t.price.toFixed(2)}</td>
+                <td class="px-6 py-4 text-right font-mono font-bold text-white">$${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
 // Portfolio CRUD
 async function savePortfolio(event) {
     event.preventDefault();
@@ -162,10 +316,10 @@ function renderPortfolioCards() {
     if (portfolios.length === 0) {
         container.innerHTML = `
             <div class="glass-panel p-8 rounded-xl text-center col-span-3">
-                <div class="text-gray-400 mb-4">No portfolios yet</div>
+                <div class="text-gray-400 mb-4">No portfolios yet. Create one to start paper trading!</div>
                 <button onclick="openCreatePortfolioModal()" 
                         class="px-4 py-2 bg-warren-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all">
-                    Create Your First Portfolio
+                    Create Paper Trading Portfolio
                 </button>
             </div>
         `;
@@ -178,7 +332,10 @@ function renderPortfolioCards() {
             <h4 class="text-lg font-bold text-white mb-1">${p.name}</h4>
             <p class="text-xs text-gray-500 mb-3">${p.description || 'No description'}</p>
             <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400">${p.position_count} positions</span>
+                <div>
+                    <span class="text-green-400 font-mono font-bold">$${(p.cash_usd || 100000).toLocaleString()}</span>
+                    <span class="text-gray-500 text-[10px] ml-1">CASH</span>
+                </div>
                 <button onclick="deletePortfolio('${p.id}', event)" 
                         class="text-red-400 hover:text-red-300 text-xs">Delete</button>
             </div>
@@ -204,11 +361,18 @@ async function selectPortfolio(portfolioId) {
         const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
         document.getElementById('portfolio-updated-at').textContent = dateStr;
 
+        // Cash Balances
+        document.getElementById('portfolio-cash-usd').textContent = `$${(portfolio.cash_usd || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+        document.getElementById('portfolio-cash-cad').textContent = `C$${(portfolio.cash_cad || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
         // Show details section
         document.getElementById('portfolio-details').classList.remove('hidden');
 
         // Load positions with live prices
         await loadPositions(portfolio.positions);
+
+        // Load Trade History
+        loadTradeHistory(portfolioId);
     } catch (error) {
         console.error('Error loading portfolio:', error);
     }

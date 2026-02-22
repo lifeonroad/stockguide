@@ -8,6 +8,9 @@ import os
 import requests
 from superinvestors import get_superinvestors as get_static_superinvestors
 
+from datetime import datetime, date, timedelta
+from superinvestors import get_superinvestors as get_static_superinvestors
+
 # CIK codes for our tracked investors
 INVESTOR_CIKS = {
     "buffett": "0001067983",  # Berkshire Hathaway
@@ -15,6 +18,55 @@ INVESTOR_CIKS = {
     "druckenmiller": "0001536411",  # Duquesne Family Office
     "pabrai": "0001336528"    # Dalal Street LLC
 }
+
+def get_next_filing_info():
+    """
+    Returns information about the next 13F filing deadline.
+    Deadlines are 45 days after each calendar quarter end.
+    """
+    today = date.today()
+    year = today.year
+    
+    # Filing deadlines (roughly Feb 14, May 15, Aug 14, Nov 14)
+    deadlines = [
+        (date(year, 2, 14), "Q4 (prev year)"),
+        (date(year, 5, 15), "Q1"),
+        (date(year, 8, 14), "Q2"),
+        (date(year, 11, 14), "Q3"),
+        (date(year + 1, 2, 14), "Q4") # Next year transition
+    ]
+    
+    next_deadline = None
+    quarter_name = ""
+    
+    for d, q in deadlines:
+        if d >= today:
+            next_deadline = d
+            quarter_name = q
+            break
+            
+    if not next_deadline:
+        # Fallback if somehow missed all
+        next_deadline = date(year + 1, 2, 14)
+        quarter_name = "Q4"
+
+    days_left = (next_deadline - today).days
+    
+    if days_left < 0:
+        status = "Filing window recently closed"
+    elif days_left == 0:
+        status = "Filings are due TODAY!"
+    elif days_left <= 7:
+        status = f"Filings due in {days_left} days (Active Window)"
+    else:
+        status = f"Next major update: {next_deadline.strftime('%b %d, %Y')}"
+        
+    return {
+        "status": status,
+        "quarter": quarter_name,
+        "deadline": next_deadline.isoformat(),
+        "days_remaining": days_left
+    }
 
 def fetch_13f_holdings(cik, api_key):
     """

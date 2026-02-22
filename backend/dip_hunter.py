@@ -8,9 +8,12 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import concurrent.futures
+import time
+import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
-from screener import SECTOR_ETFS, SECTOR_STOCKS, GROWTH_STOCKS, DIVIDEND_KINGS
+from screener import SECTOR_ETFS, SECTOR_STOCKS, GROWTH_STOCKS, DIVIDEND_KINGS, get_sector_stocks
+from cache_utils import fetch_with_retry
 
 class DipCache:
     """Simple in-memory cache with TTL"""
@@ -66,9 +69,9 @@ def get_drop_from_high(ticker_obj, period: str = '52w') -> Tuple[float, float, f
     """
     try:
         if period == '52w':
-            hist = ticker_obj.history(period='1y')
+            hist = fetch_with_retry(lambda: ticker_obj.history(period='1y'), max_attempts=3, base_delay=1.5)
         else:  # 20d
-            hist = ticker_obj.history(period='1mo')
+            hist = fetch_with_retry(lambda: ticker_obj.history(period='1mo'), max_attempts=3, base_delay=1.5)
         
         if hist.empty:
             return 0.0, 0.0, 0.0
@@ -132,16 +135,21 @@ def scan_etf_dips() -> List[Dict]:
     all_etfs = {**MARKET_ETFS, **harmonized_sectors}
     
     def fetch_etf_data(ticker, name):
+        # Small random sleep to spread concurrent requests from same IP
+        time.sleep(random.uniform(0.1, 0.5))
         try:
             etf = yf.Ticker(ticker)
-            hist = etf.history(period='1y')
+            hist = fetch_with_retry(lambda t=etf: t.history(period='1y'), max_attempts=3, base_delay=1.5)
             if hist.empty: return None
             
             drop_pct, current_price, high_price = get_drop_from_high(etf, '52w')
             rsi = calculate_rsi(hist['Close'])
             
             if abs(drop_pct) >= 3:
-                info = etf.info
+                try:
+                    info = fetch_with_retry(lambda t=etf: t.info, max_attempts=3, base_delay=1.5)
+                except Exception:
+                    info = {}
                 vol = info.get('volume', 0)
                 avg_vol = info.get('averageVolume', vol)
                 return {
@@ -159,7 +167,7 @@ def scan_etf_dips() -> List[Dict]:
                 }
         except Exception: return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
         futures = [executor.submit(fetch_etf_data, t, n) for t, n in all_etfs.items()]
         for future in concurrent.futures.as_completed(futures):
             res = future.result()
@@ -171,10 +179,11 @@ def scan_etf_dips() -> List[Dict]:
 
 def fetch_single_stock(ticker, sector):
     """Helper for concurrent stock scanning"""
+    # Small random sleep to spread concurrent requests from same IP
+    time.sleep(random.uniform(0.1, 0.6))
     try:
         stock = yf.Ticker(ticker)
-        # We only need enough history for RSI (30 days is fine, but 1y is safer for 52w high)
-        hist = stock.history(period='1y')
+        hist = fetch_with_retry(lambda t=stock: t.history(period='1y'), max_attempts=3, base_delay=1.5)
         if hist.empty: return None
         
         # Calculate drop metrics first for quick filtering
@@ -184,7 +193,10 @@ def fetch_single_stock(ticker, sector):
         
         if abs(drop_pct) < 5: return None
         
-        info = stock.info
+        try:
+            info = fetch_with_retry(lambda t=stock: t.info, max_attempts=3, base_delay=1.5)
+        except Exception:
+            info = {}
         rsi = calculate_rsi(hist['Close'])
         roe = info.get('returnOnEquity', 0)
         debt_equity = info.get('debtToEquity', 0)
@@ -231,14 +243,22 @@ def scan_stock_dips(min_quality_score: float = 0) -> List[Dict]:
     results = []
     tasks = []
     
-    for sector, stocks in SECTOR_STOCKS.items():
-        for s in stocks: tasks.append((s, sector))
+    # Build task list from dynamic sector stocks (falls back to static per-sector)
+    sector_universe = get_sector_stocks()  # dict[sector, {tickers, is_dynamic, ...}]
+    universe_meta = {
+        "is_dynamic": all(v.get("is_dynamic", False) for v in sector_universe.values()),
+        "partially_dynamic": any(v.get("is_dynamic", False) for v in sector_universe.values()),
+        "ttl_hours": 24,
+    }
+
+    for sector, entry in sector_universe.items():
+        for s in entry.get("tickers", []): tasks.append((s, sector))
     for s in GROWTH_STOCKS: tasks.append((s, "Hyper-Growth"))
     for s in DIVIDEND_KINGS: tasks.append((s, "Dividend Kings"))
     
     unique_tasks = list({t[0]: t for t in tasks}.values())
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
         futures = [executor.submit(fetch_single_stock, t, s) for t, s in unique_tasks]
         for future in concurrent.futures.as_completed(futures):
             res = future.result()

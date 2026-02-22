@@ -2,7 +2,7 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from cache_utils import timed_cache
+from cache_utils import timed_cache, fetch_with_retry
 
 # Sector Map for Macro Impacts
 SECTOR_MAP = {
@@ -32,8 +32,12 @@ def get_macro_trends():
     # ^VIX: CBOE Volatility Index
     tickers = ["^TNX", "CL=F", "GLD", "^VIX"]
     
-    # Download data - returns multi-index DataFrame
-    raw_data = yf.download(tickers, period="5d", progress=False)
+    # Download data with retry - threads=False avoids extra connections from shared cloud IP
+    raw_data = fetch_with_retry(
+        lambda: yf.download(tickers, period="5d", progress=False, threads=False),
+        max_attempts=3,
+        base_delay=2.0,
+    )
     
     # Extract Close prices - handle multi-index structure
     if isinstance(raw_data.columns, pd.MultiIndex):

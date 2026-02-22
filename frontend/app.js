@@ -188,12 +188,23 @@ async function loadMacroTrends() {
 async function loadIndustries() {
     try {
         const res = await fetch(`${API_BASE}/industries/top`);
-        const data = await res.json();
+        const payload = await res.json();
+
+        // Handle both legacy bare-array and new {rankings, universe_meta} shape
+        const data = Array.isArray(payload) ? payload : (payload.rankings || []);
+        const universeMeta = payload.universe_meta || null;
 
         const tbody = document.getElementById('industry-table-body');
         tbody.innerHTML = ''; // Clear loading
 
+        // Inject universe badge into industry table header if element exists
+        const industryBadgeEl = document.getElementById('industry-universe-badge');
+        if (industryBadgeEl && universeMeta) {
+            industryBadgeEl.innerHTML = renderUniverseBadge(universeMeta);
+        }
+
         data.forEach((ind, index) => {
+
             const tr = document.createElement('tr');
             tr.className = "hover:bg-gray-700/50 transition-colors group cursor-pointer";
             tr.onclick = () => loadStocks(ind.industry);
@@ -628,11 +639,21 @@ function renderMoatMatrix(stocks) {
     });
 }
 
-// Helper: TradingView Link
+// Helper: TradingView & Actions Link
 const linkTV = (symbol) => {
-    // Handle special cases like "NVDA & PLTR" by splitting or just searching the first
+    if (!symbol) return '';
     const cleanSymbol = symbol.split(' ')[0].replace(/[^a-zA-Z]/g, '');
-    return `<a href="https://www.tradingview.com/symbols/${cleanSymbol}/" target="_blank" class="hover:text-warren-accent underline decoration-dotted transition-colors" title="View on TradingView">${symbol}</a>`;
+    return `
+        <div class="inline-flex items-center gap-1 group/ticker">
+            <a href="https://www.tradingview.com/symbols/${cleanSymbol}/" target="_blank" class="font-bold hover:text-warren-accent underline decoration-dotted transition-colors" title="View on TradingView">${symbol}</a>
+            <div class="flex gap-1 opacity-0 group-hover/ticker:opacity-100 transition-opacity">
+                <button onclick="if(window.openTradeModal) window.openTradeModal('${cleanSymbol}')" class="text-[10px] bg-green-500/10 text-green-400 hover:bg-green-500/20 px-1 rounded border border-green-500/30" title="Paper Trade">⚡</button>
+                <button onclick="window.switchTab('research'); window.loadResearch('${cleanSymbol}')" class="text-[10px] bg-warren-accent/10 text-warren-accent hover:bg-warren-accent/20 px-1 rounded border border-warren-accent/30 flex items-center gap-1" title="Institutional Deep Research">
+                    <span class="text-[8px] font-black uppercase">Research</span> 🔍
+                </button>
+            </div>
+        </div>
+    `;
 };
 
 // 5. Superinvestor Logic
@@ -645,11 +666,22 @@ async function loadSuperinvestors() {
 
     try {
         const res = await fetch(`${API_BASE}/superinvestors`);
-        const data = await res.json();
+        const payload = await res.json();
+
+        // Handle wrapped vs raw array response
+        const investors = Array.isArray(payload) ? payload : (payload.investors || []);
+        const nextFiling = payload.next_filing;
+
+        // Populate next-filing info if present
+        const filingEl = document.getElementById('next-filing-info');
+        if (filingEl && nextFiling) {
+            filingEl.textContent = nextFiling.status;
+            filingEl.classList.remove('hidden');
+        }
 
         container.innerHTML = '';
 
-        data.forEach(investor => {
+        investors.forEach(investor => {
             const card = document.createElement('div');
             card.className = "glass-panel p-0 rounded-2xl border border-gray-700/50 hover:border-warren-accent/50 transition-all overflow-hidden flex flex-col";
 
@@ -726,6 +758,10 @@ async function loadCopycatPortfolio() {
 
     // Only load if empty (prevent spamming API on tab switch)
     if (tbody.children.length > 0) return;
+
+    // Inject curated badge into section header
+    const copycatHeader = document.getElementById('copycat-universe-badge');
+    if (copycatHeader) copycatHeader.innerHTML = renderUniverseBadge(null, 'curated') + ' <span class="text-gray-500 normal-case font-normal text-[10px]">Based on 13F SEC filings</span>';
 
     tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500 animate-pulse">Fetching Real-Time Prices...</td></tr>';
 
@@ -806,6 +842,10 @@ async function loadMoonshots() {
         const data = await res.json();
         MOONSHOT_STOCKS = data;
 
+        // Inject curated badge
+        const moonHeader = document.getElementById('moonshot-universe-badge');
+        if (moonHeader) moonHeader.innerHTML = renderUniverseBadge(null, 'curated') + ' <span class="text-gray-500 normal-case font-normal text-[10px]">Thematic picks</span>';
+
         renderMoonshots(data); // Initial render
         setupMoonshotFilters();
 
@@ -843,7 +883,11 @@ function renderMoonshots(stocks) {
         // Robust Ticker Logic
         const tickerHtml = stock.symbol ? linkTV(stock.symbol) : '<span class="text-red-500">N/A</span>';
 
+        // Discovery Badge
+        const discoveryBadge = stock.is_discovery ? `<div class="absolute -right-12 top-4 rotate-45 bg-warren-accent text-[8px] font-black py-1 px-12 shadow-lg z-10">DISCOVERY 🚀</div>` : '';
+
         card.innerHTML = `
+            ${discoveryBadge}
             <div class="absolute top-0 left-0 w-1 h-full ${scoreColor} opacity-50"></div>
             <div class="flex justify-between items-start mb-2 pl-2">
                 <div>
@@ -912,6 +956,57 @@ function setupMoonshotFilters() {
 
 
 
+// =====================================================
+// Universe Badge Helper
+// =====================================================
+
+/**
+ * Renders a ⚡ Live / 📌 Static / 📌 Curated pill badge.
+ * @param {object|null} meta - universe_meta object from API, or null for hardcoded curated lists
+ * @param {'dynamic'|'static'|'curated'} forceMode - override when meta is not from API
+ * @returns {string} HTML string for the badge
+ */
+function renderUniverseBadge(meta, forceMode) {
+    if (forceMode === 'curated') {
+        return `<span class="universe-badge universe-badge--curated"
+            title="Universe is curated by hand — it is not dynamically ranked">📌 Curated</span>`;
+    }
+    if (!meta) return '';
+    const isDynamic = meta.is_dynamic;
+    const isPartial = meta.partially_dynamic;
+    const scoredAt = meta.scored_at ? new Date(meta.scored_at).toLocaleDateString() : null;
+
+    if (isDynamic) {
+        const tip = scoredAt ? `Live-ranked with financial metrics · Scored ${scoredAt} · Refreshes every 24h` : 'Live-ranked with financial metrics · Refreshes every 24h';
+        return `<span class="universe-badge universe-badge--live" title="${tip}">⚡ Live Universe</span>`;
+    } else if (isPartial) {
+        return `<span class="universe-badge universe-badge--partial" title="Some sectors using live ranking, others using curated fallback">⚡ Partially Live</span>`;
+    } else {
+        return `<span class="universe-badge universe-badge--static"
+            title="Using curated fallback list — live ranking temporarily unavailable. Data is still real-time.">📌 Static Universe</span>`;
+    }
+}
+
+// Inject badge CSS once
+(function injectBadgeCSS() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .universe-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+            text-transform: uppercase; padding: 2px 8px; border-radius: 9999px;
+            cursor: default; transition: opacity 0.2s;
+        }
+        .universe-badge:hover { opacity: 0.85; }
+        .universe-badge--live   { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+        .universe-badge--partial { background: rgba(250,204,21,0.15); color: #facc15; border: 1px solid rgba(250,204,21,0.3); }
+        .universe-badge--static { background: rgba(251,146,60,0.15); color: #fb923c; border: 1px solid rgba(251,146,60,0.3); }
+        .universe-badge--curated { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+    `;
+    document.head.appendChild(style);
+})();
+
+
 // 8. Screener Logic
 async function runScreen(strategyId) {
     const tbody = document.getElementById('screener-table-body');
@@ -925,13 +1020,23 @@ async function runScreen(strategyId) {
         'magic_formula': 'Magic Formula 🪄',
         'rule_of_40': 'Rule of 40 🚀',
         'lynch': 'Peter Lynch Growth 📈',
-        'deep_value': 'Deep Value 💎'
+        'deep_value': 'Deep Value 💎',
+        'moat_masters': 'Moat Masters 🏰',
+        'quality_compounders': 'Quality Compounders 👑',
+        'fallen_angels': 'Fallen Angels 🔥',
+        'burry_orphans': 'Burry\'s Orphans 🦉'
     };
     title.textContent = `Results: ${names[strategyId] || 'Custom Scan'}`;
 
     try {
         const res = await fetch(`${API_BASE}/screeners/${strategyId}`);
-        const data = await res.json();
+        const payload = await res.json();
+
+        // Inject universe badge into title
+        const titleBadge = payload.universe_meta ? renderUniverseBadge(payload.universe_meta) : '';
+        title.innerHTML = `Results: ${names[strategyId] || 'Custom Scan'} ${titleBadge}`;
+
+        const data = Array.isArray(payload) ? payload : (payload.stocks || payload.results || []);
 
         tbody.innerHTML = '';
 
@@ -971,8 +1076,7 @@ async function runScreen(strategyId) {
 
 
 // Tab Switching
-// Tab Switching
-window.switchTab = (tabName) => {
+function switchTab(tabName) {
     // Buttons
     const btnDash = document.getElementById('tab-dashboard');
     const btnSuper = document.getElementById('tab-superinvestors');
@@ -982,7 +1086,10 @@ window.switchTab = (tabName) => {
     const btnEcon = document.getElementById('tab-economics');
     const btnContrarian = document.getElementById('tab-contrarian');
     const btnDiphunter = document.getElementById('tab-diphunter');
+    const btnAlpha = document.getElementById('tab-alpha');
+    const btnSmallCaps = document.getElementById('tab-small-caps');
     const btnPort = document.getElementById('tab-portfolio');
+    const btnResearch = document.getElementById('tab-research');
 
     // Views
     const viewDash = document.getElementById('dashboard-view');
@@ -993,17 +1100,20 @@ window.switchTab = (tabName) => {
     const viewEcon = document.getElementById('economics-view');
     const viewContrarian = document.getElementById('contrarian-view');
     const viewDiphunter = document.getElementById('diphunter-view');
+    const viewAlpha = document.getElementById('alpha-view');
+    const viewSmallCaps = document.getElementById('small-caps-view');
     const viewPort = document.getElementById('portfolio-view');
+    const viewResearch = document.getElementById('research-view');
 
     // Reset All
-    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen, btnEcon, btnContrarian, btnDiphunter, btnPort].forEach(btn => {
+    [btnDash, btnSuper, btnCopy, btnMoon, btnScreen, btnEcon, btnContrarian, btnDiphunter, btnAlpha, btnSmallCaps, btnPort, btnResearch].forEach(btn => {
         if (btn) {
             btn.classList.remove('bg-warren-accent', 'text-white', 'shadow-lg');
             btn.classList.add('text-gray-400');
         }
     });
 
-    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen, viewEcon, viewContrarian, viewDiphunter, viewPort].forEach(view => {
+    [viewDash, viewSuper, viewCopy, viewMoon, viewScreen, viewEcon, viewContrarian, viewDiphunter, viewAlpha, viewSmallCaps, viewPort, viewResearch].forEach(view => {
         if (view) view.classList.add('hidden');
     });
 
@@ -1036,6 +1146,7 @@ window.switchTab = (tabName) => {
         btnEcon.classList.remove('text-gray-400');
         viewEcon.classList.remove('hidden');
         loadEconomicIndicators();
+        loadMoneyFlow();
     } else if (tabName === 'contrarian') {
         btnContrarian.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
         btnContrarian.classList.remove('text-gray-400');
@@ -1046,6 +1157,16 @@ window.switchTab = (tabName) => {
         btnDiphunter.classList.remove('text-gray-400');
         viewDiphunter.classList.remove('hidden');
         loadDipHunterData();
+    } else if (tabName === 'alpha') {
+        btnAlpha.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
+        btnAlpha.classList.remove('text-gray-400');
+        viewAlpha.classList.remove('hidden');
+        loadAlphaIntelligence();
+    } else if (tabName === 'small-caps') {
+        btnSmallCaps.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
+        btnSmallCaps.classList.remove('text-gray-400');
+        viewSmallCaps.classList.remove('hidden');
+        loadSmallCaps();
     } else if (tabName === 'portfolio') {
         btnPort.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
         btnPort.classList.remove('text-gray-400');
@@ -1053,8 +1174,15 @@ window.switchTab = (tabName) => {
         if (typeof initPortfolioView === 'function') {
             initPortfolioView();
         }
+    } else if (tabName === 'research') {
+        if (btnResearch) {
+            btnResearch.classList.add('bg-warren-accent', 'text-white', 'shadow-lg');
+            btnResearch.classList.remove('text-gray-400', 'text-warren-accent');
+        }
+        if (viewResearch) viewResearch.classList.remove('hidden');
     }
 }
+window.switchTab = switchTab;
 
 // Economic Indicators
 async function loadEconomicIndicators() {
@@ -1108,6 +1236,107 @@ async function loadEconomicIndicators() {
     } catch (err) {
         console.error('Failed to load economic indicators', err);
         grid.innerHTML = '<div class="col-span-full text-center text-red-400">Failed to load indicators</div>';
+    }
+}
+
+// Money Flow Visualizer
+async function loadMoneyFlow() {
+    const container = document.getElementById('money-flow-container');
+    const summaryContainer = document.getElementById('money-flow-summary');
+    const notesContainer = document.getElementById('money-flow-notes');
+    const notesList = document.getElementById('money-flow-notes-list');
+
+    if (!container) return;
+
+    container.innerHTML = '<div class="col-span-full text-center text-blue-400 animate-pulse py-10">Analyzing institutional volume & Chaikin Money Flow...</div>';
+
+    try {
+        const res = await fetch(`${API_BASE}/money-flow`);
+        const data = await res.json();
+
+        // 1. Render Summary / Best Bets
+        if (summaryContainer && data.data.length > 0) {
+            summaryContainer.classList.remove('hidden');
+            const bestBets = data.data.filter(d => d.score >= 70).slice(0, 2);
+
+            summaryContainer.innerHTML = `
+                <div class="glass-panel p-5 rounded-xl border border-green-500/30 bg-green-500/5">
+                    <div class="text-xs font-bold text-green-400 uppercase mb-2">🚀 Institutional Conviction: High</div>
+                    <div class="text-sm text-gray-300">
+                        Institutional accumulation is strongest in <span class="text-white font-bold">${bestBets.length > 0 ? bestBets.map(b => b.symbol).join(' and ') : 'N/A'}</span>. 
+                        High relative volume combined with positive Chaikin Money Flow suggests significant position building.
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border border-blue-500/30">
+                    <div class="text-xs font-bold text-blue-400 uppercase mb-2">📊 Current Environment</div>
+                    <div class="text-sm text-gray-300">
+                        Market sentiment is currently ${data.data[0].score > 60 ? 'Bullish' : (data.data[0].score < 40 ? 'Bearish' : 'Mixed')}. 
+                        Focus on sectors showing > 1.2x RVOL for high-probability setups.
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2. Render Educational Notes
+        if (notesContainer && data.notes) {
+            notesContainer.classList.remove('hidden');
+            notesList.innerHTML = data.notes.map(note => `<li>${note}</li>`).join('');
+        }
+
+        container.innerHTML = '';
+
+        data.data.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'glass-panel p-4 rounded-xl border-l-4 transition-all hover:bg-gray-800/50 flex flex-col justify-between h-full';
+
+            const colorClass = item.status_color === 'green' ? 'border-green-500' : (item.status_color === 'red' ? 'border-red-500' : 'border-gray-600');
+            const textColor = item.status_color === 'green' ? 'text-green-400' : (item.status_color === 'red' ? 'text-red-400' : 'text-gray-400');
+            const bgBadge = item.status_color === 'green' ? 'bg-green-500/10' : (item.status_color === 'red' ? 'bg-red-500/10' : 'bg-gray-500/10');
+
+            card.classList.add(colorClass);
+
+            card.innerHTML = `
+                <div>
+                    <div class="flex justify-between items-start mb-1">
+                        <div>
+                            <div class="font-bold text-white text-lg">${linkTV(item.symbol)}</div>
+                            <div class="text-[10px] text-warren-accent font-bold uppercase">${item.name}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-mono text-white">$${item.price}</div>
+                            <div class="text-[10px] ${item.change_pct >= 0 ? 'text-green-400' : 'text-red-400'}">${item.change_pct > 0 ? '+' : ''}${item.change_pct}%</div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-[10px] text-gray-500 leading-relaxed mb-4 italic">
+                        ${item.description}
+                    </p>
+                    
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded ${bgBadge} ${textColor}">${item.sentiment}</span>
+                        <div class="text-[10px] text-gray-400">RVOL: <span class="text-white font-mono">${item.volume_ratio}x</span></div>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-2">
+                    <div class="flex justify-between text-[9px] text-gray-500 mb-1">
+                        <span>Analysis Conviction</span>
+                        <span>${item.score}/100</span>
+                    </div>
+                    <div class="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+                        <div class="h-full ${item.status_color === 'green' ? 'bg-green-500' : (item.status_color === 'red' ? 'bg-red-500' : 'bg-blue-500')}" style="width: ${item.score}%"></div>
+                    </div>
+                    <div class="mt-2 text-[8px] text-gray-600 text-right">
+                        CMF: ${item.cmf || '0.0'}
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+    } catch (err) {
+        console.error('Failed to load money flow', err);
+        container.innerHTML = '<div class="col-span-full text-center text-red-400">Failed to load money flow data</div>';
     }
 }
 
@@ -1170,8 +1399,8 @@ async function loadContrarianOpportunities() {
         document.getElementById('avg-score').textContent = Math.round(avgScore);
 
         // Update VIX data (from macro trends)
-        if (MACRO_DATA && MACRO_DATA['rates']) {
-            const vix = MACRO_DATA['rates']?.volatility || 0;
+        if (MACRO_DATA && MACRO_DATA.indicators && MACRO_DATA.indicators.vix) {
+            const vix = parseFloat(MACRO_DATA.indicators.vix.current) || 0;
             document.getElementById('contrarian-vix').textContent = vix.toFixed(1);
             let signal = 'Low Fear';
             if (vix > 30) signal = 'Extreme Fear 🚨';
@@ -1238,7 +1467,7 @@ function renderContrarianTable(opportunities) {
             <tr class="border-b border-gray-800 hover:bg-gray-800/30 transition-colors">
 <td class="py-3 px-2 text-gray-400 text-sm">#${index + 1}</td>
                 <td class="py-3 px-2">
-                    <div class="font-semibold text-white">${opp.symbol}</div>
+                    <div class="font-semibold text-white">${linkTV(opp.symbol)}</div>
                     <div class="text-xs text-gray-500">${opp.name}</div>
                 </td>
                 <td class="py-3 px-2">
@@ -1356,11 +1585,20 @@ async function loadDipHunterData() {
 
 async function loadDipStocks(minQuality = 0) {
     const tbody = document.getElementById('dip-stocks-body');
+    const badgeEl = document.getElementById('dip-universe-badge');
     tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-warren-accent animate-pulse">Filtering Quality Opportunities...</td></tr>';
 
     try {
         const res = await fetch(`${API_BASE}/dip-hunter/stocks?min_quality=${minQuality}`);
-        DIP_STOCKS = await res.json();
+        const payload = await res.json();
+
+        // Handle wrapped vs legacy response
+        DIP_STOCKS = Array.isArray(payload) ? payload : (payload.results || []);
+
+        // Render universe badge
+        if (badgeEl && payload.universe_meta) {
+            badgeEl.innerHTML = renderUniverseBadge(payload.universe_meta);
+        }
 
         renderDipStocks();
 
@@ -1452,9 +1690,461 @@ function sortDipStocks(column) {
     renderDipStocks();
 }
 
+
+// 10. Alpha Intelligence Logic
+async function loadAlphaIntelligence() {
+    console.log("Loading Alpha Intelligence...");
+    try {
+        const res = await fetch(`${API_BASE}/alpha/cycle`);
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+
+        renderCyclePhase(data.phase);
+        renderRotationTable(data.rotation);
+
+    } catch (err) {
+        console.error("Alpha Intelligence Scan Failed", err);
+    }
+}
+
+function renderCyclePhase(phase) {
+    const nameEl = document.getElementById('cycle-phase-name');
+    const badgeEl = document.getElementById('cycle-phase-badge');
+    const descEl = document.getElementById('cycle-phase-desc');
+    const borderEl = document.getElementById('cycle-phase-border');
+    const focusEl = document.getElementById('cycle-focus');
+    const sentimentEl = document.getElementById('cycle-sentiment');
+    const riskDial = document.getElementById('risk-dial');
+    const riskLabel = document.getElementById('risk-label');
+
+    if (!nameEl) return;
+
+    nameEl.textContent = phase.name;
+    badgeEl.textContent = phase.name;
+    descEl.textContent = phase.description;
+
+    // Phase Styling
+    const colors = {
+        'green': { border: 'border-green-500', badge: 'bg-green-500/20 text-green-400', focus: 'Cyclicals, Tech, Small Caps', sentiment: 'Aggressive Accumulation', risk: '🛡️', riskLabel: 'Low Risk Regime' },
+        'blue': { border: 'border-blue-500', badge: 'bg-blue-500/20 text-blue-400', focus: 'Quality Growth, Healthcare', sentiment: 'Calculated Risk Taking', risk: '⚖️', riskLabel: 'Moderate Risk' },
+        'orange': { border: 'border-orange-500', badge: 'bg-orange-500/20 text-orange-400', focus: 'Staples, Utilities, Energy', sentiment: 'Defensive Distribution', risk: '⚠️', riskLabel: 'High Risk Warning' },
+        'red': { border: 'border-red-500', badge: 'bg-red-500/20 text-red-400', focus: 'Cash, Gold, Inverse ETFs', sentiment: 'Panic / Capitulation', risk: '🚨', riskLabel: 'Extreme Risk' }
+    };
+
+    const config = colors[phase.color] || colors['blue'];
+
+    borderEl.className = `glass-panel p-6 rounded-2xl col-span-2 border-l-4 ${config.border}`;
+    badgeEl.className = `px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${config.badge}`;
+
+    focusEl.textContent = config.focus;
+    document.getElementById('cycle-hint').textContent = phase.hint || config.sentiment;
+    riskDial.textContent = config.risk;
+    riskLabel.textContent = config.riskLabel;
+}
+
+function renderRotationTable(rotation) {
+    const tbody = document.getElementById('rotation-table-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    rotation.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-800/30 transition-colors border-b border-gray-800/50";
+
+        const getPerfClass = (val) => val >= 0 ? 'text-green-400' : 'text-red-400';
+        const formatPct = (val) => `${val > 0 ? '+' : ''}${parseFloat(val || 0).toFixed(2)}%`;
+        const perf1M = s.returns ? (s.returns['1M'] || 0) : 0;
+
+        // Rating styling
+        const rating = s.rating || 'HOLD';
+        let ratingClass = 'text-gray-400';
+        if (rating.includes('BUY')) ratingClass = 'text-green-400';
+        if (rating.includes('SELL')) ratingClass = 'text-red-400';
+
+        // Generate Picks HTML with TradingView links and actions
+        const picks = s.top_picks || [];
+        const picksHtml = picks.map(ticker => linkTV(ticker)).join(' ');
+
+        tr.innerHTML = `
+            <td class="px-6 py-4">
+                <div class="font-bold text-white">${s.name}</div>
+                <div class="text-[10px] text-gray-500 uppercase">${s.ticker}</div>
+            </td>
+            <td class="px-6 py-4 text-center font-mono ${getPerfClass(s.returns['1D'])} text-xs">${formatPct(s.returns['1D'])}</td>
+            <td class="px-6 py-4 text-center font-mono ${getPerfClass(s.returns['1W'])} text-xs">${formatPct(s.returns['1W'])}</td>
+            <td class="px-6 py-4 text-center bg-warren-accent/5">
+                <div class="flex items-center justify-center gap-2">
+                    <span class="font-mono font-bold ${getPerfClass(perf1M)} text-xs">${formatPct(perf1M)}</span>
+                    <div class="h-1 w-12 bg-gray-800 rounded-full overflow-hidden hidden md:block">
+                        <div class="h-full bg-warren-accent" style="width: ${Math.min(Math.abs(perf1M) * 5, 100)}%"></div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-6 py-4 text-center font-mono ${getPerfClass(s.returns['6M'])} text-xs">${formatPct(s.returns['6M'])}</td>
+            <td class="px-6 py-4 text-center">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${ratingClass} border-current opacity-80 uppercase tracking-tighter">
+                    ${s.rating}
+                </span>
+            </td>
+            <td class="px-6 py-4">
+                <div class="flex flex-wrap gap-1">
+                    ${picksHtml || '<span class="text-gray-600 text-[10px]">Analyzing...</span>'}
+                </div>
+            </td>
+            <td class="px-6 py-4 text-right">
+                <span class="text-lg font-black text-white">${Math.round((s.momentum_score || 0) + 50)}</span>
+                <span class="text-[10px] text-gray-500">pts</span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
+    initTheme();
     await loadMarketStatus();
     await loadMacroTrends(); // Load this first so we have data for the table
     await loadIndustries();
 });
+
+// Small-Cap Gems Loader
+async function loadSmallCaps() {
+    const container = document.getElementById('small-caps-container');
+    const summaryContainer = document.getElementById('small-caps-summary');
+    const notesContainer = document.getElementById('small-caps-notes');
+    const notesList = document.getElementById('small-caps-notes-list');
+
+    if (!container) return;
+
+    // Get filter values
+    const growth = document.getElementById('small-cap-filter-growth')?.value || '0.05';
+    const pe = document.getElementById('small-cap-filter-pe')?.value || '25';
+    const roe = document.getElementById('small-cap-filter-roe')?.value || '0.10';
+
+    container.innerHTML = '<div class="col-span-full text-center text-warren-accent animate-pulse py-20">Scanning institutional gems & hidden growth...</div>';
+
+    try {
+        const res = await fetch(`${API_BASE}/small-caps?min_growth=${growth}&max_pe=${pe}&min_roe=${roe}`);
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+
+        // 1. Render Summary Stats
+        if (summaryContainer && data.data && data.data.length > 0) {
+            const topGem = data.data[0];
+            const avgScore = Math.round(data.data.reduce((acc, curr) => acc + curr.gem_score, 0) / data.data.length);
+
+            summaryContainer.innerHTML = `
+                <div class="glass-panel p-5 rounded-2xl border border-blue-500/30 bg-blue-500/5">
+                    <div class="text-[10px] text-blue-400 uppercase font-bold tracking-widest mb-1">Top Rated Gem</div>
+                    <div class="text-2xl font-black text-white">$${linkTV(topGem.symbol)}</div>
+                    <div class="text-xs text-gray-400 mt-1">${topGem.name} | Score: ${topGem.gem_score}</div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border border-warren-accent/30">
+                    <div class="text-[10px] text-warren-accent uppercase font-bold tracking-widest mb-1">Avg Gem Score</div>
+                    <div class="text-2xl font-black text-white">${avgScore}/100</div>
+                    <div class="text-xs text-gray-400 mt-1">Found ${data.data.length} undervalued opportunities</div>
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border border-green-500/30">
+                    <div class="text-[10px] text-green-400 uppercase font-bold tracking-widest mb-1">Market Segment</div>
+                    <div class="text-2xl font-black text-white">$300M - $3B</div>
+                    <div class="text-xs text-gray-400 mt-1">Underserved high-growth small caps</div>
+                </div>
+            `;
+        }
+
+        // 2. Render Educational Notes
+        if (notesContainer && data.notes) {
+            notesContainer.classList.remove('hidden');
+            notesList.innerHTML = data.notes.map(note => `<li class="leading-relaxed"><strong class="text-gray-300">Note:</strong> ${note}</li>`).join('');
+        }
+
+        // 3. Render Cards
+        container.innerHTML = '';
+        if (data.data.length === 0) {
+            container.innerHTML = '<div class="col-span-full text-center text-gray-500 py-10 italic">No gems currently meet for the strict growth/value criteria.</div>';
+            return;
+        }
+
+        data.data.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'glass-panel p-6 rounded-2xl border-l-4 transition-all hover:bg-gray-800/40 flex flex-col h-full group';
+
+            const colorClass = item.gem_score > 75 ? 'border-green-500' : 'border-blue-500';
+            const badgeClass = item.gem_score > 75 ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400';
+
+            card.classList.add(colorClass);
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <div class="flex items-baseline gap-2">
+                            <h4 class="text-xl font-black text-white">${linkTV(item.symbol)}</h4>
+                            <span class="text-[8px] text-gray-500 uppercase tracking-tighter">${item.sector}</span>
+                        </div>
+                        <p class="text-[10px] text-warren-accent font-bold uppercase truncate max-w-[120px]">${item.name}</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-lg font-mono text-white">$${item.price}</div>
+                        <div class="text-[9px] text-gray-500 uppercase font-bold tracking-widest">${item.market_cap}M Cap</div>
+                    </div>
+                </div>
+
+                <p class="text-[10px] text-gray-400 italic leading-relaxed mb-6 flex-grow line-clamp-3">
+                    "${item.desc}"
+                </p>
+
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <div class="bg-gray-900/50 p-2 rounded-lg text-center">
+                        <div class="text-[8px] text-gray-500 uppercase">P/E Ratio</div>
+                        <div class="text-sm font-mono text-white">${item.pe}</div>
+                    </div>
+                    <div class="bg-gray-900/50 p-2 rounded-lg text-center">
+                        <div class="text-[8px] text-gray-500 uppercase">Rev Growth</div>
+                        <div class="text-sm font-mono text-green-400">+${item.rev_growth}%</div>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-4 border-t border-gray-800/50">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${badgeClass}">${item.sentiment}</span>
+                        <div class="text-[9px] text-gray-500">Gem Score: <span class="text-white font-bold">${item.gem_score}/100</span></div>
+                    </div>
+                    <div class="h-1.5 w-full bg-gray-900 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-blue-500 to-warren-accent group-hover:from-warren-accent group-hover:to-green-400 transition-all duration-500" style="width: ${item.gem_score}%"></div>
+                    </div>
+                    <div class="mt-3 text-[8px] text-gray-600 flex justify-between">
+                        <span>P/B: ${item.pb}</span>
+                        <span>ROE: ${item.roe}%</span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+    } catch (err) {
+        console.error('Failed to load small-cap gems', err);
+        container.innerHTML = '<div class="col-span-full text-center text-red-400 py-10">Failed to load gems. Try again later.</div>';
+    }
+}
+
+// Theme Management
+function toggleThemeMenu() {
+    const menu = document.getElementById('theme-menu');
+    if (!menu) return;
+    menu.classList.toggle('hidden');
+
+    // Close on click outside
+    const closeMenu = (e) => {
+        const container = document.getElementById('theme-switcher-container');
+        if (container && !container.contains(e.target)) {
+            menu.classList.add('hidden');
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    if (!menu.classList.contains('hidden')) {
+        setTimeout(() => document.addEventListener('click', closeMenu), 10);
+    }
+}
+
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('selected-theme', theme);
+
+    // Update icon
+    const iconEl = document.getElementById('current-theme-icon');
+    const iconMap = { 'dark': '🌙', 'light': '☀️', 'solaris': '🌅', 'contrast': '👁️' };
+    if (iconEl) iconEl.textContent = iconMap[theme] || '🌙';
+
+    // Close menu
+    const menu = document.getElementById('theme-menu');
+    if (menu) menu.classList.add('hidden');
+
+    console.log(`Theme set to: ${theme}`);
+}
+
+function initTheme() {
+    const saved = localStorage.getItem('selected-theme') || 'dark';
+    setTheme(saved);
+}
+
+// Global exposure for navigation and theme
+
+// Research Hub Logic
+async function startResearch() {
+    const input = document.getElementById('research-ticker-input');
+    const symbol = input.value.trim().toUpperCase();
+    if (!symbol) return;
+
+    await loadResearch(symbol);
+}
+
+const renderWithRating = (label, rating, score) => {
+    let color = 'text-gray-400';
+    if (rating.includes('BUY')) color = 'text-green-400';
+    if (rating.includes('SELL') || rating.includes('SHORT')) color = 'text-red-400';
+
+    return `
+        <div class="glass-panel p-4 rounded-xl border border-gray-700/50">
+            <div class="text-[10px] uppercase font-bold text-gray-500 mb-2">${label}</div>
+            <div class="text-lg font-black ${color}">${rating}</div>
+            <div class="text-[10px] text-gray-500 mt-1">Score: <span class="text-white">${score}/10</span></div>
+        </div>
+    `;
+};
+
+async function loadResearch(symbol) {
+    const content = document.getElementById('research-content');
+    const empty = document.getElementById('research-empty');
+    if (!content || !empty) return;
+
+    content.classList.remove('hidden');
+    empty.classList.add('hidden');
+
+    content.innerHTML = `<div class="py-20 text-center animate-pulse text-warren-accent font-black tracking-widest text-xl uppercase">Initiating Institutional Deep Dive for $${symbol}...</div>`;
+
+    try {
+        const res = await fetch(`${API_BASE}/research/${symbol}`);
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+
+        content.innerHTML = `
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left: Profile & Analysts -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Identity Card -->
+                    <div class="glass-panel p-8 rounded-2xl flex flex-col md:flex-row justify-between items-start gap-6 border-l-4 border-warren-accent">
+                        <div>
+                            <div class="flex items-center gap-3 mb-2">
+                                <h1 class="text-4xl font-black text-white">$${data.symbol}</h1>
+                                <span class="px-3 py-1 bg-warren-accent/10 border border-warren-accent/20 rounded-full text-[10px] font-bold text-warren-accent uppercase tracking-widest">${data.sector}</span>
+                            </div>
+                            <h2 class="text-xl font-bold text-gray-400">${data.name}</h2>
+                            <p class="text-xs text-gray-500 mt-4 leading-relaxed max-w-2xl">${data.summary.substring(0, 300)}...</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-4xl font-black text-white mb-1">$${data.market_data.price.toFixed(2)}</div>
+                            <div class="text-sm font-bold ${data.market_data.change_pct >= 0 ? 'text-green-400' : 'text-red-400'}">
+                                ${data.market_data.change_pct >= 0 ? '▲' : '▼'} ${data.market_data.change_pct.toFixed(2)}% Today
+                            </div>
+                            <div class="mt-4 flex gap-2 justify-end">
+                                ${linkTV(data.symbol, 'Technical Chart')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analyst Consensus -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        ${renderWithRating('Buffett (Quality)', data.analysts.buffett.rating, data.analysts.buffett.score)}
+                        ${renderWithRating('Burry (Value)', data.analysts.burry.rating, data.analysts.burry.score)}
+                        ${renderWithRating('Lynch (Growth)', data.analysts.lynch.rating, data.analysts.lynch.score)}
+                    </div>
+
+                    <!-- Deep Logic Table -->
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h3 class="text-sm font-black text-white uppercase tracking-widest mb-6 opacity-60">Strategic Reasoning</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div>
+                                <div class="text-[10px] font-black text-warren-accent mb-3 uppercase">Buffett Logic</div>
+                                <ul class="space-y-2">
+                                    ${data.analysts.buffett.verdict.map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-black text-warren-accent mb-3 uppercase">Burry Logic</div>
+                                <ul class="space-y-2">
+                                    ${data.analysts.burry.verdict.map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
+                                </ul>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-black text-warren-accent mb-3 uppercase">Lynch Logic</div>
+                                <ul class="space-y-2">
+                                    ${data.analysts.lynch.verdict.map(v => `<li class="text-[11px] text-gray-400 flex gap-2"><span>•</span> ${v}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Scorecard & Efficiency -->
+                <div class="space-y-6">
+                    <!-- Moat Card -->
+                    <div class="glass-panel p-6 rounded-2xl bg-gradient-to-br from-gray-900 to-blue-900/20 border border-warren-accent/30 shadow-2xl shadow-blue-500/5">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-sm font-black text-white uppercase tracking-widest">Moat Intelligence</h3>
+                            <div class="text-[10px] font-black text-warren-accent ring-1 ring-warren-accent/50 px-2 py-0.5 rounded-full">${data.moat.rating}</div>
+                        </div>
+                        <div class="flex items-center gap-6 mb-6">
+                            <div class="relative w-20 h-20 flex items-center justify-center">
+                                <svg class="w-full h-full transform -rotate-90">
+                                    <circle cx="40" cy="40" r="32" stroke="currentColor" stroke-width="6" fill="transparent" class="text-gray-800" />
+                                    <circle cx="40" cy="40" r="32" stroke="currentColor" stroke-width="6" fill="transparent" class="text-warren-accent" stroke-dasharray="${2 * Math.PI * 32}" stroke-dashoffset="${(1 - data.moat.score / 100) * 2 * Math.PI * 32}" stroke-linecap="round" />
+                                </svg>
+                                <span class="absolute text-xl font-black text-white">${data.moat.score}</span>
+                            </div>
+                            <div class="flex-1 space-y-2">
+                                ${data.moat.reasons.map(r => `<div class="text-[10px] text-gray-400 leading-tight">• ${r}</div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fundamental Grid -->
+                    <div class="glass-panel p-6 rounded-2xl space-y-4">
+                        <h3 class="text-sm font-black text-white uppercase tracking-widest mb-2 opacity-60">Scorecard</h3>
+                        <div class="space-y-3">
+                            ${renderMetricWithContext('ROE', data.quality_scorecard.roe.toFixed(1), 15.0, '%')}
+                            ${renderMetricWithContext('P/E Ratio', data.valuation_scorecard.trailing_pe?.toFixed(1) || 'N/A', 22.0)}
+                            ${renderMetricWithContext('Price / Sales', data.valuation_scorecard.ps?.toFixed(2) || 'N/A', 2.0)}
+                            ${renderMetricWithContext('FCF Yield', data.valuation_scorecard.fcf_yield?.toFixed(1) || '0.0', 5.0, '%')}
+                            ${renderMetricWithContext('Debt / Equity', data.quality_scorecard.debt_to_equity?.toFixed(1) || '0.0', 100.0)}
+                        </div>
+                    </div>
+
+                    <!-- Growth Reality Check -->
+                    <div class="glass-panel p-6 rounded-2xl bg-gray-900 border border-gray-800">
+                        <h3 class="text-sm font-black text-white uppercase tracking-widest mb-4">The Reality Check</h3>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-gray-500">Market Implied Growth (Perpetual)</span>
+                                <span class="text-white font-mono font-bold">${data.growth.implied_growth}%</span>
+                            </div>
+                            <div class="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-red-400" style="width: ${Math.min(data.growth.implied_growth * 5, 100)}%"></div>
+                            </div>
+                            <div class="flex justify-between items-center text-xs">
+                                <span class="text-gray-500">Buffett Conservative Projection</span>
+                                <span class="text-warren-accent font-mono font-bold">${data.growth.projected_5yr}%</span>
+                            </div>
+                            <div class="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full bg-warren-accent" style="width: ${Math.min(data.growth.projected_5yr * 5, 100)}%"></div>
+                            </div>
+                            <div class="mt-4 p-3 bg-warren-accent/5 rounded-lg border border-warren-accent/10">
+                                <p class="text-[10px] text-gray-400 italic leading-relaxed">
+                                    ${data.growth.implied_growth > data.growth.projected_5yr
+                ? "⚠️ WARNING: Market pricing in growth far above conservative norms. High risk of disappointment."
+                : "✅ CONFIDENCE: Market growth expectations are conservative compared to underlying business metrics."}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    } catch (err) {
+        console.error("Research Hub Error:", err);
+        content.innerHTML = `
+            <div class="py-20 text-center">
+                <div class="text-red-400 text-4xl mb-4">⚠️</div>
+                <h3 class="text-xl font-bold text-white">Analysis Interrupted</h3>
+                <p class="text-gray-500 mt-2">${err.message || 'Check connection or ticker symbol validity.'}</p>
+                <button onclick="startResearch()" class="mt-6 px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700">Retry Analysis</button>
+            </div>
+        `;
+    }
+}
+
+window.startResearch = startResearch;
+window.loadResearch = loadResearch;

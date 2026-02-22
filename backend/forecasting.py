@@ -1,7 +1,9 @@
 
 import yfinance as yf
 import pandas as pd
+from cache_utils import timed_cache, fetch_with_retry
 
+@timed_cache(ttl_seconds=1800)  # Cache per symbol for 30 minutes
 def analyze_stock_buffett(symbol):
     """
     Analyzes a single stock using Warren Buffett's core principles:
@@ -11,10 +13,9 @@ def analyze_stock_buffett(symbol):
     4. Fair Valuation (Margin of Safety)
     """
     ticker = yf.Ticker(symbol)
-    info = ticker.info
-    
-    # defensive check for bad symbol
-    if 'symbol' not in info:
+    try:
+        info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=3, base_delay=2.0)
+    except Exception:
         return {"error": "Symbol not found or data unavailable."}
 
     # 1. Gather Metrics

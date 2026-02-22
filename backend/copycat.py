@@ -1,4 +1,5 @@
 import yfinance as yf
+from cache_utils import timed_cache, fetch_with_retry
 
 # Defined based on our Superinvestor research
 COPYCAT_HOLDINGS = [
@@ -14,6 +15,7 @@ COPYCAT_HOLDINGS = [
     {"symbol": "BABA", "name": "Alibaba", "held_by": ["Burry (Q2)"]}
 ]
 
+@timed_cache(ttl_seconds=600)  # Cache for 10 minutes
 def get_copycat_performance():
     """
     Fetches real-time performance for the Superinvestor Copycat Portfolio.
@@ -29,7 +31,7 @@ def get_copycat_performance():
             
             try:
                 stock = yf.Ticker(sym)
-                info = stock.info
+                info = fetch_with_retry(lambda t=stock: t.info, max_attempts=3, base_delay=2.0)
                 
                 # Get price data
                 price = info.get('currentPrice', info.get('regularMarketPrice', 0.0))

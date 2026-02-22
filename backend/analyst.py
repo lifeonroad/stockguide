@@ -1,14 +1,21 @@
 
 import yfinance as yf
 from macro import get_macro_trends, SECTOR_MAP
-
+from cache_utils import fetch_with_retry
 import math
 
 class BaseStrategy:
     def __init__(self, symbol):
         self.symbol = symbol.upper()
         self.ticker = yf.Ticker(symbol)
-        self.info = self.ticker.info
+        try:
+            self.info = fetch_with_retry(
+                lambda t=self.ticker: t.info,
+                max_attempts=3,
+                base_delay=2.0,
+            )
+        except Exception:
+            self.info = {}
         self.reasons = []
         self.score = 0
         self.rating = "HOLD"

@@ -92,19 +92,21 @@ fi
 
 # Step 4: Environment Setup (instant)
 echo -e "${CYAN}[4/4]${NC} ${YELLOW}Checking configuration...${NC}"
-if [ ! -f "stockguide/.env" ]; then
-    cat > stockguide/.env << 'EOF'
+if [ ! -f ".env" ]; then
+    cat > .env << 'EOF'
 # Add your API keys here if needed
 # EXAMPLE_API_KEY=your_key_here
 EOF
+
     echo -e "${GREEN}      ✓ Created .env file${NC}\n"
 else
     echo -e "${GREEN}      ✓ Configuration exists${NC}\n"
 fi
 
 # Launch
-cd stockguide
+# cd stockguide (already in script dir)
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
 echo -e "${GREEN}🚀 Launching Dashboard...${NC}"
 echo -e "${CYAN}   → Server will start on http://localhost:8000${NC}"
 echo -e "${CYAN}   → Browser will open automatically${NC}"
