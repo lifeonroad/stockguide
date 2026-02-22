@@ -31,6 +31,7 @@ write_disk_cache(data)          → persist scored universe to disk
 """
 
 import asyncio
+import yfinance as yf
 import json
 import logging
 import math
@@ -111,82 +112,75 @@ def _score(market_cap: float, momentum: float, roe: float,
 
 def _bulk_momentum(tickers: List[str]) -> Dict[str, float]:
     """
-    Download 1-year monthly prices for ALL tickers in ONE yfinance request.
+    Download 1-year monthly prices for ALL tickers using data_client.
     Returns { symbol: 52wk_return_decimal }. Misses default to 0.
     """
-    import yfinance as yf
+    from data_client import get_price_history
+    import concurrent.futures
+
     if not tickers:
         return {}
-    try:
-        raw = yf.download(
-            " ".join(tickers),
-            period="1y",
-            interval="1mo",
-            group_by="ticker",
-            auto_adjust=True,
-            threads=True,
-            progress=False,
-        )
-        result: Dict[str, float] = {}
-        for sym in tickers:
-            try:
-                if len(tickers) == 1:
-                    col = raw["Close"]
-                else:
-                    col = raw[sym]["Close"]
-                col = col.dropna()
-                if len(col) >= 2:
-                    val = ((col.iloc[-1] - col.iloc[0]) / col.iloc[0]) * 100
-                    result[sym] = sanitize_metric(val, 0)
-            except Exception:
-                pass
-        return result
-    except Exception as exc:
-        logger.warning("[DynUniverse] Bulk momentum fetch failed: %s", exc)
-        return {}
+    
+    result = {}
+    
+    def fetch_mom(sym):
+        try:
+            hist = get_price_history(sym, days=252)
+            if hist is not None and not hist.empty and len(hist) > 2:
+                val = ((hist['close'].iloc[-1] - hist['close'].iloc[0]) / hist['close'].iloc[0]) * 100
+                return sym, sanitize_metric(val, 0)
+        except Exception:
+            pass
+        return sym, 0.0
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_mom, sym): sym for sym in tickers}
+        for future in concurrent.futures.as_completed(futures):
+            sym, val = future.result()
+            if val != 0.0:
+                result[sym] = val
+
+    return result
 
 
 def _bulk_fundamentals(tickers: List[str]) -> Dict[str, dict]:
     """
-    Use yahooquery (async mode) to fetch market_cap, avg_volume, ROE, EPS,
-    and sector for all tickers in batch. Much faster than yf.Ticker.info.
+    Use data_client to fetch market_cap, avg_volume, ROE, EPS,
+    and sector for all tickers in batch.
     Returns { symbol: {market_cap, avg_volume, roe, eps, sector} }
     """
-    try:
-        from yahooquery import Ticker as YQTicker  # noqa: PLC0415
-        yq = YQTicker(tickers, asynchronous=True, max_workers=10, validate=False)
+    from data_client import get_fundamentals, get_price_live
+    import concurrent.futures
 
-        # Pull the two modules we need in one pass each
-        summary = yq.summary_detail          # avg_volume
-        fin_data = yq.financial_data         # roe, free cash flow
-        key_stats = yq.key_stats             # market_cap, eps
-        profile = yq.asset_profile           # sector
-
-        out: Dict[str, dict] = {}
-        for sym in tickers:
-            try:
-                sd = summary.get(sym, {}) if isinstance(summary, dict) else {}
-                fd = fin_data.get(sym, {}) if isinstance(fin_data, dict) else {}
-                ks = key_stats.get(sym, {}) if isinstance(key_stats, dict) else {}
-                ap = profile.get(sym, {}) if isinstance(profile, dict) else {}
-
-                # yahooquery returns error strings when a ticker misses
-                if isinstance(sd, str) or isinstance(fd, str):
-                    continue
-
-                out[sym] = {
-                    "market_cap": sanitize_metric(ks.get("enterpriseValue") or sd.get("marketCap"), 0),
-                    "avg_volume": sanitize_metric(sd.get("averageVolume10days") or sd.get("averageDailyVolume10Day"), 0),
-                    "roe": sanitize_metric(fd.get("returnOnEquity"), 0),
-                    "eps": sanitize_metric(ks.get("trailingEps"), 0),
-                    "sector": ap.get("sector", ""),
-                }
-            except Exception:
-                pass
-        return out
-    except Exception as exc:
-        logger.warning("[DynUniverse] yahooquery fundamentals failed: %s", exc)
+    if not tickers:
         return {}
+
+    out: Dict[str, dict] = {}
+    
+    def fetch_fund(sym):
+        try:
+            info = get_fundamentals(sym)
+            live = get_price_live(sym)
+            if not info: return sym, None
+            
+            return sym, {
+                "market_cap": sanitize_metric(info.get("marketCap"), 0),
+                "avg_volume": sanitize_metric(live.get("volume"), 0),
+                "roe": sanitize_metric(info.get("returnOnEquity"), 0),
+                "eps": sanitize_metric(info.get("trailingEps"), 0),
+                "sector": info.get("sector", ""),
+            }
+        except Exception:
+            return sym, None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_fund, sym): sym for sym in tickers}
+        for future in concurrent.futures.as_completed(futures):
+            sym, data = future.result()
+            if data:
+                out[sym] = data
+                
+    return out
 
 
 # ---------------------------------------------------------------------------

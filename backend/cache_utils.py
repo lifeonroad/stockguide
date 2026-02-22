@@ -31,6 +31,7 @@ def sanitize_metric(v, default=None):
     except:
         return default
 import logging
+import yfinance as yf
 from functools import wraps
 from typing import Callable, Any
 

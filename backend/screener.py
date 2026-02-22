@@ -1,7 +1,7 @@
 
 import time
-from typing import Optional
 import yfinance as yf
+from typing import Optional
 import pandas as pd
 import random
 from cache_utils import timed_cache, fetch_with_retry

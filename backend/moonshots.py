@@ -1,5 +1,6 @@
-import yfinance as yf
+
 import random
+import yfinance as yf
 import logging
 from typing import List, Dict, Any, Optional
 from cache_utils import timed_cache, fetch_with_retry, sanitize_metric
