@@ -118,6 +118,7 @@ from screeners import ScreenerEngine
 from updater import update_universe_file
 from small_caps import get_small_cap_gems
 from research import get_comprehensive_research
+from international import InternationalScanner
 
 @app.get("/api/economic-indicators")
 async def economic_indicators():
@@ -139,6 +140,15 @@ async def money_flow():
 async def small_caps(min_growth: float = 0.05, max_pe: float = 25.0, min_roe: float = 0.10):
     try:
         data = await asyncio.to_thread(get_small_cap_gems, min_growth=min_growth, max_pe=max_pe, min_roe=min_roe)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/international/picks")
+async def international_picks():
+    try:
+        scanner = InternationalScanner()
+        data = await asyncio.to_thread(scanner.get_picks)
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

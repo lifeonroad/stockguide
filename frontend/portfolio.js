@@ -1,4 +1,7 @@
 
+import { API_BASE } from './js/api.js';
+import { linkTV } from './js/utils.js';
+
 let currentPortfolioId = null;
 let portfolios = [];
 
@@ -878,3 +881,22 @@ async function importWealthSimple(input) {
         input.value = '';
     }
 }
+
+// --- Window Exports ---
+window.openCreatePortfolioModal = openCreatePortfolioModal;
+window.closePortfolioModal = closePortfolioModal;
+window.openAddPositionModal = openAddPositionModal;
+window.closePositionModal = closePositionModal;
+window.openTradeModal = openTradeModal;
+window.closeTradeModal = closeTradeModal;
+window.setTradeType = setTradeType;
+window.submitTrade = submitTrade;
+window.savePortfolio = savePortfolio;
+window.selectPortfolio = selectPortfolio;
+window.deletePortfolio = deletePortfolio;
+window.savePosition = savePosition;
+window.deletePosition = deletePosition;
+window.sortPortfolio = sortPortfolio;
+window.toggleAllocationMode = toggleAllocationMode;
+window.initPortfolioView = initPortfolioView;
+window.importWealthSimple = importWealthSimple;
