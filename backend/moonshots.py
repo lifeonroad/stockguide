@@ -1,9 +1,7 @@
-
 import random
-import yfinance as yf
 import logging
 from typing import List, Dict, Any, Optional
-from cache_utils import timed_cache, fetch_with_retry, sanitize_metric
+from cache_utils import timed_cache, sanitize_metric
 from dynamic_universe import get_sector_stocks_cached
 
 logger = logging.getLogger(__name__)
@@ -84,18 +82,18 @@ class MoonshotScanner:
         return [r for r in results if r is not None]
 
     def _fetch_and_score(self, symbol: str, theme: str, meta: Dict) -> Optional[Dict]:
+        from data_client import get_price_live, get_fundamentals
         try:
-            ticker = yf.Ticker(symbol)
-            # Use fetch_with_retry for info
-            info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=2)
-            if not info or 'regularMarketPrice' not in info and 'currentPrice' not in info:
+            live = get_price_live(symbol)
+            fund = get_fundamentals(symbol)
+            if not live or live.get('price', 0) == 0:
                 return self._fallback_data(symbol, theme, meta)
 
-            price = info.get('currentPrice') or info.get('regularMarketPrice') or 0
-            day_change = info.get('regularMarketChangePercent', 0)
-            mkt_cap = info.get('marketCap', 0)
-            rev_growth = sanitize_metric(info.get('revenueGrowth'), 0)
-            beta = sanitize_metric(info.get('beta'), 1.0)
+            price = live.get('price', 0)
+            day_change = live.get('change_pct', 0)
+            mkt_cap = fund.get('marketCap') or live.get('mkt_cap', 0)
+            rev_growth = sanitize_metric(fund.get('revenueGrowth'), 0)
+            beta = 1.0
             
             # Innovation Score: Growth + Momentum proxy (Beta) + Small Cap bias (Discovery)
             # Targeted for 0-100 range

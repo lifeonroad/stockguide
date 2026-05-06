@@ -453,6 +453,21 @@ class PortfolioManager:
         
         return tickers
 
+    def get_all_owned_tickers(self) -> List[str]:
+        """Get all unique tickers across all portfolios."""
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT DISTINCT ticker 
+            FROM positions 
+        ''')
+        
+        tickers = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        return tickers
+
 
 if __name__ == "__main__":
     # Test the portfolio manager

@@ -473,7 +473,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
             <!-- Navigation Tabs -->
-            <div class="flex space-x-1 bg-gray-800/50 p-1 rounded-xl w-fit mb-8 border border-gray-700">
+            <div class="flex flex-wrap gap-2 bg-gray-800/50 p-2 rounded-xl mb-8 border border-gray-700">
                 <button onclick="switchTab('dashboard')" id="tab-dashboard"
                     class="px-5 py-2 rounded-lg text-sm font-medium transition-all bg-warren-accent text-white shadow-lg">
                     Market Dashboard
@@ -517,6 +517,10 @@
                 <button id="tab-portfolio" onclick="switchTab('portfolio')"
                     class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                     My Portfolios <span class="ml-1 text-xs">💼</span>
+                </button>
+                <button id="tab-international" onclick="switchTab('international')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    International <span class="ml-1 text-xs">🌍</span>
                 </button>
                 <button id="tab-research" onclick="switchTab('research')"
                     class="text-warren-accent hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-warren-accent/30 bg-warren-accent/5">
@@ -999,6 +1003,15 @@
                                         Drop % <span id="sort-drop_pct" class="ml-1 text-[8px] opacity-50">↕</span>
                                     </th>
                                     <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('recovery_5d')">
+                                        5D Recv <span id="sort-recovery_5d" class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('recovery_15d')">
+                                        15D Recv <span id="sort-recovery_15d"
+                                            class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
                                         onclick="sortDipStocks('rsi')">
                                         RSI <span id="sort-rsi" class="ml-1 text-[8px] opacity-50">↕</span>
                                     </th>
@@ -1020,7 +1033,7 @@
                             </thead>
                             <tbody id="dip-stocks-body" class="divide-y divide-gray-700/50">
                                 <tr>
-                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">Scanning for
+                                    <td colspan="9" class="px-6 py-8 text-center text-gray-500">Scanning for
                                         opportunities...</td>
                                 </tr>
                             </tbody>
@@ -1381,6 +1394,44 @@
                     </div>
                 </div>
             </div>
+            <!-- Moonshot View -->
+            <div id="moonshot-view" class="hidden animate-fade-in">
+                <!-- Content will be injected but container handled by index.html already higher up -->
+            </div>
+
+            <!-- International View -->
+            <div id="international-view" class="hidden animate-fade-in space-y-8">
+                <!-- Content injected via international.js component -->
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2" id="international-title">Loading Global Markets...
+                    </h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto mb-4" id="international-subtitle">Fetching emerging and
+                        developed market picks.</p>
+                </div>
+                <!-- India Section -->
+                <div>
+                    <h3
+                        class="text-2xl font-bold text-white mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
+                        <span class="text-warren-warning">🇮🇳</span> India (Emerging Market)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"
+                        id="india-picks-container">
+                        <!-- Cards here -->
+                    </div>
+                </div>
+                <!-- Canada Section -->
+                <div class="mt-12">
+                    <h3
+                        class="text-2xl font-bold text-white mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
+                        <span class="text-red-500">🇨🇦</span> Canada (Developed Market)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"
+                        id="canada-picks-container">
+                        <!-- Cards here -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Portfolio View -->
             <div id="portfolio-view" class="hidden animate-fade-in">
                 <!-- Portfolio Selector -->
@@ -1729,8 +1780,8 @@
         </div>
 
         <!-- App Logic -->
-        <script src="/static/portfolio.js?v=13"></script>
-        <script src="/static/app.js?v=13"></script>
+        <script type="module" src="/static/portfolio.js?v=14"></script>
+        <script type="module" src="/static/app.js?v=16"></script>
 </body>
 
 </html>

@@ -117,7 +117,8 @@ from moonshots import MoonshotScanner
 from screeners import ScreenerEngine
 from updater import update_universe_file
 from small_caps import get_small_cap_gems
-from research import get_comprehensive_research
+from research import get_comprehensive_research, get_historical_trends
+from international import InternationalScanner
 
 @app.get("/api/economic-indicators")
 async def economic_indicators():
@@ -143,10 +144,33 @@ async def small_caps(min_growth: float = 0.05, max_pe: float = 25.0, min_roe: fl
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/international/picks")
+async def international_picks():
+    try:
+        scanner = InternationalScanner()
+        data = await asyncio.to_thread(scanner.get_picks)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/research/{symbol}")
 async def research(symbol: str):
     try:
         data = await asyncio.to_thread(get_comprehensive_research, symbol)
+        if isinstance(data, dict) and "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return data
+    except HTTPException as e:
+        raise e
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Data temporarily unavailable (rate limited). Please retry in a moment.")
+
+@app.get("/api/research/trends/{symbol}")
+async def research_trends(symbol: str, range: str = '5y'):
+    try:
+        data = await asyncio.to_thread(get_historical_trends, symbol, range)
         if "error" in data:
             raise HTTPException(status_code=404, detail=data["error"])
         return data

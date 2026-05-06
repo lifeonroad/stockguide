@@ -145,6 +145,12 @@ def scan_etf_dips() -> List[Dict]:
             drop_pct, current_price, high_price = get_drop_from_high(etf, '52w')
             rsi = calculate_rsi(hist['Close'])
             
+            low_5d = hist['Low'].tail(5).min()
+            recovery_5d = round(((current_price - low_5d) / low_5d) * 100, 2) if low_5d > 0 else 0.0
+            
+            low_15d = hist['Low'].tail(15).min()
+            recovery_15d = round(((current_price - low_15d) / low_15d) * 100, 2) if low_15d > 0 else 0.0
+            
             if abs(drop_pct) >= 3:
                 try:
                     info = fetch_with_retry(lambda t=etf: t.info, max_attempts=3, base_delay=1.5)
@@ -162,6 +168,8 @@ def scan_etf_dips() -> List[Dict]:
                     "volume": vol,
                     "avg_volume": avg_vol,
                     "volume_ratio": round(vol / avg_vol, 2) if avg_vol > 0 else 1.0,
+                    "recovery_5d": recovery_5d,
+                    "recovery_15d": recovery_15d,
                     "classification": classify_dip_quality(drop_pct, rsi),
                     "is_market_etf": ticker in MARKET_ETFS
                 }
@@ -191,7 +199,14 @@ def fetch_single_stock(ticker, sector):
         high_price = hist['High'].max()
         drop_pct = round(((current_price - high_price) / high_price) * 100, 2)
         
-        if abs(drop_pct) < 5: return None
+        # Calculate recovery metrics
+        low_5d = hist['Low'].tail(5).min()
+        recovery_5d = round(((current_price - low_5d) / low_5d) * 100, 2) if low_5d > 0 else 0.0
+        
+        low_15d = hist['Low'].tail(15).min()
+        recovery_15d = round(((current_price - low_15d) / low_15d) * 100, 2) if low_15d > 0 else 0.0
+        
+        if abs(drop_pct) < 5 and sector != "Tracked": return None
         
         try:
             info = fetch_with_retry(lambda t=stock: t.info, max_attempts=3, base_delay=1.5)
@@ -226,6 +241,8 @@ def fetch_single_stock(ticker, sector):
             "debt_equity": round(debt_equity, 2) if debt_equity else 0,
             "profit_margin": round(profit_margin * 100, 2) if profit_margin else 0,
             "pe_ratio": round(pe_ratio, 2) if pe_ratio else 0,
+            "recovery_5d": recovery_5d,
+            "recovery_15d": recovery_15d,
             "quality_score": quality_score,
             "volume": info.get('volume', 0),
             "avg_volume": info.get('averageVolume', 0),
@@ -255,6 +272,15 @@ def scan_stock_dips(min_quality_score: float = 0) -> List[Dict]:
         for s in entry.get("tickers", []): tasks.append((s, sector))
     for s in GROWTH_STOCKS: tasks.append((s, "Hyper-Growth"))
     for s in DIVIDEND_KINGS: tasks.append((s, "Dividend Kings"))
+    
+    # Fetch owned portfolio tickers
+    try:
+        from portfolio import PortfolioManager
+        pm = PortfolioManager()
+        owned = pm.get_all_owned_tickers()
+        for s in owned: tasks.append((s.upper(), "Tracked"))
+    except Exception as e:
+        print(f"Error bringing in tracked portfolios to dip hunter: {e}")
     
     unique_tasks = list({t[0]: t for t in tasks}.values())
 
