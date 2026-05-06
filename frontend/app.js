@@ -2,7 +2,7 @@
 
 import { API_BASE } from './js/api.js';
 import { loadMarketStatus, loadMacroTrends } from './js/components/marketStatus.js';
-import { loadIndustries, loadStocks, searchStock, startResearch, loadResearch } from './js/components/researchUi.js';
+import { loadIndustries, loadStocks, searchStock, startResearch, loadResearch, loadTrends } from './js/components/researchUi.js';
 import { loadSuperinvestors, loadCopycatPortfolio, loadMoonshots } from './js/components/thematic.js';
 import { runScreen } from './js/components/screenerUi.js';
 import { loadEconomicIndicators, loadMoneyFlow, loadMarketNews, loadContrarianOpportunities, filterContrarian } from './js/components/economics.js';
@@ -96,6 +96,7 @@ window.sortDipStocks = sortDipStocks;
 window.toggleThemeMenu = toggleThemeMenu;
 window.setTheme = setTheme;
 window.renderUniverseBadge = renderUniverseBadge;
+window.loadTrends = loadTrends;
 window.closeModal = () => document.getElementById('forecast-modal').classList.add('hidden');
 
 // --- Tab Navigation Orchestrator ---

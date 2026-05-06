@@ -126,17 +126,55 @@ export async function loadStocks(industryName) {
             container.appendChild(card);
         });
 
+        // Update table headers with benchmarks
+        setTimeout(() => {
+            const table = document.getElementById('sector-stocks-table');
+            if (table) {
+                const headers = table.querySelectorAll('th');
+                if (headers.length >= 6) {
+                    headers[2].innerHTML = `P/E <div class="text-[10px] text-gray-500 normal-case font-normal">Avg: ${data.avg_pe || '0.00'}</div>`;
+                    headers[3].innerHTML = `ROE % <div class="text-[10px] text-gray-500 normal-case font-normal">Avg: ${data.avg_roe || '0.00'}</div>`;
+                    headers[4].innerHTML = `Debt/Eq <div class="text-[10px] text-gray-500 normal-case font-normal">Avg: ${data.avg_debt_equity || '0.00'}</div>`;
+                    headers[5].innerHTML = `Margin % <div class="text-[10px] text-gray-500 normal-case font-normal">Avg: ${data.avg_profit_margin || '0.00'}</div>`;
+                }
+            }
+        }, 100);
+
         data.all_analyzed.forEach(stock => {
             const isTop = data.top_stocks.find(t => t.symbol === stock.symbol);
             const tr = document.createElement('tr');
-            tr.className = isTop ? "bg-warren-accent/5" : "text-gray-400";
+            tr.className = isTop ? "bg-warren-accent/5" : "text-gray-400 hover:bg-gray-800/10 transition-colors";
+            
+            // Comparison indicators
+            const peColor = stock.pe < data.avg_pe ? 'text-green-400' : 'text-gray-400';
+            const roeColor = stock.roe > data.avg_roe ? 'text-green-400' : 'text-gray-400';
+            const deColor = stock.debt_to_equity < data.avg_debt_equity ? 'text-green-400' : 'text-gray-400';
+            const marginColor = stock.profit_margin > data.avg_profit_margin ? 'text-green-400' : 'text-gray-400';
+
+            const peIndicator = stock.pe < data.avg_pe ? '<span class="text-[8px] block opacity-60">↑ Value</span>' : '';
+            const roeIndicator = stock.roe > data.avg_roe ? '<span class="text-[8px] block opacity-60">↑ Strong</span>' : '';
+            const deIndicator = stock.debt_to_equity < data.avg_debt_equity ? '<span class="text-[8px] block opacity-60">↓ Safe</span>' : '';
+            const marginIndicator = stock.profit_margin > data.avg_profit_margin ? '<span class="text-[8px] block opacity-60">↑ Efficient</span>' : '';
+
             tr.innerHTML = `
-                <td class="py-2 font-medium ${isTop ? 'text-white' : ''}">${linkTV(stock.symbol)}</td>
-                <td class="py-2">$${stock.price}</td>
-                <td class="py-2">${stock.pe}</td>
-                <td class="py-2 ${stock.roe > 15 ? 'text-green-400' : ''}">${stock.roe}%</td>
-                <td class="py-2">${stock.debt_to_equity}</td>
-                <td class="py-2">${stock.profit_margin}%</td>
+                <td class="py-3 font-medium ${isTop ? 'text-white' : ''}">${linkTV(stock.symbol)}</td>
+                <td class="py-3 font-mono text-gray-300">$${stock.price.toFixed(2)}</td>
+                <td class="py-3 font-mono ${peColor}">
+                    ${stock.pe}
+                    ${peIndicator}
+                </td>
+                <td class="py-3 font-mono ${roeColor}">
+                    ${stock.roe}%
+                    ${roeIndicator}
+                </td>
+                <td class="py-3 font-mono ${deColor}">
+                    ${stock.debt_to_equity}
+                    ${deIndicator}
+                </td>
+                <td class="py-3 font-mono ${marginColor}">
+                    ${stock.profit_margin}%
+                    ${marginIndicator}
+                </td>
             `;
             detailBody.appendChild(tr);
         });
@@ -453,6 +491,10 @@ export async function loadResearch(symbol) {
         const res = await fetch(`${API_BASE}/research/${symbol}`);
         const data = await res.json();
 
+        if (!res.ok) {
+            const msg = data.detail || data.error || `Server returned ${res.status}`;
+            throw new Error(msg);
+        }
         if (data.error) throw new Error(data.error);
 
         content.innerHTML = `
@@ -470,9 +512,11 @@ export async function loadResearch(symbol) {
                             <p class="text-xs text-gray-500 mt-4 leading-relaxed max-w-2xl">${(data.summary || '').substring(0, 300)}${(data.summary || '').length > 300 ? '...' : ''}</p>
                         </div>
                         <div class="text-right">
-                            <div class="text-4xl font-black text-white mb-1">$${(data.market_data.price || 0).toFixed(2)}</div>
-                            <div class="text-sm font-bold ${(data.market_data.change_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}">
-                                ${(data.market_data.change_pct || 0) >= 0 ? '▲' : '▼'} ${(data.market_data.change_pct || 0).toFixed(2)}% Today
+                            <div class="text-4xl font-black text-white mb-1">
+                                $${data.market_data ? (data.market_data.price || 0).toFixed(2) : '0.00'}
+                            </div>
+                            <div class="text-sm font-bold ${((data.market_data || {}).change_pct || 0) >= 0 ? 'text-green-400' : 'text-red-400'}">
+                                ${((data.market_data || {}).change_pct || 0) >= 0 ? '▲' : '▼'} ${((data.market_data || {}).change_pct || 0).toFixed(2)}% Today
                             </div>
                             <div class="mt-4 flex gap-2 justify-end">
                                 ${linkTV(data.symbol, 'Technical Chart')}
@@ -572,11 +616,148 @@ export async function loadResearch(symbol) {
                 : "✅ CONFIDENCE: Market growth expectations are conservative compared to underlying business metrics."}
                                 </p>
                             </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Valuation Laboratory — full width -->
+            <div class="glass-panel p-8 rounded-2xl border border-gray-800 mt-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+                    <div>
+                        <h3 class="text-lg font-black text-white uppercase tracking-widest">Valuation Laboratory</h3>
+                        <p class="text-xs text-gray-500 mt-1">Multi-model intrinsic value analysis — comparing 5 independent valuation frameworks</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Consensus Fair Value</div>
+                            <div class="text-2xl font-black ${data.consensus_valuation.margin_of_safety >= 0 ? 'text-green-400' : 'text-red-400'}">
+                                $${data.consensus_valuation.intrinsic_value.toFixed(2)}
+                            </div>
+                            <div class="text-[10px] font-bold ${data.consensus_valuation.margin_of_safety >= 0 ? 'text-green-400/70' : 'text-red-400/70'}">
+                                ${data.consensus_valuation.margin_of_safety >= 0 ? '↑' : '↓'} ${Math.abs(data.consensus_valuation.margin_of_safety)}% ${data.consensus_valuation.verdict}
+                                <span class="text-gray-600 ml-1">(${data.consensus_valuation.models_used} models)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    ${(data.valuation_models || []).map(m => {
+                        const isUnder = m.margin_of_safety > 0;
+                        const isNA = m.intrinsic_value <= 0;
+                        const borderColor = isNA ? 'border-gray-800' : isUnder ? 'border-green-500/30' : 'border-red-500/30';
+                        const bgGlow = isNA ? '' : isUnder ? 'shadow-green-500/5 shadow-lg' : 'shadow-red-500/5 shadow-lg';
+                        const mosColor = isNA ? 'text-gray-600' : isUnder ? 'text-green-400' : 'text-red-400';
+                        const methodColors = {
+                            'Defensive': 'bg-blue-500/10 text-blue-400',
+                            'Intrinsic': 'bg-purple-500/10 text-purple-400',
+                            'Buffett': 'bg-amber-500/10 text-amber-400',
+                            'Dividend': 'bg-emerald-500/10 text-emerald-400',
+                            'Multiples': 'bg-cyan-500/10 text-cyan-400'
+                        };
+                        const methodClass = methodColors[m.method] || 'bg-gray-500/10 text-gray-400';
+                        
+                        return `
+                            <div class="glass-panel p-5 rounded-2xl border ${borderColor} bg-gray-900/30 ${bgGlow} flex flex-col justify-between">
+                                <div>
+                                    <div class="flex items-center justify-between mb-3">
+                                        <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${methodClass}">${m.method}</span>
+                                    </div>
+                                    <div class="text-sm font-bold text-white mb-1">${m.name}</div>
+                                    <div class="text-[10px] text-gray-600 mb-4 leading-relaxed">${m.formula}</div>
+                                </div>
+                                <div>
+                                    <div class="text-2xl font-black text-white mb-1">
+                                        ${isNA ? '<span class=\"text-gray-600 text-lg\">N/A</span>' : '$' + m.intrinsic_value.toFixed(2)}
+                                    </div>
+                                    <div class="text-xs font-bold ${mosColor}">
+                                        ${isNA ? m.verdict : (isUnder ? '↑ ' : '↓ ') + Math.abs(m.margin_of_safety) + '% ' + m.verdict}
+                                    </div>
+                                    <div class="mt-3 pt-3 border-t border-gray-800/50 space-y-1">
+                                        ${Object.entries(m.inputs).map(([k, v]) => 
+                                            '<div class=\"flex justify-between text-[10px]\"><span class=\"text-gray-600\">' + k + '</span><span class=\"text-gray-400 font-mono\">' + v + '</span></div>'
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+
+                <!-- Price vs Fair Value Bar -->
+                <div class="mt-6 p-4 bg-gray-900/50 rounded-xl border border-gray-800/50">
+                    <div class="flex justify-between text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2">
+                        <span>Current Price: $${(data.market_data.price || 0).toFixed(2)}</span>
+                        <span>Consensus IV: $${data.consensus_valuation.intrinsic_value.toFixed(2)}</span>
+                    </div>
+                    <div class="relative h-3 bg-gray-800 rounded-full overflow-hidden">
+                        ${(() => {
+                            const p = data.market_data.price || 0;
+                            const iv = data.consensus_valuation.intrinsic_value || 1;
+                            const ratio = Math.min(p / iv, 2) * 50; // 50% = fair value
+                            const barColor = p < iv ? 'bg-green-500' : 'bg-red-500';
+                            return '<div class=\"h-full ' + barColor + ' rounded-full transition-all\" style=\"width:' + ratio + '%\"></div>';
+                        })()}
+                    </div>
+                    <div class="flex justify-between text-[9px] text-gray-600 mt-1">
+                        <span>Deep Value</span>
+                        <span>Fair Value</span>
+                        <span>Overpriced</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Historical Trends Dashboard — full width, outside the sidebar grid -->
+            <div class="glass-panel p-8 rounded-2xl border border-gray-800 mt-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+                    <div>
+                        <h3 class="text-lg font-black text-white uppercase tracking-widest">Historical Fundamentals</h3>
+                        <p class="text-xs text-gray-500 mt-1">Multi-year trends across PE, Revenue, EPS, Earnings Growth, and Free Cash Flow</p>
+                    </div>
+                    <div class="flex gap-2 mt-4 md:mt-0 bg-gray-900 p-1.5 rounded-xl border border-gray-800" id="trend-range-selector">
+                        <button onclick="window.loadTrends('${data.symbol}', '1y')" class="trend-btn px-4 py-1.5 text-xs font-bold rounded-lg text-gray-400 hover:text-white transition-colors" data-range="1y">1Y</button>
+                        <button onclick="window.loadTrends('${data.symbol}', '3y')" class="trend-btn px-4 py-1.5 text-xs font-bold rounded-lg text-gray-400 hover:text-white transition-colors" data-range="3y">3Y</button>
+                        <button onclick="window.loadTrends('${data.symbol}', '5y')" class="trend-btn px-4 py-1.5 text-xs font-bold rounded-lg bg-warren-accent text-white transition-colors" data-range="5y">5Y</button>
+                        <button onclick="window.loadTrends('${data.symbol}', 'max')" class="trend-btn px-4 py-1.5 text-xs font-bold rounded-lg text-gray-400 hover:text-white transition-colors" data-range="max">MAX</button>
+                    </div>
+                </div>
+                
+                <div id="trends-loading" class="py-16 text-center text-warren-accent text-sm tracking-widest font-bold uppercase">Fetching Historical Data...</div>
+                <div id="trends-grid" class="hidden">
+                    <!-- Top row: 3 charts -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div class="glass-panel p-5 rounded-2xl border border-gray-800/50 bg-gray-900/30 hover:border-gray-700 transition-colors" style="min-height: 280px;">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 font-bold">P/E Ratio · Valuation</div>
+                            <div style="height: 230px;"><canvas id="chart-pe"></canvas></div>
+                        </div>
+                        <div class="glass-panel p-5 rounded-2xl border border-gray-800/50 bg-gray-900/30 hover:border-gray-700 transition-colors" style="min-height: 280px;">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 font-bold">Total Revenue</div>
+                            <div style="height: 230px;"><canvas id="chart-revenue"></canvas></div>
+                        </div>
+                        <div class="glass-panel p-5 rounded-2xl border border-gray-800/50 bg-gray-900/30 hover:border-gray-700 transition-colors" style="min-height: 280px;">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 font-bold">Diluted EPS</div>
+                            <div style="height: 230px;"><canvas id="chart-eps"></canvas></div>
+                        </div>
+                    </div>
+                    <!-- Bottom row: 2 charts, wider -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="glass-panel p-5 rounded-2xl border border-gray-800/50 bg-gray-900/30 hover:border-gray-700 transition-colors" style="min-height: 280px;">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 font-bold">Earnings Growth % (YoY)</div>
+                            <div style="height: 230px;"><canvas id="chart-growth"></canvas></div>
+                        </div>
+                        <div class="glass-panel p-5 rounded-2xl border border-gray-800/50 bg-gray-900/30 hover:border-gray-700 transition-colors" style="min-height: 280px;">
+                            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-3 font-bold">Free Cash Flow</div>
+                            <div style="height: 230px;"><canvas id="chart-fcf"></canvas></div>
                         </div>
                     </div>
                 </div>
             </div>
         `;
+
+        // Automatically load trends for 5y
+        setTimeout(() => window.loadTrends(data.symbol, '5y'), 100);
 
     } catch (err) {
         console.error("Research Hub Error:", err);
@@ -590,3 +771,148 @@ export async function loadResearch(symbol) {
         `;
     }
 }
+
+// Global chart instances for trends
+const trendCharts = {};
+
+export async function loadTrends(symbol, range) {
+    // Update button states
+    document.querySelectorAll('.trend-btn').forEach(btn => {
+        if (btn.getAttribute('data-range') === range) {
+            btn.className = "trend-btn px-3 py-1 text-xs font-bold rounded bg-warren-accent text-white transition-colors";
+        } else {
+            btn.className = "trend-btn px-3 py-1 text-xs font-bold rounded text-gray-400 hover:text-white transition-colors";
+        }
+    });
+
+    const loading = document.getElementById('trends-loading');
+    const grid = document.getElementById('trends-grid');
+    if (!loading || !grid) return;
+
+    loading.classList.remove('hidden');
+    grid.classList.add('hidden');
+
+    try {
+        const res = await fetch(`${API_BASE}/research/trends/${encodeURIComponent(symbol)}?range=${range}`);
+        const data = await res.json();
+        
+        if (data.error) throw new Error(data.error);
+
+        loading.classList.add('hidden');
+        grid.classList.remove('hidden');
+
+        renderTrendChart('chart-pe', 'P/E Ratio', data.pe_trend, '#38bdf8', false);
+        renderTrendChart('chart-revenue', 'Total Revenue', data.revenue_trend, '#22c55e', true);
+        renderTrendChart('chart-eps', 'Diluted EPS', data.eps_trend, '#a855f7', false);
+        renderTrendChart('chart-growth', 'Earnings Growth %', data.growth_trend, '#f472b6', false, '%');
+        renderTrendChart('chart-fcf', 'Free Cash Flow', data.fcf_trend, '#eab308', true);
+
+    } catch (err) {
+        console.error("Trends error:", err);
+        loading.innerHTML = `<span class="text-red-400">Failed to load historical trends.</span>`;
+    }
+}
+
+function renderTrendChart(canvasId, label, dataArray, colorCode, isLargeCurrency, unit = '') {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    if (trendCharts[canvasId]) {
+        trendCharts[canvasId].destroy();
+    }
+
+    if (!dataArray || dataArray.length === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Insufficient data for ${label}`, canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    const labels = dataArray.map(d => d.date.includes('Q') ? d.date : d.date.split('-')[0]);
+    const values = dataArray.map(d => d.value);
+
+    // Dynamic gradient for a "soothing" look
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, colorCode + '33'); // 20% opacity
+    gradient.addColorStop(1, colorCode + '00'); // 0% opacity
+
+    trendCharts[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label,
+                data: values,
+                borderColor: colorCode,
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.4, // Smoother curves
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: colorCode,
+                pointBorderColor: '#000',
+                pointHoverRadius: 6,
+                pointHoverBackgroundColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    titleColor: '#9ca3af',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(75, 85, 99, 0.3)',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: (ctx) => {
+                            let val = ctx.raw;
+                            if (isLargeCurrency) {
+                                if (Math.abs(val) >= 1e12) val = '$' + (val / 1e12).toFixed(2) + 'T';
+                                else if (Math.abs(val) >= 1e9) val = '$' + (val / 1e9).toFixed(2) + 'B';
+                                else if (Math.abs(val) >= 1e6) val = '$' + (val / 1e6).toFixed(1) + 'M';
+                                else val = '$' + val.toLocaleString();
+                            } else {
+                                val = val.toLocaleString() + unit;
+                            }
+                            return `${label}: ${val}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#6b7280', font: { size: 10 } }
+                },
+                y: {
+                    grid: { color: 'rgba(75, 85, 99, 0.1)' },
+                    ticks: {
+                        color: '#6b7280',
+                        font: { size: 10 },
+                        callback: (val) => {
+                            if (isLargeCurrency) {
+                                if (Math.abs(val) >= 1e9) return '$' + (val / 1e9).toFixed(0) + 'B';
+                                if (Math.abs(val) >= 1e6) return '$' + (val / 1e6).toFixed(0) + 'M';
+                                return '$' + val;
+                            }
+                            return val + unit;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
