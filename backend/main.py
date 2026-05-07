@@ -334,6 +334,16 @@ async def dip_hunter_summary():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/opportunities")
+async def get_opportunities(min_quality: int = 0):
+    """Get context-enriched investment opportunities with market regime"""
+    try:
+        from opportunity_engine import get_opportunities as _get_opportunities
+        data = await asyncio.to_thread(_get_opportunities, min_quality)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Portfolio Management Endpoints
 from portfolio import PortfolioManager
 from pydantic import BaseModel

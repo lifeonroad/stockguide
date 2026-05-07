@@ -1,5 +1,41 @@
 # Changelog
 
+## [2026-05-07] — Opportunity Engine: Context-Aware Investment Intelligence
+
+### New
+- **`opportunity_engine.py`**: New orchestration layer that adds context to dip opportunities
+  - **Market Regime Detection**: Analyzes SPY, QQQ, VIXY, and sector breadth to classify market state (CRASH / BEAR / BULL / ROTATION / MIXED)
+  - **Opportunity Classification**: Tags each dip with investment thesis:
+    - `CRASH_BUY`: Market down >10%, but company has strong fundamentals
+    - `SECTOR_RECOVERY`: Industry bottoming, sector ETF oversold but recovering
+    - `COMPANY_TURNAROUND`: Stock-specific issue resolving (insider buying, analyst upgrades)
+    - `MOMENTUM_SHIFT`: Sector rotating into favor, stock starting to recover
+    - `GENERIC_DIP`: Doesn't fit a clear narrative
+  - **Sentiment Signals**: Insider buying detection, analyst upgrade/downgrade trends
+- **`/api/opportunities`**: New endpoint returning context-enriched opportunities + market regime
+- **Frontend**: Market regime banner at top of Dip Hunter tab, filter bar by opportunity type, thesis + signals column in table
+
+### Changed
+- **`dipHunter.js`**: Complete rewrite — fetches from `/api/opportunities` instead of `/api/dip-hunter/stocks`
+- **`index.html`**: Updated table headers (removed recovery columns, added Opportunity + Thesis columns)
+- **`main.py`**: Added async `/api/opportunities` endpoint
+
+### Architecture
+```
+opportunity_engine.py (orchestration layer)
+├── get_market_regime() → CRASH/BEAR/BULL/ROTATION/MIXED
+├── _get_sector_etf_drops() → sector-level context
+├── classify_opportunity() → tags each dip with thesis + signals
+│   ├── _get_insider_signal() → insider buying/selling patterns (6h cache)
+│   └── _get_analyst_signal() → analyst upgrades/downgrades (6h cache)
+└── get_opportunities() → main API (combines dip_hunter + regime + classification)
+```
+
+### Performance
+- Full opportunity scan: ~28s first run, <1ms cached
+- Market regime detection: ~1s (single batch ETF download)
+- Insider/analyst signals: cached 6h per ticker
+
 ## [2026-05-07] — Dip Hunter Dynamic Sector Expansion
 
 ### New
