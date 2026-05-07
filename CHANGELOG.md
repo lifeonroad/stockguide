@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-05-07] — Phase 2: SWR Caching & Cache Warming
+
+### New
+- **SWR (Stale-While-Revalidate) pattern** in `cache_utils.py`
+  - Three-tier cache states: fresh, stale (SWR active), expired
+  - Background refresh triggered during stale period — user gets instant response
+  - Default soft TTL = 75% of hard TTL
+- **Request deduplication (in-flight coalescing)**
+  - Concurrent identical requests share one backend fetch
+  - Uses `threading.Event` for efficient wait/notify
+- **Cache warming on startup** in `main.py`
+  - Pre-warms 5 critical caches before first user arrives
+  - Runs asynchronously — server starts immediately
+
+### Changed
+- Applied soft/hard TTL tiers to all 22 existing cache decorators
+- `get_cache_stats()` now returns detailed per-entry state (fresh/stale/expired, hit counts, age)
+- `clear_cache()` now also clears in-flight request slots
+
+### Performance Impact
+| Metric | Before | After |
+|---|---|---|
+| Startup (first user latency) | ~14s cold | ~0ms (pre-warmed) |
+| Stale cache response | Blocking refresh | Instant + background refresh |
+| Concurrent duplicate requests | N duplicate fetches | 1 fetch, N responses |
+
+---
+
 ## [2026-05-07] — Phase 1: Smart Caching & Circuit Breaker
 
 ### New
