@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-05-07] — Dip Hunter Performance Fix
+
+### Fixed
+- **`dip_hunter.py` batch download**: Fixed MultiIndex column parsing in `_fetch_batch_history()` — was checking `data.columns.levels[0]` for symbols but yfinance puts symbols in `levels[1]`. Now correctly extracts per-ticker DataFrames from batch `yf.download()` results.
+  - First run: ~293s (fundamentals via defeatbeta, 24h cache) → subsequent calls <1ms
+  - Price history batch: 98 tickers in ~5.6s (was failing with 0 tickers)
+  - Pre-filter by drop % reduces fundamentals calls from 98 → ~91 candidates
+- **`main.py` cache warming**: Added dip hunter to background cache warming (delayed 10s after startup to not compete with other warm-up tasks). Server is immediately usable; dip scan runs in background thread.
+- **`screener.py`**: Restored missing `import yfinance as yf` after Phase 4 refactor.
+
+### Architecture
+- Two-phase dip hunter scan:
+  1. Batch price download (`yf.download()` in batches of 50) → ~5s for 98 tickers
+  2. Pre-filter by drop %, fetch fundamentals only for candidates via `_bulk_fundamentals()` (ThreadPoolExecutor, 10 workers)
+  3. Score all candidates locally (no network calls)
+- `@timed_cache` with SWR on `scan_stock_dips()`: 1h hard TTL, 30m soft TTL
+
 ## [2026-05-07] — Phase 4: Data Routing & Non-Blocking Endpoints
 
 ### New
