@@ -1,6 +1,6 @@
 """
 data_client.py — Unified Data Abstraction Layer
-================================================
+===============================================
 Routes calls to the right data source:
   - defeatbeta: fundamentals, historical data, news, DCF  (weekly snapshots, no rate limits)
   - yfinance:   live price & % change only                (real-time)
@@ -9,6 +9,7 @@ All callers import from here — never directly from yfinance or defeatbeta.
 """
 
 import logging
+import os
 from datetime import date
 
 import yfinance as yf
@@ -16,6 +17,9 @@ import yfinance as yf
 from cache_utils import timed_cache, fetch_with_retry
 
 logger = logging.getLogger(__name__)
+
+# Toggle defeatbeta on/off (set DEFEATBETA_ENABLED=0 to disable)
+DEFEATBETA_ENABLED = os.getenv("DEFEATBETA_ENABLED", "1") != "0"
 
 # ──────────────────────────────────────────────────────────
 # Internal helpers
@@ -54,6 +58,47 @@ def _get_yq_info(symbol: str) -> dict:
     return info
 
 
+def _get_yf_fundamentals(symbol: str) -> dict:
+    """Get fundamentals directly from yfinance (defeatbeta bypass)."""
+    try:
+        info = _get_yq_info(symbol)
+        mkt_cap = info.get("marketCap", 0.0)
+        ttm_fcf = info.get("freeCashflow", 0.0)
+        return {
+            "symbol":   symbol,
+            "longName": info.get("longName") or info.get("shortName") or symbol,
+            "shortName": info.get("shortName") or symbol,
+            "sector":   info.get("sector", "Unknown"),
+            "industry": info.get("industry", "Unknown"),
+            "longBusinessSummary": info.get("longBusinessSummary", "No business summary available."),
+            "data_as_of": str(date.today()),
+            "trailingPE": info.get("trailingPE", 0.0),
+            "forwardPE": info.get("forwardPE", 0.0),
+            "priceToSalesTrailing12Months": info.get("priceToSalesTrailing12Months", 0.0),
+            "priceToBook": info.get("priceToBook", 0.0),
+            "pegRatio": info.get("pegRatio", 0.0),
+            "trailingEps": info.get("trailingEps", 0.0),
+            "returnOnEquity": info.get("returnOnEquity", 0.0),
+            "returnOnAssets": info.get("returnOnAssets", 0.0),
+            "roic": 0.0,
+            "wacc": 0.0,
+            "totalDebt": info.get("totalDebt", 0.0),
+            "totalCash": info.get("totalCash", 0.0),
+            "debtToEquity": info.get("debtToEquity", 0.0),
+            "currentRatio": info.get("currentRatio", 0.0),
+            "freeCashflow": ttm_fcf,
+            "fcf_yield": (ttm_fcf / mkt_cap) if mkt_cap else 0.0,
+            "revenueGrowth": info.get("revenueGrowth", 0.0),
+            "earningsGrowth": info.get("earningsGrowth", 0.0),
+            "revenue": info.get("totalRevenue", 0.0),
+            "netIncome": info.get("netIncomeToCommon", 0.0),
+            "marketCap": mkt_cap,
+        }
+    except Exception as e:
+        logger.error("yfinance fundamentals failed for %s: %s", symbol, e)
+        return {}
+
+
 # ──────────────────────────────────────────────────────────
 # Live Price  (yfinance — real-time)
 # ──────────────────────────────────────────────────────────
@@ -87,47 +132,13 @@ def get_fundamentals(symbol: str) -> dict:
     Returns a yfinance-compatible fundamentals dict built from defeatbeta.
     Each metric is fetched in isolation — one failure does not block others.
     """
+    if not DEFEATBETA_ENABLED:
+        return _get_yf_fundamentals(symbol)
     try:
         t = _db_ticker(symbol)
     except Exception as e:
         logger.warning("defeatbeta init failed (%s), falling back to yfinance for fundamentals: %s", symbol, e)
-        try:
-            info = _get_yq_info(symbol)
-            mkt_cap = info.get("marketCap", 0.0)
-            ttm_fcf = info.get("freeCashflow", 0.0)
-            return {
-                "symbol":   symbol,
-                "longName": info.get("longName") or info.get("shortName") or symbol,
-                "shortName": info.get("shortName") or symbol,
-                "sector":   info.get("sector", "Unknown"),
-                "industry": info.get("industry", "Unknown"),
-                "longBusinessSummary": info.get("longBusinessSummary", "No business summary available."),
-                "data_as_of": str(date.today()),
-                "trailingPE": info.get("trailingPE", 0.0),
-                "forwardPE": info.get("forwardPE", 0.0),
-                "priceToSalesTrailing12Months": info.get("priceToSalesTrailing12Months", 0.0),
-                "priceToBook": info.get("priceToBook", 0.0),
-                "pegRatio": info.get("pegRatio", 0.0),
-                "trailingEps": info.get("trailingEps", 0.0),
-                "returnOnEquity": info.get("returnOnEquity", 0.0),
-                "returnOnAssets": info.get("returnOnAssets", 0.0),
-                "roic": 0.0,
-                "wacc": 0.0,
-                "totalDebt": info.get("totalDebt", 0.0),
-                "totalCash": info.get("totalCash", 0.0),
-                "debtToEquity": info.get("debtToEquity", 0.0),
-                "currentRatio": info.get("currentRatio", 0.0),
-                "freeCashflow": ttm_fcf,
-                "fcf_yield": (ttm_fcf / mkt_cap) if mkt_cap else 0.0,
-                "revenueGrowth": info.get("revenueGrowth", 0.0),
-                "earningsGrowth": info.get("earningsGrowth", 0.0),
-                "revenue": info.get("totalRevenue", 0.0),
-                "netIncome": info.get("netIncomeToCommon", 0.0),
-                "marketCap": mkt_cap,
-            }
-        except Exception as e2:
-            logger.error("yfinance fundamentals fallback failed for %s: %s", symbol, e2)
-            return {}
+        return _get_yf_fundamentals(symbol)
 
     def _fetch(method_name, col):
         try:
@@ -178,14 +189,17 @@ def get_fundamentals(symbol: str) -> dict:
     sector = "Unknown"
     industry = "Unknown"
     summary = "No business summary available."
-    try:
-        meta = t.info() or {}
-        name     = meta.get("longName") or meta.get("shortName") or symbol
-        sector   = meta.get("sector")   or "Unknown"
-        industry = meta.get("industry") or "Unknown"
-        summary  = meta.get("longBusinessSummary") or "No business summary available."
-    except Exception:
-        # yfinance fallback for identity only
+    if DEFEATBETA_ENABLED:
+        try:
+            meta = t.info() or {}
+            name     = meta.get("longName") or meta.get("shortName") or symbol
+            sector   = meta.get("sector")   or "Unknown"
+            industry = meta.get("industry") or "Unknown"
+            summary  = meta.get("longBusinessSummary") or "No business summary available."
+        except Exception:
+            pass
+    # Always try yfinance if identity is still default
+    if name == symbol:
         try:
             yf_info = yf.Ticker(symbol).info or {}
             name     = yf_info.get("longName") or yf_info.get("shortName") or symbol
@@ -202,7 +216,7 @@ def get_fundamentals(symbol: str) -> dict:
         "sector":   sector,
         "industry": industry,
         "longBusinessSummary": summary,
-        "data_as_of": "2026-02-20",  # defeatbeta weekly snapshot
+        "data_as_of": "2026-02-20" if DEFEATBETA_ENABLED else str(date.today()),  # defeatbeta weekly snapshot
 
         # Valuation
         "trailingPE":                   ttm_pe,
@@ -248,13 +262,14 @@ def get_price_history(symbol: str, days: int = 90):
     Sliced to the last `days` trading days.
     Falls back to yfinance on error.
     """
-    try:
-        t = _db_ticker(symbol)
-        df = t.price()
-        if df is not None and not df.empty:
-            return df.tail(days).reset_index(drop=True)
-    except Exception as e:
-        logger.warning("get_price_history defeatbeta(%s) failed: %s — falling back to yfinance", symbol, e)
+    if DEFEATBETA_ENABLED:
+        try:
+            t = _db_ticker(symbol)
+            df = t.price()
+            if df is not None and not df.empty:
+                return df.tail(days).reset_index(drop=True)
+        except Exception as e:
+            logger.warning("get_price_history defeatbeta(%s) failed: %s — falling back to yfinance", symbol, e)
 
     # yfinance fallback
     try:
@@ -280,29 +295,28 @@ def get_news(symbol: str, n: int = 5) -> list:
     """
     Returns a list of recent news dicts: [{title, date, source, url}]
     """
-    try:
-        t = _db_ticker(symbol)
-        news_obj = t.news()
-        # news() returns an object with a get_news_list() or similar method
-        if hasattr(news_obj, "get_news_list"):
-            items = news_obj.get_news_list()
-        elif hasattr(news_obj, "to_dict"):
-            items = news_obj.to_dict("records")
-        else:
-            return []
-
-        result = []
-        for item in items[:n]:
-            result.append({
-                "title":  item.get("title") or item.get("headline") or "",
-                "date":   str(item.get("publish_date") or item.get("date") or ""),
-                "source": item.get("source") or item.get("publisher") or "",
-                "url":    item.get("url") or item.get("link") or "#",
-            })
-        return result
-    except Exception as e:
-        logger.warning("get_news(%s) failed: %s", symbol, e)
-        return []
+    if DEFEATBETA_ENABLED:
+        try:
+            t = _db_ticker(symbol)
+            news_obj = t.news()
+            if hasattr(news_obj, "get_news_list"):
+                items = news_obj.get_news_list()
+            elif hasattr(news_obj, "to_dict"):
+                items = news_obj.to_dict("records")
+            else:
+                pass
+            if items:
+                result = []
+                for item in items[:n]:
+                    result.append({
+                        "title":  item.get("title") or item.get("headline") or "",
+                        "date":   str(item.get("publish_date") or item.get("date") or ""),
+                        "source": item.get("source") or item.get("publisher") or "",
+                        "url":    item.get("url") or item.get("link") or "#",
+                    })
+                return result
+        except Exception as e:
+            logger.warning("get_news(%s) failed: %s", symbol, e)
 
 
 # ──────────────────────────────────────────────────────────
@@ -314,32 +328,28 @@ def get_dcf(symbol: str) -> dict:
     """
     Returns a DCF valuation summary: {fair_value, current_price, upside_pct, wacc, recommendation}
     """
-    try:
-        t = _db_ticker(symbol)
-        dcf_obj = t.dcf()
-        data = {}
-
-        # defeatbeta DCF returns an object — extract key fields
-        if hasattr(dcf_obj, "get_summary"):
-            data = dcf_obj.get_summary() or {}
-        elif hasattr(dcf_obj, "to_dict"):
-            data = dcf_obj.to_dict() or {}
-
-        fair_value = _safe_float(data.get("fair_value") or data.get("intrinsic_value"))
-        wacc_val   = _safe_float(data.get("wacc"))
-        recommendation = data.get("recommendation") or data.get("action") or "N/A"
-
-        live = get_price_live(symbol)
-        current_price = live.get("price", 0.0)
-        upside_pct = ((fair_value - current_price) / current_price * 100) if current_price else 0.0
-
-        return {
-            "fair_value":     round(fair_value, 2),
-            "current_price":  round(current_price, 2),
-            "upside_pct":     round(upside_pct, 1),
-            "wacc":           round(wacc_val * 100, 2) if wacc_val < 1 else round(wacc_val, 2),
-            "recommendation": recommendation,
-        }
-    except Exception as e:
-        logger.warning("get_dcf(%s) failed: %s", symbol, e)
-        return {}
+    if DEFEATBETA_ENABLED:
+        try:
+            t = _db_ticker(symbol)
+            dcf_obj = t.dcf()
+            data = {}
+            if hasattr(dcf_obj, "get_summary"):
+                data = dcf_obj.get_summary() or {}
+            elif hasattr(dcf_obj, "to_dict"):
+                data = dcf_obj.to_dict() or {}
+            fair_value = _safe_float(data.get("fair_value") or data.get("intrinsic_value"))
+            wacc_val   = _safe_float(data.get("wacc"))
+            recommendation = data.get("recommendation") or data.get("action") or "N/A"
+            live = get_price_live(symbol)
+            current_price = live.get("price", 0.0)
+            upside_pct = ((fair_value - current_price) / current_price * 100) if current_price else 0.0
+            return {
+                "fair_value":     round(fair_value, 2),
+                "current_price":  round(current_price, 2),
+                "upside_pct":     round(upside_pct, 1),
+                "wacc":           round(wacc_val * 100, 2) if wacc_val < 1 else round(wacc_val, 2),
+                "recommendation": recommendation,
+            }
+        except Exception as e:
+            logger.warning("get_dcf(%s) failed: %s", symbol, e)
+    return {}

@@ -11,7 +11,8 @@ from dip_hunter import scan_etf_dips, scan_stock_dips, get_dip_summary
 from cycle_analytics import get_cycle_intelligence
 
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 app = FastAPI(title="Rational Equity API")
 
@@ -46,7 +47,12 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 @app.get("/")
 async def read_index():
-    return FileResponse(os.path.join(FRONTEND_DIR, 'index.html'))
+    response = FileResponse(os.path.join(FRONTEND_DIR, 'index.html'), headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    })
+    return response
 
 @app.get("/api/market-status")
 async def market_status():

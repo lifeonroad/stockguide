@@ -4,6 +4,25 @@ Quick wins and polish items to implement between major features.
 
 ---
 
+## ✅ Completed
+
+### Defeatbeta Toggle
+**Status**: ✅ Done (2026-05-07)
+**What**: `DEFEATBETA_ENABLED` env var in `data_client.py` — easy on/off switch for defeatbeta vs yfinance.
+**Why**: Allows quick A/B testing of data sources without code changes.
+
+### Cache Prevention
+**Status**: ✅ Done (2026-05-07)
+**What**: `Cache-Control: no-cache` headers on `index.html`, `?v=N` version bumping on script tags.
+**Why**: Eliminated "UI broken after update" issues caused by stale browser cache.
+
+### HTML ID Mismatches
+**Status**: ✅ Done (2026-05-07)
+**What**: Fixed `superinvestors-view`, `moonshots-view` IDs, removed duplicate divs and orphaned `</main>`.
+**Why**: Tab switching was broken — `app.js` expected different IDs than what existed in `index.html`.
+
+---
+
 ## 🎯 Priority Improvements
 
 ### 1. Sector Deep Dive - Industry Benchmarks in Headers
