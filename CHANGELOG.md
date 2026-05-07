@@ -1,5 +1,47 @@
 # Changelog
 
+## [2026-05-07] — Phase 1: Smart Caching & Circuit Breaker
+
+### New
+- **`backend/filing_calendar.py`**: 13F SEC filing schedule intelligence
+  - Detects filing windows (45 days after quarter end), deadlines, and straggler periods
+  - Dynamic cache TTL: 30 days outside window, 6h inside window, 1h on deadline
+  - Returns filing status with badge text and color for frontend display
+- **`/api/admin/data-source`** (GET/POST): Runtime-toggleable data source switch
+- **`/api/admin/cache/stats`** (GET): Cache and circuit breaker statistics
+- **`/api/admin/cache/clear`** (POST): Force clear all caches and circuit breakers
+
+### Changed
+- **`backend/superinvestors_live.py`**: Filing-aware caching replaces no-cache approach
+  - Manual cache with TTL driven by `filing_calendar.py`
+  - Zero API calls for ~270 days/year (30-day cache outside window)
+  - 4 checks/day during filing window, 24 checks/day on deadline
+  - Stale fallback during API failures
+- **`backend/screener.py`**: 30min cache on `analyze_sector_fundamentals()` (was: no cache)
+  - First call: ~11s, cached call: ~7ms (1,700x speedup)
+  - Prevents repeated yfinance API hammering on every sector click
+- **`backend/cache_utils.py`**: Circuit breaker pattern added to `timed_cache`
+  - 3 consecutive failures → open circuit (5min cooldown)
+  - Half-open state allows test request after cooldown
+  - Serves stale data during cooldown if available
+  - `get_cache_stats()` and `clear_cache()` utilities
+- **`backend/data_client.py`**: Runtime-toggleable `DEFEATBETA_ENABLED` flag
+  - Module-level mutable state (no server restart required)
+  - Clears all caches on toggle to prevent cross-source contamination
+  - `is_defeatbeta_enabled()`, `set_defeatbeta_enabled()`, `get_data_source_status()`
+- **`frontend/index.html`**: Footer data source toggle + filing status badge
+- **`frontend/app.js`**: `toggleDataSource()` function with reload prompt
+- **`frontend/js/components/thematic.js`**: Filing status badge rendering with color coding
+
+### Performance Impact
+| Metric | Before | After |
+|---|---|---|
+| Sector analysis (2nd click) | ~11s | ~7ms |
+| 13F API calls/year | ~3,650 (4/day × 365) | ~60 (4/day × 15 filing days) |
+| API failure resilience | Error propagated | Stale data served for 5min |
+
+---
+
 ## [2026-05-07] — Data Source Toggle + Cache Fixes
 
 ### Changed
