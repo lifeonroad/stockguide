@@ -1,6 +1,6 @@
 """
 dynamic_universe.py
-====================
+===================
 Static-first, non-blocking dynamic ticker universe.
 
 Architecture
@@ -8,11 +8,10 @@ Architecture
 1. Every API call gets a response in < 1ms — always returns SECTOR_STOCKS
    (static) or the last scored dynamic universe from cache.
 2. On startup (and on a 24h schedule), a background asyncio task kicks off
-   scoring. It uses:
-     • yf.download()    — bulk 1-year price history in ONE request (~15s)
-     • yahooquery async — bulk fundamentals (market cap, ROE, EPS, volume) (~20s)
+   chunked scoring. It processes tickers in batches of ~100 with staggered
+   delays to reduce burst load on external APIs.
 3. Once scoring finishes, results land in _LIVE_CACHE (in-memory) and
-   sector_cache.json (disk). All subsequent calls serve live data with
+   per-sector disk cache files. All subsequent calls serve live data with
    the ⚡ Live Universe badge.
 
 Scoring (0-100 per ticker)
@@ -22,22 +21,29 @@ Scoring (0-100 per ticker)
   Quality     25 pts  ROE threshold tiers + positive EPS
   Liquidity   15 pts  log-normalised avg volume [100k, 100M]
 
+Chunked Scoring
+---------------
+  Instead of fetching all ~500 tickers at once, we split into chunks of 100.
+  Each chunk takes ~30-45s to process, with a 5s delay between chunks.
+  Results are merged incrementally — sectors become live as they're scored.
+
 Public API
 ----------
 get_sector_stocks_cached(n=25)  → dict  (INSTANT — never blocks)
 trigger_background_score(n=25)  → fire-and-forget coroutine
 get_sector_meta(sector=None)    → dict  {is_dynamic, scored_at, ttl_hours, …}
-write_disk_cache(data)          → persist scored universe to disk
+write_disk_cache(data)          → persist scored universe to disk (per-sector)
 """
 
 import asyncio
-import yfinance as yf
 import json
 import logging
 import math
 import os
 import time
+import concurrent.futures
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from cache_utils import sanitize_metric
@@ -45,9 +51,10 @@ from cache_utils import sanitize_metric
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Disk cache path
+# Disk cache directory (per-sector granularity)
 # ---------------------------------------------------------------------------
-_CACHE_FILE = os.path.join(os.path.dirname(__file__), "sector_cache.json")
+_CACHE_DIR = os.path.join(os.path.dirname(__file__), "sector_cache")
+Path(_CACHE_DIR).mkdir(exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # In-memory state
@@ -55,6 +62,11 @@ _CACHE_FILE = os.path.join(os.path.dirname(__file__), "sector_cache.json")
 _LIVE_CACHE: Dict[str, dict] = {}          # populated by background task
 _LIVE_CACHE_TIME: Optional[float] = None   # epoch when cache was filled
 _SCORE_TASK_RUNNING: bool = False          # guard against concurrent runs
+_SECTOR_SCORED_AT: Dict[str, float] = {}   # per-sector timestamps
+
+# Chunking configuration
+CHUNK_SIZE = 100          # tickers per chunk
+CHUNK_DELAY = 5           # seconds between chunks
 
 # ---------------------------------------------------------------------------
 # GICS sector mapping  (our canonical key → yfinance sector string)
@@ -112,11 +124,10 @@ def _score(market_cap: float, momentum: float, roe: float,
 
 def _bulk_momentum(tickers: List[str]) -> Dict[str, float]:
     """
-    Download 1-year monthly prices for ALL tickers using data_client.
+    Download 1-year monthly prices for a batch of tickers using data_client.
     Returns { symbol: 52wk_return_decimal }. Misses default to 0.
     """
     from data_client import get_price_history
-    import concurrent.futures
 
     if not tickers:
         return {}
@@ -146,11 +157,10 @@ def _bulk_momentum(tickers: List[str]) -> Dict[str, float]:
 def _bulk_fundamentals(tickers: List[str]) -> Dict[str, dict]:
     """
     Use data_client to fetch market_cap, avg_volume, ROE, EPS,
-    and sector for all tickers in batch.
+    and sector for a batch of tickers.
     Returns { symbol: {market_cap, avg_volume, roe, eps, sector} }
     """
     from data_client import get_fundamentals, get_price_live
-    import concurrent.futures
 
     if not tickers:
         return {}
@@ -184,34 +194,71 @@ def _bulk_fundamentals(tickers: List[str]) -> Dict[str, dict]:
 
 
 # ---------------------------------------------------------------------------
-# Core scoring logic (runs in background thread → called via asyncio executor)
+# Chunked scoring (runs in background thread)
 # ---------------------------------------------------------------------------
 
-def _run_scoring(candidates: List[str], n: int) -> Dict[str, dict]:
+def _run_chunked_scoring(candidates: List[str], n: int) -> None:
     """
-    Synchronous scoring — runs in a thread pool via asyncio.to_thread().
-    Returns the full sector dict (same shape as SECTOR_STOCKS but with scores).
+    Score candidates in chunks, merging results incrementally.
+    Each chunk writes to the disk cache so partial results are available.
     """
-    from screener import SECTOR_STOCKS  # noqa: PLC0415 (avoid circular at module level)
+    from screener import SECTOR_STOCKS  # noqa: PLC0415
 
-    logger.info("[DynUniverse] Scoring %d candidates …", len(candidates))
     t0 = time.time()
+    chunks = [candidates[i:i + CHUNK_SIZE] for i in range(0, len(candidates), CHUNK_SIZE)]
+    logger.info("[DynUniverse] Starting chunked scoring: %d candidates in %d chunks",
+                len(candidates), len(chunks))
 
-    # Step 1 — bulk price/momentum in one yfinance request
-    momentum_map = _bulk_momentum(candidates)
-    logger.info("[DynUniverse] Momentum fetched in %.1fs (%d tickers)",
-                time.time() - t0, len(momentum_map))
+    all_momentum: Dict[str, float] = {}
+    all_fundamentals: Dict[str, dict] = {}
 
-    # Step 2 — bulk fundamentals via yahooquery (async under the hood)
-    fund_map = _bulk_fundamentals(candidates)
-    logger.info("[DynUniverse] Fundamentals fetched in %.1fs (%d tickers)",
-                time.time() - t0, len(fund_map))
+    for i, chunk in enumerate(chunks):
+        chunk_start = time.time()
+        logger.info("[DynUniverse] Processing chunk %d/%d (%d tickers)",
+                    i + 1, len(chunks), len(chunk))
 
-    # Step 3 — score and bucket by sector
-    sector_buckets: Dict[str, list] = {}  # sector → [(score, symbol)]
+        # Fetch momentum and fundamentals for this chunk
+        chunk_momentum = _bulk_momentum(chunk)
+        chunk_fundamentals = _bulk_fundamentals(chunk)
+
+        all_momentum.update(chunk_momentum)
+        all_fundamentals.update(chunk_fundamentals)
+
+        logger.info("[DynUniverse] Chunk %d complete in %.1fs (momentum=%d, fundamentals=%d)",
+                    i + 1, time.time() - chunk_start, len(chunk_momentum), len(chunk_fundamentals))
+
+        # Merge and write partial results after each chunk
+        _merge_and_write(all_momentum, all_fundamentals, candidates, n)
+
+        # Stagger chunks to reduce burst load
+        if i < len(chunks) - 1:
+            logger.info("[DynUniverse] Waiting %ds before next chunk...", CHUNK_DELAY)
+            time.sleep(CHUNK_DELAY)
+
+    total_time = time.time() - t0
+    logger.info("[DynUniverse] Chunked scoring complete in %.1fs", total_time)
+
+
+def _merge_and_write(
+    momentum_map: Dict[str, float],
+    fund_map: Dict[str, dict],
+    all_candidates: List[str],
+    n: int,
+) -> Dict[str, dict]:
+    """
+    Score all available data and write to in-memory + disk cache.
+    Returns the full sector dict.
+    """
+    from screener import SECTOR_STOCKS  # noqa: PLC0415
+
+    sector_buckets: Dict[str, list] = {}
     now_str = datetime.now(timezone.utc).isoformat()
+    now_ts = time.time()
 
-    for sym in candidates:
+    # Score only candidates that have fundamentals data
+    scored_candidates = [sym for sym in all_candidates if sym in fund_map]
+
+    for sym in scored_candidates:
         fd = fund_map.get(sym, {})
         sector_raw = fd.get("sector", "")
         our_sector = _YF_TO_OURS.get(sector_raw)
@@ -234,19 +281,32 @@ def _run_scoring(candidates: List[str], n: int) -> Dict[str, dict]:
         top = [sym for _, sym in bucket[:n]]
 
         if len(top) >= 5:
-            result[sector] = {"tickers": top, "is_dynamic": True, "scored_at": now_str}
+            sector_data = {"tickers": top, "is_dynamic": True, "scored_at": now_str}
+            result[sector] = sector_data
+            _SECTOR_SCORED_AT[sector] = now_ts
             logger.info("[DynUniverse] %s → %d dynamic tickers (top=%.1f)",
-                        sector, len(top), bucket[0][0])
+                        sector, len(top), bucket[0][0] if bucket else 0)
         else:
-            # Not enough scored tickers → fall back to static for this sector
-            result[sector] = {
-                "tickers": static_tickers,
-                "is_dynamic": False,
-                "scored_at": now_str,
-            }
-            logger.info("[DynUniverse] %s → static fallback (%d tickers)", sector, len(static_tickers))
+            # If we haven't scored enough for this sector yet, check disk cache
+            disk_sector = _load_sector_disk_cache(sector)
+            if disk_sector and disk_sector.get("is_dynamic"):
+                result[sector] = disk_sector
+            else:
+                result[sector] = {
+                    "tickers": static_tickers,
+                    "is_dynamic": False,
+                    "scored_at": now_str,
+                }
 
-    logger.info("[DynUniverse] Scoring complete in %.1fs", time.time() - t0)
+    # Update in-memory cache incrementally
+    global _LIVE_CACHE, _LIVE_CACHE_TIME
+    _LIVE_CACHE.update(result)
+    _LIVE_CACHE_TIME = now_ts
+
+    # Write per-sector disk caches
+    for sector, data in result.items():
+        write_sector_disk_cache(sector, data)
+
     return result
 
 
@@ -256,10 +316,10 @@ def _run_scoring(candidates: List[str], n: int) -> Dict[str, dict]:
 
 async def background_score_all(n: int = 25) -> None:
     """
-    Fire-and-forget coroutine.  Runs _run_scoring in a thread pool so the
-    event loop never blocks.  Writes results to _LIVE_CACHE and sector_cache.json.
+    Fire-and-forget coroutine. Runs chunked scoring in a thread pool so the
+    event loop never blocks.
     """
-    global _LIVE_CACHE, _LIVE_CACHE_TIME, _SCORE_TASK_RUNNING
+    global _SCORE_TASK_RUNNING
 
     if _SCORE_TASK_RUNNING:
         return
@@ -273,11 +333,8 @@ async def background_score_all(n: int = 25) -> None:
         candidates = []
 
     try:
-        result = await asyncio.to_thread(_run_scoring, candidates, n)
-        _LIVE_CACHE = result
-        _LIVE_CACHE_TIME = time.time()
-        write_disk_cache(result)
-        logger.info("[DynUniverse] Background scoring complete — %d sectors live", len(result))
+        await asyncio.to_thread(_run_chunked_scoring, candidates, n)
+        logger.info("[DynUniverse] Background scoring complete — %d sectors in cache", len(_LIVE_CACHE))
     except Exception as exc:
         logger.error("[DynUniverse] Background scoring failed: %s", exc)
     finally:
@@ -294,7 +351,7 @@ def get_sector_stocks_cached(n: int = 25) -> Dict[str, dict]:
 
     Priority order:
       1. In-memory live cache (if < 25h old)
-      2. Disk cache (sector_cache.json, if < 26h old)
+      2. Per-sector disk cache (if < 26h old)
       3. Static SECTOR_STOCKS fallback
 
     Never makes network calls. Call trigger_background_score() separately.
@@ -305,12 +362,26 @@ def get_sector_stocks_cached(n: int = 25) -> Dict[str, dict]:
     if _LIVE_CACHE and _LIVE_CACHE_TIME and (time.time() - _LIVE_CACHE_TIME) < 90000:
         return _LIVE_CACHE
 
-    # 2. Disk cache
-    disk = _load_disk_cache()
-    if disk:
-        return disk
+    # 2. Per-sector disk cache (granular fallback)
+    result = {}
+    all_stale = True
+    for sector, static_tickers in SECTOR_STOCKS.items():
+        disk = _load_sector_disk_cache(sector)
+        if disk:
+            result[sector] = disk
+            all_stale = False
+        else:
+            now_str = datetime.now(timezone.utc).isoformat()
+            result[sector] = {
+                "tickers": static_tickers,
+                "is_dynamic": False,
+                "scored_at": now_str,
+            }
 
-    # 3. Static fallback
+    if not all_stale:
+        return result
+
+    # 3. Full static fallback
     now_str = datetime.now(timezone.utc).isoformat()
     return {
         sector: {"tickers": tickers, "is_dynamic": False, "scored_at": now_str}
@@ -361,33 +432,59 @@ def get_sector_meta(sector: Optional[str] = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Disk cache helpers
+# Disk cache helpers (per-sector granularity)
 # ---------------------------------------------------------------------------
 
-def write_disk_cache(data: Dict[str, dict]) -> None:
+def _sector_cache_file(sector: str) -> str:
+    """Returns the path to a sector's cache file."""
+    safe_name = sector.replace(" ", "_").lower()
+    return os.path.join(_CACHE_DIR, f"{safe_name}.json")
+
+
+def write_sector_disk_cache(sector: str, data: dict) -> None:
+    """Write a single sector's scored data to disk."""
     try:
-        with open(_CACHE_FILE, "w") as f:
+        path = _sector_cache_file(sector)
+        with open(path, "w") as f:
             json.dump(data, f)
-        logger.info("[DynUniverse] Wrote disk cache → %s", _CACHE_FILE)
     except Exception as exc:
-        logger.warning("[DynUniverse] Could not write disk cache: %s", exc)
+        logger.warning("[DynUniverse] Could not write sector cache for %s: %s", sector, exc)
+
+
+def _load_sector_disk_cache(sector: str) -> Optional[dict]:
+    """Load a single sector's cached data from disk (if < 26h old)."""
+    try:
+        path = _sector_cache_file(sector)
+        if not os.path.exists(path):
+            return None
+        age_h = (time.time() - os.path.getmtime(path)) / 3600
+        if age_h > 26:
+            return None
+        with open(path) as f:
+            return json.load(f)
+    except Exception as exc:
+        logger.debug("[DynUniverse] Could not read sector cache for %s: %s", sector, exc)
+        return None
+
+
+def write_disk_cache(data: Dict[str, dict]) -> None:
+    """Write all sectors to disk (legacy compat — calls per-sector writer)."""
+    for sector, sector_data in data.items():
+        write_sector_disk_cache(sector, sector_data)
+    logger.info("[DynUniverse] Wrote disk cache for %d sectors → %s", len(data), _CACHE_DIR)
 
 
 def _load_disk_cache() -> Optional[Dict[str, dict]]:
-    try:
-        if not os.path.exists(_CACHE_FILE):
-            return None
-        age_h = (time.time() - os.path.getmtime(_CACHE_FILE)) / 3600
-        if age_h > 26:
-            logger.info("[DynUniverse] Disk cache stale (%.1fh), ignoring", age_h)
-            return None
-        with open(_CACHE_FILE) as f:
-            data = json.load(f)
-        logger.info("[DynUniverse] Loaded disk cache (%.1fh old)", age_h)
-        return data
-    except Exception as exc:
-        logger.warning("[DynUniverse] Could not read disk cache: %s", exc)
-        return None
+    """Load all sectors from per-sector disk cache (legacy compat)."""
+    from screener import SECTOR_STOCKS  # noqa: PLC0415
+    result = {}
+    any_loaded = False
+    for sector in SECTOR_STOCKS:
+        data = _load_sector_disk_cache(sector)
+        if data:
+            result[sector] = data
+            any_loaded = True
+    return result if any_loaded else None
 
 
 # ---------------------------------------------------------------------------
