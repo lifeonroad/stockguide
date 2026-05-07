@@ -1,4 +1,4 @@
-import yfinance as yf
+from data_client import get_ticker_info
 from cache_utils import timed_cache, fetch_with_retry
 
 # Defined based on our Superinvestor research
@@ -25,13 +25,14 @@ def get_copycat_performance():
     data = []
 
     try:
-        # Fetch one by one with delays to avoid 401 blocks
+        # Fetch using data_client (respects defeatbeta toggle)
         for holding in COPYCAT_HOLDINGS:
             sym = holding['symbol']
             
             try:
-                stock = yf.Ticker(sym)
-                info = fetch_with_retry(lambda t=stock: t.info, max_attempts=3, base_delay=2.0)
+                info = get_ticker_info(sym)
+                if not info:
+                    continue
                 
                 # Get price data
                 price = info.get('currentPrice', info.get('regularMarketPrice', 0.0))
@@ -53,8 +54,8 @@ def get_copycat_performance():
                     "market_cap": info.get('marketCap', 0)
                 })
                 
-                # Small delay between requests (0.5-1 second)
-                time.sleep(0.5)
+                # Small delay between requests to avoid overwhelming the API
+                time.sleep(0.2)
                 
             except Exception as stock_err:
                 print(f"Error fetching {sym}: {stock_err}")

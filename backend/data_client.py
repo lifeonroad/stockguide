@@ -136,6 +136,98 @@ def _get_yf_fundamentals(symbol: str) -> dict:
 
 
 # ──────────────────────────────────────────────────────────
+# Unified Ticker Info  (respects defeatbeta toggle)
+# ──────────────────────────────────────────────────────────
+
+@timed_cache(ttl_seconds=1800, soft_ttl_seconds=1200)   # 30m hard, 20m soft (SWR)
+def get_ticker_info(symbol: str) -> dict:
+    """
+    Returns a yfinance-compatible info dict that respects the DEFEATBETA_ENABLED
+    toggle.  Merges defeatbeta fundamentals (cached 24h) with live yfinance
+    price data (cached 5m) so callers get a single drop-in replacement for
+    `yf.Ticker(symbol).info`.
+
+    Fields added on top of get_fundamentals():
+      currentPrice, regularMarketPrice, regularMarketChangePercent,
+      regularMarketVolume, regularMarketPreviousClose, 52WeekChange,
+      averageVolume, fiftyTwoWeekHigh, fiftyTwoWeekLow, beta,
+      trailingAnnualDividendYield, dividendRate, dividendYield,
+      shortRatio, sharesOutstanding, forwardEps, forwardPE
+    """
+    base = get_fundamentals(symbol)
+    if not base:
+        return {}
+
+    live = get_price_live(symbol)
+    hist = get_price_history(symbol, days=252)
+
+    # 52-week high/low
+    high_52w = low_52w = 0.0
+    if hist is not None and not hist.empty:
+        try:
+            high_52w = float(hist['high'].max())
+            low_52w = float(hist['low'].min())
+        except Exception:
+            pass
+
+    # 52-week change
+    change_52w = 0.0
+    if hist is not None and not hist.empty and len(hist) > 2:
+        try:
+            change_52w = float((hist['close'].iloc[-1] - hist['close'].iloc[0]) / hist['close'].iloc[0])
+        except Exception:
+            pass
+
+    # Merge into yfinance-compatible shape
+    return {
+        "symbol": base.get("symbol", symbol),
+        "shortName": base.get("shortName", symbol),
+        "longName": base.get("longName", symbol),
+        "sector": base.get("sector", "Unknown"),
+        "industry": base.get("industry", "Unknown"),
+        "longBusinessSummary": base.get("longBusinessSummary", "No business summary available."),
+        "currentPrice": live.get("price", 0.0),
+        "regularMarketPrice": live.get("price", 0.0),
+        "regularMarketChangePercent": live.get("change_pct", 0.0),
+        "regularMarketVolume": live.get("volume", 0),
+        "regularMarketPreviousClose": live.get("price", 0.0),  # best available
+        "marketCap": base.get("marketCap", 0.0),
+        "trailingPE": base.get("trailingPE", 0.0),
+        "forwardPE": base.get("trailingPE", 0.0),
+        "trailingEps": base.get("trailingEps", 0.0),
+        "forwardEps": base.get("trailingEps", 0.0),
+        "priceToBook": base.get("priceToBook", 0.0),
+        "priceToSalesTrailing12Months": base.get("priceToSalesTrailing12Months", 0.0),
+        "pegRatio": base.get("pegRatio", 0.0),
+        "returnOnEquity": base.get("returnOnEquity", 0.0),
+        "returnOnAssets": base.get("returnOnAssets", 0.0),
+        "debtToEquity": base.get("debtToEquity", 0.0),
+        "currentRatio": base.get("currentRatio", 0.0),
+        "freeCashflow": base.get("freeCashflow", 0.0),
+        "totalDebt": base.get("totalDebt", 0.0),
+        "totalCash": base.get("totalCash", 0.0),
+        "revenueGrowth": base.get("revenueGrowth", 0.0),
+        "earningsGrowth": base.get("earningsGrowth", 0.0),
+        "totalRevenue": base.get("revenue", 0.0),
+        "netIncomeToCommon": base.get("netIncome", 0.0),
+        "operatingCashflow": base.get("freeCashflow", 0.0),  # best proxy
+        "52WeekChange": change_52w,
+        "fiftyTwoWeekHigh": high_52w,
+        "fiftyTwoWeekLow": low_52w,
+        "averageVolume": live.get("volume", 0),
+        "volume": live.get("volume", 0),
+        "beta": 0.0,
+        "trailingAnnualDividendYield": 0.0,
+        "dividendRate": 0.0,
+        "dividendYield": 0.0,
+        "payoutRatio": 0.0,
+        "shortRatio": 0.0,
+        "sharesOutstanding": 0.0,
+        "enterpriseToEbitda": 0.0,
+    }
+
+
+# ──────────────────────────────────────────────────────────
 # Live Price  (yfinance — real-time)
 # ──────────────────────────────────────────────────────────
 

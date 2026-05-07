@@ -6,7 +6,7 @@ Fetches key macroeconomic data from FRED (St. Louis Fed) API.
 import os
 import requests
 from datetime import datetime, timedelta
-from cache_utils import timed_cache
+from cache_utils import timed_cache, fetch_with_retry
 
 
 @timed_cache(ttl_seconds=86400, soft_ttl_seconds=43200)  # 24h hard, 12h soft (SWR)
@@ -64,7 +64,11 @@ def fetch_fred_series(api_key: str, series_id: str, limit: int = 12):
         'limit': limit
     }
     
-    response = requests.get(url, params=params, timeout=10)
+    response = fetch_with_retry(
+        lambda: requests.get(url, params=params, timeout=10),
+        max_attempts=3,
+        base_delay=2.0,
+    )
     response.raise_for_status()
     data = response.json()
     

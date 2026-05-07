@@ -1,10 +1,10 @@
 
 import time
-import yfinance as yf
 from typing import Optional
 import pandas as pd
 import random
 from cache_utils import timed_cache, fetch_with_retry
+from data_client import get_ticker_info
 
 # Mapping Sectors to ETFs (Proxies)
 SECTOR_ETFS = {
@@ -165,8 +165,9 @@ def get_sector_metrics_from_constituents(sector_name):
     # Sample top 5 stocks for speed (instead of all)
     for symbol in stocks[:5]:  # noqa: E501
         try:
-            ticker = yf.Ticker(symbol)
-            info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=3, base_delay=1.5)
+            info = get_ticker_info(symbol)
+            if not info:
+                continue
 
             roe = info.get('returnOnEquity', 0)
             debt = info.get('debtToEquity', 0)
@@ -241,10 +242,8 @@ def analyze_sector_fundamentals(sector_name):
     stock_data = []
     
     for symbol in stocks:
-        t = yf.Ticker(symbol)
-        try:
-            i = fetch_with_retry(lambda _t=t: _t.info, max_attempts=3, base_delay=1.5)
-        except Exception:
+        i = get_ticker_info(symbol)
+        if not i:
             i = {}
         time.sleep(0.2)  # gentle throttle
         

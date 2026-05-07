@@ -97,9 +97,9 @@ async def market_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/industries/top")
-def top_industries():
+async def top_industries():
     try:
-        data = get_industry_rankings()
+        data = await asyncio.to_thread(get_industry_rankings)
         return {
             "rankings": data,
             "universe_meta": get_sector_meta(),
@@ -113,9 +113,9 @@ from cycle_analytics import get_cycle_intelligence
 from dip_hunter import scan_etf_dips, scan_stock_dips, get_dip_summary
 
 @app.get("/api/stocks/{industry}")
-def stock_picks(industry: str):
+async def stock_picks(industry: str):
     try:
-        data = analyze_sector_fundamentals(industry)
+        data = await asyncio.to_thread(analyze_sector_fundamentals, industry)
         if "error" in data:
              raise HTTPException(status_code=404, detail=data['error'])
         data["universe_meta"] = get_sector_meta(industry)
@@ -124,9 +124,9 @@ def stock_picks(industry: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/analyze/{symbol}")
-def analyze_stock_endpoint(symbol: str, strategy: str = "buffett"):
+async def analyze_stock_endpoint(symbol: str, strategy: str = "buffett"):
     try:
-        data = analyze_stock_strategy(symbol, strategy)
+        data = await asyncio.to_thread(analyze_stock_strategy, symbol, strategy)
         if "error" in data:
             raise HTTPException(status_code=404, detail=data['error'])
         return data
@@ -237,26 +237,29 @@ async def market_news():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/superinvestors")
-def superinvestors_endpoint():
+async def superinvestors_endpoint():
     try:
+        investors = await asyncio.to_thread(get_live_superinvestors)
+        next_filing = await asyncio.to_thread(get_next_filing_info)
+        filing_status = await asyncio.to_thread(get_filing_status)
         return {
-            "investors": get_live_superinvestors(),
-            "next_filing": get_next_filing_info(),
-            "filing_status": get_filing_status()
+            "investors": investors,
+            "next_filing": next_filing,
+            "filing_status": filing_status
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/admin/update-universe")
-def update_universe_endpoint():
+async def update_universe_endpoint():
     """Triggers the weekly scraper for S&P 500 / Nasdaq 100 universe +
     pre-warms the dynamic sector scoring cache on disk."""
     try:
-        success = update_universe_file()
-        # Pre-warm dynamic sector rankings into sector_cache.json
+        success = await asyncio.to_thread(update_universe_file)
+        # Pre-warm dynamic sector rankings into per-sector disk cache
         try:
-            from dynamic_universe import get_dynamic_sector_stocks, write_disk_cache  # noqa: PLC0415
-            live_data = get_dynamic_sector_stocks.__wrapped__(25) if hasattr(get_dynamic_sector_stocks, '__wrapped__') else get_dynamic_sector_stocks(25)
+            from dynamic_universe import get_sector_stocks_cached, write_disk_cache  # noqa: PLC0415
+            live_data = get_sector_stocks_cached(25)
             write_disk_cache(live_data)
         except Exception as cache_err:
             pass  # Non-fatal; disk cache is best-effort
@@ -268,18 +271,18 @@ def update_universe_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/copycat")
-def get_copycat():
-    return get_copycat_performance()
+async def get_copycat():
+    return await asyncio.to_thread(get_copycat_performance)
 
 @app.get("/api/moonshots")
-def get_moonshots():
+async def get_moonshots():
     scanner = MoonshotScanner()
-    return scanner.get_moonshots()
+    return await asyncio.to_thread(scanner.get_moonshots)
 
 @app.get("/api/screeners/{strategy_id}")
-def get_screeners(strategy_id: str):
+async def get_screeners(strategy_id: str):
     engine = get_screener_engine()
-    stocks = engine.run_screen(strategy_id)
+    stocks = await asyncio.to_thread(engine.run_screen, strategy_id)
     return {
         "stocks": stocks,
         "universe_meta": get_sector_meta(),
@@ -370,7 +373,7 @@ def update_portfolio(portfolio_id: str, portfolio: PortfolioCreate, pm: Portfoli
 from market_data import get_batch_quotes
 
 @app.get("/api/quotes")
-def get_quotes(symbols: str):
+async def get_quotes(symbols: str):
     """
     Get batch quotes for comma-separated symbols.
     Example: /api/quotes?symbols=AAPL,MSFT,TSLA
@@ -379,7 +382,7 @@ def get_quotes(symbols: str):
         return {}
     
     ticker_list = symbols.split(',')
-    return get_batch_quotes(ticker_list)
+    return await asyncio.to_thread(get_batch_quotes, ticker_list)
 
 @app.delete("/api/portfolios/{portfolio_id}")
 def delete_portfolio(portfolio_id: str, pm: PortfolioManager = Depends(get_portfolio_manager)):

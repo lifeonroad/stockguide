@@ -10,6 +10,7 @@ from datetime import datetime
 
 import requests
 import io
+from cache_utils import fetch_with_retry
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36"
@@ -19,7 +20,11 @@ def fetch_sp500_tickers():
     """Scrape S&P 500 tickers from Wikipedia."""
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        response = requests.get(url, headers=HEADERS)
+        response = fetch_with_retry(
+            lambda: requests.get(url, headers=HEADERS, timeout=15),
+            max_attempts=3,
+            base_delay=2.0,
+        )
         response.raise_for_status()
         
         tables = pd.read_html(io.StringIO(response.text))
@@ -36,7 +41,11 @@ def fetch_nasdaq100_tickers():
     """Scrape Nasdaq 100 tickers from Wikipedia."""
     try:
         url = "https://en.wikipedia.org/wiki/Nasdaq-100"
-        response = requests.get(url, headers=HEADERS)
+        response = fetch_with_retry(
+            lambda: requests.get(url, headers=HEADERS, timeout=15),
+            max_attempts=3,
+            base_delay=2.0,
+        )
         response.raise_for_status()
         
         tables = pd.read_html(io.StringIO(response.text))

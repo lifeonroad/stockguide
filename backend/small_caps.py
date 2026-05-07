@@ -1,10 +1,10 @@
 import asyncio
 import logging
-import yfinance as yf
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from cache_utils import timed_cache, sanitize_metric
 from dynamic_universe import _bulk_fundamentals, _bulk_momentum
+from data_client import get_ticker_info
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,9 @@ def get_small_cap_gems(min_growth: float = 0.05, max_pe: float = 25.0, min_roe: 
                 continue
             
             # 4. Fetch deeper metrics for filtered subset
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
+            info = get_ticker_info(symbol)
+            if not info:
+                continue
             
             forward_pe = info.get('forwardPE') or info.get('trailingPE') or 0
             price_to_book = info.get('priceToBook') or 0

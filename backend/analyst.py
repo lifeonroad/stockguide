@@ -1,5 +1,5 @@
 
-import yfinance as yf
+from data_client import get_ticker_info, get_price_history
 from macro import get_macro_trends, SECTOR_MAP
 from cache_utils import fetch_with_retry
 import math
@@ -7,13 +7,8 @@ import math
 class BaseStrategy:
     def __init__(self, symbol):
         self.symbol = symbol.upper()
-        self.ticker = yf.Ticker(symbol)
         try:
-            self.info = fetch_with_retry(
-                lambda t=self.ticker: t.info,
-                max_attempts=3,
-                base_delay=2.0,
-            )
+            self.info = get_ticker_info(symbol)
         except Exception:
             self.info = {}
         self.reasons = []
@@ -70,7 +65,9 @@ class BaseStrategy:
         Note: Sells are less meaningful (liquidity), but Cluster Sales are bad.
         """
         try:
-            tx = self.ticker.insider_transactions
+            import yfinance as yf
+            ticker = yf.Ticker(self.symbol)
+            tx = ticker.insider_transactions
             if tx is None or tx.empty:
                 return "Neutral (No Data)"
             

@@ -27,7 +27,11 @@ def get_gdp_from_fred():
             'sort_order': 'desc',
             'limit': 1
         }
-        response = requests.get(url, params=params, timeout=10)
+        response = fetch_with_retry(
+            lambda: requests.get(url, params=params, timeout=10),
+            max_attempts=3,
+            base_delay=2.0,
+        )
         data = response.json()
         
         if 'observations' in data and len(data['observations']) > 0:

@@ -18,6 +18,7 @@ import requests
 from datetime import datetime, date
 from superinvestors import get_superinvestors as get_static_superinvestors
 from filing_calendar import get_filing_status, filing_aware_ttl
+from cache_utils import fetch_with_retry
 
 # CIK codes for our tracked investors
 INVESTOR_CIKS = {
@@ -148,7 +149,11 @@ def _fetch_13f_holdings(cik, api_key):
     try:
         url = f"https://financialmodelingprep.com/api/v3/form-thirteen/{cik}"
         params = {'apikey': api_key}
-        response = requests.get(url, params=params, timeout=10)
+        response = fetch_with_retry(
+            lambda: requests.get(url, params=params, timeout=10),
+            max_attempts=3,
+            base_delay=2.0,
+        )
 
         if response.status_code == 200:
             data = response.json()

@@ -1,5 +1,69 @@
 # Changelog
 
+## [2026-05-07] — Phase 4: Data Routing & Non-Blocking Endpoints
+
+### New
+- **`data_client.get_ticker_info()`**: Unified ticker info facade
+  - Merges defeatbeta fundamentals (24h cache) with live yfinance price (5m cache)
+  - Returns yfinance-compatible dict — drop-in replacement for `yf.Ticker(symbol).info`
+  - Respects `DEFEATBETA_ENABLED` toggle
+  - Includes 52-week high/low, 52-week change, volume, dividends from history
+
+### Changed — Retry Hygiene
+- **`superinvestors_live.py`**: FMP 13F API calls now use `fetch_with_retry` (3 attempts, 2s base delay)
+- **`updater.py`**: Wikipedia scraper uses `fetch_with_retry` for both S&P 500 and Nasdaq 100 fetches
+- **`economic.py`**: FRED API calls use `fetch_with_retry`
+- **`market_data.py`**: FRED GDP fetch uses `fetch_with_retry`
+
+### Changed — Data Routing (10 modules routed through `data_client.py`)
+- **`analyst.py`**: All `yf.Ticker().info` calls → `get_ticker_info()` (insider_transactions kept direct yfinance — no defeatbeta equivalent)
+- **`forecasting.py`**: `yf.Ticker().info` → `get_ticker_info()`
+- **`copycat.py`**: Per-stock `yf.Ticker().info` → `get_ticker_info()` (0.5s→0.2s delay)
+- **`research.py`**: `yf.Ticker().info` → `get_ticker_info()` (removed redundant try/except wrapper)
+- **`screener.py`**: Both `yf.Ticker().info` calls → `get_ticker_info()`
+- **`small_caps.py`**: Post-filter `yf.Ticker().info` → `get_ticker_info()`
+- **`dip_hunter.py`**: Stock scanner uses `get_price_history()` + `get_ticker_info()` (ETF scanning kept direct yfinance — defeatbeta doesn't track ETFs)
+
+### Changed — Non-Blocking Endpoints
+- 9 sync endpoints converted to `async def` with `asyncio.to_thread()`:
+  - `/api/industries/top`, `/api/stocks/{industry}`, `/api/analyze/{symbol}`
+  - `/api/superinvestors`, `/api/admin/update-universe`
+  - `/api/copycat`, `/api/moonshots`, `/api/screeners/{strategy_id}`, `/api/quotes`
+- Prevents event loop blocking during long-running API calls
+
+### Fixes
+- `main.py` `/api/admin/update-universe`: Updated to use `get_sector_stocks_cached()` instead of deprecated `get_dynamic_sector_stocks()`
+- Removed stale `sector_cache.json` comment (replaced by per-sector `sector_cache/` directory)
+
+---
+
+## [2026-05-07] — Phase 3: Dynamic Universe Optimization
+
+### New
+- **Chunked scoring** in `dynamic_universe.py`
+  - Processes ~500 tickers in batches of 100 with 5s stagger delays
+  - Incremental merge — sectors become live as they're scored
+  - Partial results written to disk after each chunk
+- **Per-sector disk cache granularity**
+  - Single `sector_cache.json` replaced by `sector_cache/<sector>.json` files
+  - Individual sectors can be refreshed without invalidating others
+  - 26h TTL per sector file
+- **`write_sector_disk_cache()` / `_load_sector_disk_cache()`**: Per-sector disk I/O
+
+### Changed
+- **Bulk parallel fetching**: `ThreadPoolExecutor(max_workers=10)` for momentum and fundamentals per chunk
+- **Static-first architecture**: `get_sector_stocks_cached()` returns instantly via in-memory → disk cache → static fallback
+- **Backwards-compat shim**: `get_dynamic_sector_stocks()` kept for existing callers
+
+### Performance Impact
+| Metric | Before | After |
+|---|---|---|
+| First API response during scoring | Blocked until complete | < 1ms (static fallback) |
+| Scoring burst load | ~500 simultaneous requests | 100/chunk, 5s stagger |
+| Cache granularity | All-or-nothing single file | Per-sector independent files |
+
+---
+
 ## [2026-05-07] — Phase 2: SWR Caching & Cache Warming
 
 ### New

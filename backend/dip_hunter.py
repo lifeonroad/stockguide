@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 from screener import SECTOR_ETFS, SECTOR_STOCKS, GROWTH_STOCKS, DIVIDEND_KINGS, get_sector_stocks
 from cache_utils import fetch_with_retry
+from data_client import get_ticker_info, get_price_history
 
 class DipCache:
     """Simple in-memory cache with TTL"""
@@ -186,33 +187,31 @@ def scan_etf_dips() -> List[Dict]:
     return results
 
 def fetch_single_stock(ticker, sector):
-    """Helper for concurrent stock scanning"""
+    """Helper for concurrent stock scanning — uses data_client for info."""
     # Small random sleep to spread concurrent requests from same IP
     time.sleep(random.uniform(0.1, 0.6))
     try:
-        stock = yf.Ticker(ticker)
-        hist = fetch_with_retry(lambda t=stock: t.history(period='1y'), max_attempts=3, base_delay=1.5)
-        if hist.empty: return None
+        hist = get_price_history(ticker, days=252)
+        if hist is None or hist.empty: return None
         
         # Calculate drop metrics first for quick filtering
-        current_price = hist['Close'].iloc[-1]
-        high_price = hist['High'].max()
+        current_price = hist['close'].iloc[-1]
+        high_price = hist['high'].max()
         drop_pct = round(((current_price - high_price) / high_price) * 100, 2)
         
         # Calculate recovery metrics
-        low_5d = hist['Low'].tail(5).min()
+        low_5d = hist['low'].tail(5).min()
         recovery_5d = round(((current_price - low_5d) / low_5d) * 100, 2) if low_5d > 0 else 0.0
         
-        low_15d = hist['Low'].tail(15).min()
+        low_15d = hist['low'].tail(15).min()
         recovery_15d = round(((current_price - low_15d) / low_15d) * 100, 2) if low_15d > 0 else 0.0
         
         if abs(drop_pct) < 5 and sector != "Tracked": return None
         
-        try:
-            info = fetch_with_retry(lambda t=stock: t.info, max_attempts=3, base_delay=1.5)
-        except Exception:
-            info = {}
-        rsi = calculate_rsi(hist['Close'])
+        info = get_ticker_info(ticker)
+        if not info: return None
+
+        rsi = calculate_rsi(hist['close'])
         roe = info.get('returnOnEquity', 0)
         debt_equity = info.get('debtToEquity', 0)
         profit_margin = info.get('profitMargins', 0)

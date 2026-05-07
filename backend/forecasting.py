@@ -1,6 +1,6 @@
 
-import yfinance as yf
 import pandas as pd
+from data_client import get_ticker_info
 from cache_utils import timed_cache, fetch_with_retry
 
 @timed_cache(ttl_seconds=1800, soft_ttl_seconds=1200)  # 30m hard, 20m soft (SWR)
@@ -12,10 +12,8 @@ def analyze_stock_buffett(symbol):
     3. Low Debt (Safety)
     4. Fair Valuation (Margin of Safety)
     """
-    ticker = yf.Ticker(symbol)
-    try:
-        info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=3, base_delay=2.0)
-    except Exception:
+    info = get_ticker_info(symbol)
+    if not info or 'symbol' not in info:
         return {"error": "Symbol not found or data unavailable."}
 
     # 1. Gather Metrics
