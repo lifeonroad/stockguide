@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-05-07] — Dip Hunter Dynamic Sector Expansion
+
+### New
+- **Dynamic sector expansion**: `scan_stock_dips()` now detects "bleeding" sectors via ETF analysis (drop > 8%, RSI < 40) and automatically expands the scan universe to include ALL constituents from `SECTOR_STOCKS` for those sectors.
+  - During normal market: scans ~108 curated tickers (~15s first run)
+  - During sector crash (e.g., SaaS-pocalypse, healthcare selloff): scans ~150-250 tickers (~20-30s first run)
+  - Currently detects Financials and Healthcare as bleeding sectors → expands from 10→24 and 10→24 tickers respectively
+- **`_get_bleeding_sectors()`**: Parallel ETF analysis across 10 sector ETFs (~0.8s total)
+- **`_bulk_fundamentals_fast()`**: Fast bulk fundamentals via yahooquery (parallel batches of 40, ~10s for 120 tickers vs ~300s with defeatbeta)
+- **`_build_scan_tasks()`**: Combines curated universe with bleeding sector constituents dynamically
+
+### Performance
+- First run: 293s → 18.5s (16x faster)
+- Cached: <1ms
+- Top dips found: PYPL (-41.5%, BEST), NFLX (-34.2%, BEST), SYK (-26.8%, BEST), META (-22.4%, BEST)
+
 ## [2026-05-07] — Dip Hunter Performance Fix
 
 ### Fixed
