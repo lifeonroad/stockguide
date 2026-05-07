@@ -1,5 +1,6 @@
 
 import time
+import yfinance as yf
 from typing import Optional
 import pandas as pd
 import random

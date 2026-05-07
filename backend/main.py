@@ -62,6 +62,21 @@ async def _startup_background_tasks():
             success = sum(1 for r in results if not isinstance(r, Exception))
             log.info("[WARMUP] Completed: %d/%d caches warmed successfully", success, len(results))
 
+        # Warm dip hunter cache in background (delayed to not compete with startup)
+        def warm_dip_hunter():
+            try:
+                from dip_hunter import scan_stock_dips
+                log.info("[WARMUP] Starting dip hunter scan (first run, ~2-5 min)...")
+                t0 = __import__('time').time()
+                result = scan_stock_dips()
+                elapsed = __import__('time').time() - t0
+                log.info("[WARMUP] Dip hunter warmed: %d dips in %.0fs", len(result), elapsed)
+            except Exception as exc:
+                log.warning("[WARMUP] Dip hunter warm failed: %s", exc)
+
+        import threading
+        threading.Timer(10, warm_dip_hunter).start()
+
     asyncio.create_task(_warm_caches())
 
 # Enable CORS for frontend (if running separately, though we serve static now)
