@@ -12,11 +12,24 @@ export async function loadSuperinvestors() {
         const payload = await res.json();
         const investors = Array.isArray(payload) ? payload : (payload.investors || []);
         const nextFiling = payload.next_filing;
+        const filingStatus = payload.filing_status;
 
         const filingEl = document.getElementById('next-filing-info');
-        if (filingEl && nextFiling) {
-            filingEl.textContent = nextFiling.status;
+        if (filingEl) {
             filingEl.classList.remove('hidden');
+            filingEl.classList.remove('animate-pulse');
+
+            if (filingStatus) {
+                filingEl.textContent = filingStatus.badge;
+                const colorMap = {
+                    'green': 'bg-green-500/10 border-green-500/20 text-green-400',
+                    'yellow': 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
+                    'red': 'bg-red-500/10 border-red-500/20 text-red-400'
+                };
+                filingEl.className = `inline-block border px-4 py-2 rounded-full text-sm font-medium ${colorMap[filingStatus.badge_color] || colorMap['green']}`;
+            } else if (nextFiling) {
+                filingEl.textContent = nextFiling.status;
+            }
         }
 
         container.innerHTML = '';

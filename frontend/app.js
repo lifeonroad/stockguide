@@ -142,10 +142,76 @@ function switchTab(tabName) {
 }
 window.switchTab = switchTab;
 
+// --- Data Source Toggle ---
+async function loadDataSourceStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/admin/data-source`);
+        const data = await res.json();
+        updateDataSourceUI(data);
+    } catch (e) {
+        console.error("Failed to load data source status:", e);
+    }
+}
+
+function updateDataSourceUI(data) {
+    const btn = document.getElementById('datasource-toggle');
+    const label = document.getElementById('datasource-label');
+    if (!btn || !label) return;
+
+    label.textContent = data.current_source;
+
+    if (data.defeatbeta_enabled) {
+        btn.className = "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-all bg-purple-500/20 text-purple-300 border-purple-500/50 hover:bg-purple-500/30";
+    } else {
+        btn.className = "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-all bg-blue-500/20 text-blue-300 border-blue-500/50 hover:bg-blue-500/30";
+    }
+}
+
+async function toggleDataSource() {
+    const btn = document.getElementById('datasource-toggle');
+    const label = document.getElementById('datasource-label');
+    if (!label) return;
+
+    const currentlyDefeatbeta = label.textContent === 'defeatbeta';
+    const newState = !currentlyDefeatbeta;
+    const sourceName = newState ? 'yfinance' : 'defeatbeta';
+
+    // Optimistic UI update
+    label.textContent = 'Switching...';
+    btn.classList.add('animate-pulse');
+
+    try {
+        const res = await fetch(`${API_BASE}/admin/data-source`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: newState })
+        });
+        const data = await res.json();
+
+        updateDataSourceUI({
+            defeatbeta_enabled: newState,
+            current_source: data.current
+        });
+        btn.classList.remove('animate-pulse');
+
+        // Show reload prompt
+        const reload = confirm(data.message + '\n\nReload now?');
+        if (reload) {
+            window.location.reload();
+        }
+    } catch (e) {
+        label.textContent = sourceName;
+        btn.classList.remove('animate-pulse');
+        alert('Failed to switch data source: ' + e.message);
+    }
+}
+window.toggleDataSource = toggleDataSource;
+
 // --- Init Event ---
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     await loadMarketStatus();
     await loadMacroTrends();
     await loadIndustries();
+    await loadDataSourceStatus();
 });

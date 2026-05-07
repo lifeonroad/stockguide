@@ -41,6 +41,13 @@ logger = logging.getLogger(__name__)
 #   cache_key -> {"result": ..., "expiry": float, "last_good": ...}
 _cache: dict = {}
 
+# Circuit breaker state:
+#   func_key -> {"failures": int, "state": "closed"|"open"|"half_open", "opened_at": float}
+_circuit_breakers: dict = {}
+
+FAILURE_THRESHOLD = 3       # consecutive failures before opening
+COOLDOWN_SECONDS = 300      # 5 min cooldown after circuit opens
+
 
 def timed_cache(ttl_seconds: int):
     """
@@ -64,6 +71,7 @@ def timed_cache(ttl_seconds: int):
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             cache_key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
+            breaker_key = func.__name__
             current_time = time.time()
 
             entry = _cache.get(cache_key)
@@ -73,10 +81,41 @@ def timed_cache(ttl_seconds: int):
                 logger.debug("[CACHE HIT] %s", func.__name__)
                 return entry["result"]
 
+            # --- Circuit breaker check ---
+            breaker = _circuit_breakers.get(breaker_key)
+            if breaker and breaker["state"] == "open":
+                # Check if cooldown has elapsed
+                if current_time - breaker["opened_at"] >= COOLDOWN_SECONDS:
+                    breaker["state"] = "half_open"
+                    logger.info("[CIRCUIT HALF-OPEN] %s — allowing one test request", func.__name__)
+                else:
+                    # Still in cooldown — serve stale or raise
+                    if entry and entry.get("last_good") is not None:
+                        logger.warning(
+                            "[CIRCUIT OPEN] %s — serving stale data (cooldown active)",
+                            func.__name__,
+                        )
+                        return entry["last_good"]
+                    logger.error(
+                        "[CIRCUIT OPEN] %s — no cached data available, failing",
+                        func.__name__,
+                    )
+                    # Re-raise the last known error
+                    raise RuntimeError(
+                        f"Circuit breaker open for {func.__name__}: API unavailable, no cached data"
+                    )
+
             # --- Cache miss / expired ---
             logger.debug("[CACHE MISS] %s", func.__name__)
             try:
                 result = func(*args, **kwargs)
+
+                # Success — reset circuit breaker
+                if breaker:
+                    breaker["failures"] = 0
+                    breaker["state"] = "closed"
+                    logger.info("[CIRCUIT CLOSED] %s — request succeeded, reset breaker", func.__name__)
+
                 _cache[cache_key] = {
                     "result": result,
                     "expiry": current_time + ttl_seconds,
@@ -84,6 +123,28 @@ def timed_cache(ttl_seconds: int):
                 }
                 return result
             except Exception as exc:
+                # Track failure for circuit breaker
+                if breaker is None:
+                    _circuit_breakers[breaker_key] = {
+                        "failures": 1,
+                        "state": "closed",
+                        "opened_at": 0,
+                    }
+                    breaker = _circuit_breakers[breaker_key]
+                else:
+                    breaker["failures"] += 1
+
+                # Check if we should open the circuit
+                if breaker["failures"] >= FAILURE_THRESHOLD and breaker["state"] != "open":
+                    breaker["state"] = "open"
+                    breaker["opened_at"] = current_time
+                    logger.warning(
+                        "[CIRCUIT OPEN] %s — %d consecutive failures. "
+                        "Entering %ds cooldown.",
+                        func.__name__, breaker["failures"], COOLDOWN_SECONDS,
+                    )
+
+                # Stale fallback
                 if entry and entry.get("last_good") is not None:
                     logger.warning(
                         "[CACHE STALE] %s failed (%s). Returning last known good value.",
@@ -137,7 +198,37 @@ def fetch_with_retry(
 
 
 def clear_cache():
-    """Manually clear all cached data (useful for testing)."""
-    global _cache
+    """Manually clear all cached data and circuit breakers (useful for testing)."""
+    global _cache, _circuit_breakers
     _cache = {}
-    logger.info("[CACHE] Cleared all cached data.")
+    _circuit_breakers = {}
+    logger.info("[CACHE] Cleared all cached data and circuit breakers.")
+
+
+def get_cache_stats() -> dict:
+    """
+    Returns current cache and circuit breaker statistics.
+    Useful for monitoring and debugging.
+    """
+    current_time = time.time()
+    cache_entries = {}
+    for key, entry in _cache.items():
+        is_fresh = current_time < entry["expiry"]
+        age = current_time - (entry["expiry"] - ttl_seconds) if "ttl_seconds" in entry else 0
+        cache_entries[key] = {
+            "fresh": is_fresh,
+            "has_last_good": entry.get("last_good") is not None,
+        }
+
+    breaker_stats = {}
+    for key, breaker in _circuit_breakers.items():
+        breaker_stats[key] = {
+            "state": breaker["state"],
+            "failures": breaker["failures"],
+            "cooldown_remaining": max(0, COOLDOWN_SECONDS - (current_time - breaker["opened_at"])) if breaker["state"] == "open" else 0,
+        }
+
+    return {
+        "cache_entries": len(_cache),
+        "circuit_breakers": breaker_stats,
+    }

@@ -7,8 +7,7 @@ from market_data import get_buffett_indicator
 from screener import get_industry_rankings, analyze_sector_fundamentals, get_sector_stocks, get_sector_meta
 from screeners import get_screener_engine
 from superinvestors_live import get_live_superinvestors, get_next_filing_info
-from dip_hunter import scan_etf_dips, scan_stock_dips, get_dip_summary
-from cycle_analytics import get_cycle_intelligence
+from filing_calendar import get_filing_status
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
@@ -75,6 +74,8 @@ def top_industries():
 
 from analyst import analyze_stock as analyze_stock_strategy
 from macro import get_macro_trends
+from cycle_analytics import get_cycle_intelligence
+from dip_hunter import scan_etf_dips, scan_stock_dips, get_dip_summary
 
 @app.get("/api/stocks/{industry}")
 def stock_picks(industry: str):
@@ -117,7 +118,6 @@ from economic import get_economic_indicators
 from money_flow import get_money_flow_data
 from news import get_market_news
 from contrarian import get_contrarian_opportunities
-from superinvestors_live import get_live_superinvestors
 from copycat import get_copycat_performance
 from moonshots import MoonshotScanner
 from screeners import ScreenerEngine
@@ -206,7 +206,8 @@ def superinvestors_endpoint():
     try:
         return {
             "investors": get_live_superinvestors(),
-            "next_filing": get_next_filing_info()
+            "next_filing": get_next_filing_info(),
+            "filing_status": get_filing_status()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -416,6 +417,37 @@ def reset_portfolio_endpoint(portfolio_id: str, pm: PortfolioManager = Depends(g
     if not success:
         raise HTTPException(status_code=404, detail="Portfolio not found")
     return {"success": True}
+
+from cache_utils import clear_cache, get_cache_stats
+from data_client import set_defeatbeta_enabled, get_data_source_status
+
+@app.get("/api/admin/cache/stats")
+def cache_stats():
+    """Returns current cache and circuit breaker statistics."""
+    return get_cache_stats()
+
+@app.post("/api/admin/cache/clear")
+def clear_all_cache():
+    """Force clear all caches and circuit breakers. Use for testing."""
+    clear_cache()
+    return {"status": "success", "message": "All caches and circuit breakers cleared"}
+
+@app.get("/api/admin/data-source")
+def data_source_status():
+    """Returns current data source configuration."""
+    return get_data_source_status()
+
+@app.post("/api/admin/data-source")
+def data_source_toggle(body: dict):
+    """
+    Toggle data source at runtime.
+    Body: {"enabled": true} for defeatbeta, {"enabled": false} for yfinance.
+    Clears all caches on toggle.
+    """
+    enabled = body.get("enabled")
+    if enabled is None:
+        raise HTTPException(status_code=400, detail="Missing 'enabled' field (true/false)")
+    return set_defeatbeta_enabled(bool(enabled))
 
 # Import Endpoints
 from fastapi import UploadFile, File

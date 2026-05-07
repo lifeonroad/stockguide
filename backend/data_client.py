@@ -18,8 +18,44 @@ from cache_utils import timed_cache, fetch_with_retry
 
 logger = logging.getLogger(__name__)
 
-# Toggle defeatbeta on/off (set DEFEATBETA_ENABLED=0 to disable)
-DEFEATBETA_ENABLED = os.getenv("DEFEATBETA_ENABLED", "1") != "0"
+# Toggle defeatbeta on/off — runtime mutable, set via API or env var.
+# Initialized from env var, but can be changed at runtime without restart.
+_DEFEATBETA_ENABLED = os.getenv("DEFEATBETA_ENABLED", "1") != "0"
+
+
+def is_defeatbeta_enabled() -> bool:
+    """Returns whether defeatbeta is currently the primary data source."""
+    return _DEFEATBETA_ENABLED
+
+
+def set_defeatbeta_enabled(enabled: bool) -> dict:
+    """
+    Toggle defeatbeta on/off at runtime.
+    Returns dict with status info and whether a reload is recommended.
+    """
+    global _DEFEATBETA_ENABLED
+    old_value = _DEFEATBETA_ENABLED
+    _DEFEATBETA_ENABLED = enabled
+
+    # Clear caches so the new data source isn't contaminated by old cached data
+    from cache_utils import clear_cache
+    clear_cache()
+
+    return {
+        "previous": "defeatbeta" if old_value else "yfinance",
+        "current": "defeatbeta" if enabled else "yfinance",
+        "reload_recommended": True,
+        "message": f"Switched to {'defeatbeta' if enabled else 'yfinance'}. Hard refresh (Ctrl+Shift+R) to apply."
+    }
+
+
+def get_data_source_status() -> dict:
+    """Returns current data source configuration."""
+    return {
+        "defeatbeta_enabled": _DEFEATBETA_ENABLED,
+        "current_source": "defeatbeta" if _DEFEATBETA_ENABLED else "yfinance",
+        "env_default": os.getenv("DEFEATBETA_ENABLED", "1") != "0",
+    }
 
 # ──────────────────────────────────────────────────────────
 # Internal helpers
@@ -132,7 +168,7 @@ def get_fundamentals(symbol: str) -> dict:
     Returns a yfinance-compatible fundamentals dict built from defeatbeta.
     Each metric is fetched in isolation — one failure does not block others.
     """
-    if not DEFEATBETA_ENABLED:
+    if not is_defeatbeta_enabled():
         return _get_yf_fundamentals(symbol)
     try:
         t = _db_ticker(symbol)
@@ -189,7 +225,7 @@ def get_fundamentals(symbol: str) -> dict:
     sector = "Unknown"
     industry = "Unknown"
     summary = "No business summary available."
-    if DEFEATBETA_ENABLED:
+    if is_defeatbeta_enabled():
         try:
             meta = t.info() or {}
             name     = meta.get("longName") or meta.get("shortName") or symbol
@@ -216,7 +252,7 @@ def get_fundamentals(symbol: str) -> dict:
         "sector":   sector,
         "industry": industry,
         "longBusinessSummary": summary,
-        "data_as_of": "2026-02-20" if DEFEATBETA_ENABLED else str(date.today()),  # defeatbeta weekly snapshot
+        "data_as_of": "2026-02-20" if is_defeatbeta_enabled() else str(date.today()),  # defeatbeta weekly snapshot
 
         # Valuation
         "trailingPE":                   ttm_pe,
@@ -262,7 +298,7 @@ def get_price_history(symbol: str, days: int = 90):
     Sliced to the last `days` trading days.
     Falls back to yfinance on error.
     """
-    if DEFEATBETA_ENABLED:
+    if is_defeatbeta_enabled():
         try:
             t = _db_ticker(symbol)
             df = t.price()
@@ -295,7 +331,7 @@ def get_news(symbol: str, n: int = 5) -> list:
     """
     Returns a list of recent news dicts: [{title, date, source, url}]
     """
-    if DEFEATBETA_ENABLED:
+    if is_defeatbeta_enabled():
         try:
             t = _db_ticker(symbol)
             news_obj = t.news()
@@ -328,7 +364,7 @@ def get_dcf(symbol: str) -> dict:
     """
     Returns a DCF valuation summary: {fair_value, current_price, upside_pct, wacc, recommendation}
     """
-    if DEFEATBETA_ENABLED:
+    if is_defeatbeta_enabled():
         try:
             t = _db_ticker(symbol)
             dcf_obj = t.dcf()

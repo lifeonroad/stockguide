@@ -225,13 +225,15 @@ def get_industry_rankings():
     return sorted_results
 
 
+@timed_cache(ttl_seconds=1800)  # 30 min — sector fundamentals don't move intraday
 def analyze_sector_fundamentals(sector_name):
     """
     Deep dive into a sector:
     Fetches top stocks, calculates avg ROE, Debt/Eq, P/E.
     Returns: Sector Stats + Top Pick Stocks
+    Cached for 30 minutes to prevent repeated API calls.
     """
-    stocks = SECTOR_STOCKS.get(sector_name, [])
+    stocks = get_sector_stocks(sector_name).get("tickers", [])
     if not stocks:
         # Fallback for sectors not in our short list
         return {"error": "Sector data not fully mapped for MVP"}
