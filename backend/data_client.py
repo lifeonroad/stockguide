@@ -139,7 +139,7 @@ def _get_yf_fundamentals(symbol: str) -> dict:
 # Live Price  (yfinance — real-time)
 # ──────────────────────────────────────────────────────────
 
-@timed_cache(ttl_seconds=300)   # 5-minute cache
+@timed_cache(ttl_seconds=300, soft_ttl_seconds=180)   # 5m hard, 3m soft (SWR)
 def get_price_live(symbol: str) -> dict:
     """
     Returns real-time price data for a symbol.
@@ -162,7 +162,7 @@ def get_price_live(symbol: str) -> dict:
 # Fundamentals  (defeatbeta — weekly snapshot, cached 24h)
 # ──────────────────────────────────────────────────────────
 
-@timed_cache(ttl_seconds=86400)   # 24-hour cache
+@timed_cache(ttl_seconds=86400, soft_ttl_seconds=43200)   # 24h hard, 12h soft (SWR)
 def get_fundamentals(symbol: str) -> dict:
     """
     Returns a yfinance-compatible fundamentals dict built from defeatbeta.
@@ -291,7 +291,7 @@ def get_fundamentals(symbol: str) -> dict:
 # Price History  (defeatbeta — sub-second DuckDB, cached 6h)
 # ──────────────────────────────────────────────────────────
 
-@timed_cache(ttl_seconds=21600)
+@timed_cache(ttl_seconds=21600, soft_ttl_seconds=10800)  # 6h hard, 3h soft (SWR)
 def get_price_history(symbol: str, days: int = 90):
     """
     Returns a pandas DataFrame with columns: [report_date, open, close, high, low, volume]
@@ -326,7 +326,7 @@ def get_price_history(symbol: str, days: int = 90):
 # News  (defeatbeta, cached 1h)
 # ──────────────────────────────────────────────────────────
 
-@timed_cache(ttl_seconds=3600)
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=1800)  # 1h hard, 30m soft (SWR)
 def get_news(symbol: str, n: int = 5) -> list:
     """
     Returns a list of recent news dicts: [{title, date, source, url}]
@@ -359,7 +359,7 @@ def get_news(symbol: str, n: int = 5) -> list:
 # DCF Valuation  (defeatbeta, cached 24h)
 # ──────────────────────────────────────────────────────────
 
-@timed_cache(ttl_seconds=86400)
+@timed_cache(ttl_seconds=86400, soft_ttl_seconds=43200)  # 24h hard, 12h soft (SWR)
 def get_dcf(symbol: str) -> dict:
     """
     Returns a DCF valuation summary: {fair_value, current_price, upside_pct, wacc, recommendation}

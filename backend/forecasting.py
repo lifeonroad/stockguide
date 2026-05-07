@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 from cache_utils import timed_cache, fetch_with_retry
 
-@timed_cache(ttl_seconds=1800)  # Cache per symbol for 30 minutes
+@timed_cache(ttl_seconds=1800, soft_ttl_seconds=1200)  # 30m hard, 20m soft (SWR)
 def analyze_stock_buffett(symbol):
     """
     Analyzes a single stock using Warren Buffett's core principles:

@@ -32,7 +32,7 @@ INTERNATIONAL_PICKS = {
 }
 
 class InternationalScanner:
-    @timed_cache(ttl_seconds=3600)  # Cache for 1 hour
+    @timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
     def get_picks(self) -> Dict[str, List[Dict[str, Any]]]:
         """Scans and scores curated international stocks."""
         import concurrent.futures

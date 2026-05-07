@@ -31,7 +31,7 @@ SMALL_CAP_CANDIDATES += [
     "GPRO", "FITB", "HBAN", "ONB", "ZION", "BOKF", "CADE", "HWC"
 ]
 
-@timed_cache(ttl_seconds=14400) # Cache for 4 hours
+@timed_cache(ttl_seconds=14400, soft_ttl_seconds=10800) # 4h hard, 3h soft (SWR)
 def get_small_cap_gems(min_growth: float = 0.05, max_pe: float = 25.0, min_roe: float = 0.10):
     """
     Screens for Small-Cap Gems: consistent growth + undervaluation.

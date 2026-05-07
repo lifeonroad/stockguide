@@ -17,10 +17,11 @@ app = FastAPI(title="Rational Equity API")
 
 # Fire background universe scoring immediately on startup
 @app.on_event("startup")
-async def _startup_background_scoring():
+async def _startup_background_tasks():
     """
-    Kick off async background scoring as soon as the server is ready.
-    Serves static SECTOR_STOCKS instantly while scoring runs (~30-45s).
+    Kick off async background tasks as soon as the server is ready:
+    1. Dynamic universe scoring (takes ~30-45s)
+    2. Cache warming for critical paths (market-status, macro, industries)
     """
     try:
         import dynamic_universe  # noqa: PLC0415
@@ -28,6 +29,40 @@ async def _startup_background_scoring():
     except Exception as exc:
         import logging  # noqa: PLC0415
         logging.getLogger(__name__).warning("Could not start background scoring: %s", exc)
+
+    # Warm critical caches so first user gets instant data
+    async def _warm_caches():
+        import logging
+        log = logging.getLogger(__name__)
+        log.info("[WARMUP] Starting cache warming for critical paths...")
+        tasks = []
+        try:
+            from market_data import get_buffett_indicator
+            tasks.append(asyncio.to_thread(get_buffett_indicator))
+        except Exception: pass
+        try:
+            from macro import get_macro_trends
+            tasks.append(asyncio.to_thread(get_macro_trends))
+        except Exception: pass
+        try:
+            from screener import get_industry_rankings
+            tasks.append(asyncio.to_thread(get_industry_rankings))
+        except Exception: pass
+        try:
+            from filing_calendar import get_filing_status
+            tasks.append(asyncio.to_thread(get_filing_status))
+        except Exception: pass
+        try:
+            from data_client import get_data_source_status
+            tasks.append(asyncio.to_thread(get_data_source_status))
+        except Exception: pass
+
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            success = sum(1 for r in results if not isinstance(r, Exception))
+            log.info("[WARMUP] Completed: %d/%d caches warmed successfully", success, len(results))
+
+    asyncio.create_task(_warm_caches())
 
 # Enable CORS for frontend (if running separately, though we serve static now)
 app.add_middleware(

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from cache_utils import timed_cache
 
 
-@timed_cache(ttl_seconds=86400)  # Cache for 24 hours
+@timed_cache(ttl_seconds=86400, soft_ttl_seconds=43200)  # 24h hard, 12h soft (SWR)
 def get_economic_indicators():
     """
     Fetches key economic indicators from FRED API.

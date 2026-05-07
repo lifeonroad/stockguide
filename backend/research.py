@@ -16,7 +16,7 @@ def safe_list(value, n=3):
         return value[:n]
     return []
 
-@timed_cache(ttl_seconds=3600)
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_comprehensive_research(symbol):
     symbol = symbol.upper()
     ticker = yf.Ticker(symbol)
@@ -287,7 +287,7 @@ def get_comprehensive_research(symbol):
     except Exception:
         raise
 
-@timed_cache(ttl_seconds=86400) # cache for 24h
+@timed_cache(ttl_seconds=86400, soft_ttl_seconds=43200) # 24h hard, 12h soft (SWR)
 def get_historical_trends(symbol: str, time_range: str = '5y'):
     try:
         from yahooquery import Ticker

@@ -15,7 +15,7 @@ COPYCAT_HOLDINGS = [
     {"symbol": "BABA", "name": "Alibaba", "held_by": ["Burry (Q2)"]}
 ]
 
-@timed_cache(ttl_seconds=600)  # Cache for 10 minutes
+@timed_cache(ttl_seconds=600, soft_ttl_seconds=400)  # 10m hard, ~7m soft (SWR)
 def get_copycat_performance():
     """
     Fetches real-time performance for the Superinvestor Copycat Portfolio.

@@ -35,7 +35,7 @@ SECTOR_PICKS = {
     "Industrials": ["CAT", "HON", "GE"]
 }
 
-@timed_cache(ttl_seconds=3600)
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_cycle_intelligence():
     """
     Returns the comprehensive alpha report:

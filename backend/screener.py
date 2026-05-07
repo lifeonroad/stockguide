@@ -188,7 +188,7 @@ def get_sector_metrics_from_constituents(sector_name):
     return round(avg_roe, 2), round(avg_debt, 2)
 
 
-@timed_cache(ttl_seconds=3600)  # Cache for 1 hour
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_industry_rankings():
     """
     Analyzes Sector ETFs with real constituent-based metrics.
@@ -225,7 +225,7 @@ def get_industry_rankings():
     return sorted_results
 
 
-@timed_cache(ttl_seconds=1800)  # 30 min — sector fundamentals don't move intraday
+@timed_cache(ttl_seconds=1800, soft_ttl_seconds=1200)  # 30m hard, 20m soft (SWR)
 def analyze_sector_fundamentals(sector_name):
     """
     Deep dive into a sector:

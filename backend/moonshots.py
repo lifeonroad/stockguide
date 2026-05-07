@@ -36,7 +36,7 @@ MOONSHOT_THEMES = {
 }
 
 class MoonshotScanner:
-    @timed_cache(ttl_seconds=3600)  # Cache 1 hour
+    @timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
     def get_moonshots(self) -> List[Dict[str, Any]]:
         """
         Merges foundational curated picks with dynamic discoveries.

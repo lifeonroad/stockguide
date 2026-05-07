@@ -40,7 +40,7 @@ def get_gdp_from_fred():
     return None
 
 
-@timed_cache(ttl_seconds=1800)  # Cache for 30 minutes
+@timed_cache(ttl_seconds=1800, soft_ttl_seconds=1200)  # 30m hard, 20m soft (SWR)
 def get_market_cap():
     """
     Fetches the Total US Market Cap via S&P 500 daily % change applied
@@ -74,7 +74,7 @@ def get_market_cap():
     return base_market_cap
 
 
-@timed_cache(ttl_seconds=1800)  # Cache for 30 minutes
+@timed_cache(ttl_seconds=1800, soft_ttl_seconds=1200)  # 30m hard, 20m soft (SWR)
 def get_buffett_indicator():
     mkt_cap = get_market_cap()
     
@@ -102,7 +102,7 @@ def get_buffett_indicator():
     }
 
 
-@timed_cache(ttl_seconds=900)  # Cache for 15 minutes
+@timed_cache(ttl_seconds=900, soft_ttl_seconds=600)  # 15m hard, 10m soft (SWR)
 def get_batch_quotes(tickers: list):
     """
     Efficiently fetches current prices for multiple tickers.

@@ -32,7 +32,7 @@ def calculate_cmf(df, period=10):
     cmf = mfv.rolling(window=period).sum() / df['Volume'].rolling(window=period).sum()
     return cmf
 
-@timed_cache(ttl_seconds=3600)
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_money_flow_data():
     """
     Analyzes institutional money flow using Chaikin Money Flow (CMF) 

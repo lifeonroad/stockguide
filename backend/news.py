@@ -8,7 +8,7 @@ from datetime import datetime
 from cache_utils import timed_cache
 
 
-@timed_cache(ttl_seconds=3600)  # Cache for 1 hour
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_market_news():
     """
     Fetches market news from RSS feeds.
