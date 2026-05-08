@@ -22,20 +22,24 @@ _REFRESH_RUNNING = False
 # ---------------------------------------------------------------------------
 
 def _bulk_momentum(tickers: List[str]) -> Dict[str, float]:
-    from data_client import get_price_history
+    """Bulk fetch 52-week returns — reads from persistent DB first (instant)."""
+    from persistent_cache import get_price_history_cached
     import concurrent.futures
 
     if not tickers:
         return {}
-    
+
     result = {}
-    
+
     def fetch_mom(sym):
         try:
-            hist = get_price_history(sym, days=252)
-            if hist is not None and not hist.empty and len(hist) > 2:
-                val = ((hist['close'].iloc[-1] - hist['close'].iloc[0]) / hist['close'].iloc[0]) * 100
-                return sym, sanitize_metric(val, 0)
+            # Try persistent DB first
+            rows = get_price_history_cached(sym, days=252)
+            if rows and len(rows) > 2:
+                closes = [float(r["close"]) for r in rows if r.get("close")]
+                if len(closes) > 2 and closes[0] > 0:
+                    val = ((closes[-1] - closes[0]) / closes[0]) * 100
+                    return sym, sanitize_metric(val, 0)
         except Exception:
             pass
         return sym, 0.0
@@ -50,51 +54,95 @@ def _bulk_momentum(tickers: List[str]) -> Dict[str, float]:
     return result
 
 def _bulk_fundamentals(tickers: List[str]) -> Dict[str, dict]:
+    """Bulk fetch fundamentals — reads from persistent DB first (instant),
+    only fetches from network for symbols with no/stale cached data."""
     from data_client import get_fundamentals, get_price_live
+    from persistent_cache import get_bulk_ticker_info, needs_refresh
     import concurrent.futures
 
     if not tickers:
         return {}
 
     out: Dict[str, dict] = {}
-    
-    def fetch_fund(sym):
-        try:
-            info = get_fundamentals(sym)
-            live = get_price_live(sym)
-            if not info: return sym, None
-            
-            # calculate profit margin
-            rev = info.get("revenue", 0)
-            ni = info.get("netIncome", 0)
+
+    # 1. Try persistent DB first — instant read
+    db_data = get_bulk_ticker_info(tickers)
+
+    # 2. Build results from cached data
+    cached_count = 0
+    needs_fetch = []
+    for sym in tickers:
+        sym_upper = sym.upper()
+        info = db_data.get(sym_upper)
+        if info and info.get("price") and info.get("price") > 0:
+            # Calculate margin from cached data
+            rev = info.get("revenue", 0) or 0
+            ni = info.get("net_income", 0) or 0
             margin = (ni / rev) * 100 if rev else 0.0
-            
-            return sym, {
+
+            out[sym] = {
                 "symbol": sym,
-                "name": info.get('shortName', sym),
-                "price": sanitize_metric(live.get('price'), 0),
-                "pe": sanitize_metric(info.get('trailingPE'), 999),
-                "roe": sanitize_metric(info.get("returnOnEquity"), 0) * 100,
+                "name": info.get("name", sym),
+                "price": sanitize_metric(info.get("price"), 0),
+                "pe": sanitize_metric(info.get("trailing_pe"), 999),
+                "roe": sanitize_metric(info.get("roe"), 0) * 100,
                 "margin": sanitize_metric(margin, 0),
-                "rev_growth": sanitize_metric(info.get("revenueGrowth"), 0) * 100,
-                "peg": sanitize_metric(info.get('pegRatio'), 999),
-                "div_yield": 2.5, # default missing div_yield so deep_value doesn't break
-                "pb": sanitize_metric(info.get('priceToBook'), 999),
-                "debt_equity": sanitize_metric(info.get('debtToEquity'), 999),
-                "inst_ownership": 50.0, # default missing
-                "market_cap": sanitize_metric(info.get("marketCap"), 0),
+                "rev_growth": sanitize_metric(info.get("revenue_growth"), 0) * 100,
+                "peg": 999,  # not in persistent DB
+                "div_yield": sanitize_metric(info.get("dividend_yield"), 2.5) * 100,
+                "pb": sanitize_metric(info.get("price_to_book"), 999),
+                "debt_equity": sanitize_metric(info.get("debt_to_equity"), 999),
+                "inst_ownership": 50.0,
+                "market_cap": sanitize_metric(info.get("market_cap"), 0),
                 "sector": info.get("sector", ""),
             }
-        except Exception as e:
-            return sym, None
+            cached_count += 1
+        else:
+            needs_fetch.append(sym)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(fetch_fund, sym): sym for sym in tickers}
-        for future in concurrent.futures.as_completed(futures):
-            sym, data = future.result()
-            if data:
-                out[sym] = data
-                
+    if cached_count:
+        print(f"[Screener] {cached_count}/{len(tickers)} symbols from persistent DB (instant)")
+
+    # 3. Fetch remaining symbols from network
+    if needs_fetch:
+        print(f"[Screener] Fetching {len(needs_fetch)} symbols from network...")
+
+        def fetch_fund(sym):
+            try:
+                info = get_fundamentals(sym)
+                live = get_price_live(sym)
+                if not info: return sym, None
+
+                rev = info.get("revenue", 0)
+                ni = info.get("netIncome", 0)
+                margin = (ni / rev) * 100 if rev else 0.0
+
+                return sym, {
+                    "symbol": sym,
+                    "name": info.get('shortName', sym),
+                    "price": sanitize_metric(live.get('price'), 0),
+                    "pe": sanitize_metric(info.get('trailingPE'), 999),
+                    "roe": sanitize_metric(info.get("returnOnEquity"), 0) * 100,
+                    "margin": sanitize_metric(margin, 0),
+                    "rev_growth": sanitize_metric(info.get("revenueGrowth"), 0) * 100,
+                    "peg": sanitize_metric(info.get('pegRatio'), 999),
+                    "div_yield": 2.5,
+                    "pb": sanitize_metric(info.get('priceToBook'), 999),
+                    "debt_equity": sanitize_metric(info.get('debtToEquity'), 999),
+                    "inst_ownership": 50.0,
+                    "market_cap": sanitize_metric(info.get("marketCap"), 0),
+                    "sector": info.get("sector", ""),
+                }
+            except Exception as e:
+                return sym, None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(fetch_fund, sym): sym for sym in needs_fetch}
+            for future in concurrent.futures.as_completed(futures):
+                sym, data = future.result()
+                if data:
+                    out[sym] = data
+
     return out
 
 class ScreenerEngine:
@@ -118,9 +166,13 @@ class ScreenerEngine:
         
         try:
             t0 = time.time()
+            print(f"[Screener] Refreshing cache for {len(self.universe_symbols)} symbols...")
             # 1. Bulk Momentum
+            print(f"[Screener] Phase 1/2: Fetching price history...")
             mom_map = _bulk_momentum(self.universe_symbols)
+            print(f"[Screener] Phase 1/2: Done in {round(time.time()-t0, 1)}s")
             # 2. Bulk Fundamentals
+            print(f"[Screener] Phase 2/2: Fetching fundamentals...")
             fund_map = _bulk_fundamentals(self.universe_symbols)
             
             # 3. Merge
@@ -131,7 +183,7 @@ class ScreenerEngine:
             
             DATA_CACHE = new_cache
             LAST_FETCH_TIME = time.time()
-            print(f"Screener cache refreshed in {round(time.time() - t0, 1)}s. ({len(DATA_CACHE)} stocks)")
+            print(f"[Screener] Cache refreshed in {round(time.time() - t0, 1)}s. ({len(DATA_CACHE)} stocks)")
         finally:
             _REFRESH_RUNNING = False
 

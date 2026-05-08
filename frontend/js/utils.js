@@ -4,6 +4,75 @@ export const formatCurrency = (val) => {
     return `$${val.toLocaleString()}`;
 };
 
+let _progressCSSInjected = false;
+const _injectProgressCSS = () => {
+    if (_progressCSSInjected) return;
+    _progressCSSInjected = true;
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes progress-sweep {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(0%); }
+            100% { transform: translateX(100%); }
+        }
+        @keyframes progress-pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+        .loading-progress-bar {
+            height: 3px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+        .loading-progress-bar::after {
+            content: '';
+            display: block;
+            height: 100%;
+            width: 40%;
+            background: linear-gradient(90deg, transparent, var(--warren-accent, #6366f1), transparent);
+            animation: progress-sweep 1.5s ease-in-out infinite;
+        }
+        .loading-status-dot {
+            animation: progress-pulse 1.2s ease-in-out infinite;
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+const _loadingTimers = new Map();
+
+export const renderLoading = (message, container, showTimer = true) => {
+    _injectProgressCSS();
+    const id = `loading-${Date.now()}`;
+    container.innerHTML = `
+        <div class="col-span-full flex flex-col items-center justify-center py-16">
+            <div class="loading-status-dot text-warren-accent text-sm font-medium mb-2">${message}</div>
+            <div class="text-xs text-gray-600 mb-3">Fetching real-time data... <span id="${id}-elapsed" class="text-warren-accent"></span></div>
+            <div class="w-64 loading-progress-bar"></div>
+        </div>
+    `;
+    if (showTimer) {
+        const start = Date.now();
+        const updateElapsed = () => {
+            const el = document.getElementById(`${id}-elapsed`);
+            if (!el) { _loadingTimers.delete(id); return; }
+            const s = Math.floor((Date.now() - start) / 1000);
+            el.textContent = s < 60 ? `(${s}s)` : `(${Math.floor(s/60)}m ${s%60}s)`;
+        };
+        updateElapsed();
+        _loadingTimers.set(id, setInterval(updateElapsed, 1000));
+    }
+};
+
+export const stopLoadingTimer = (container) => {
+    for (const [id, timer] of _loadingTimers) {
+        clearInterval(timer);
+        _loadingTimers.delete(id);
+    }
+};
+
 export const FINANCE_TERMS = {
     'Market Cap': 'The total value of a company\'s shares of stock.',
     'GDP': 'Gross Domestic Product: Total value of goods/services produced in the US.',

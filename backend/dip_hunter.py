@@ -28,6 +28,53 @@ import time
 import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+def _save_hist_to_db(symbol: str, df: pd.DataFrame):
+    """Save price history DataFrame to persistent DB."""
+    try:
+        from persistent_cache import save_price_history
+        rows = []
+        for idx, row in df.iterrows():
+            date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)
+            rows.append({
+                "date": date_str,
+                "open": float(row.get("open", 0)) if row.get("open") is not None else 0,
+                "high": float(row.get("high", 0)) if row.get("high") is not None else 0,
+                "low": float(row.get("low", 0)) if row.get("low") is not None else 0,
+                "close": float(row.get("close", 0)) if row.get("close") is not None else 0,
+                "volume": float(row.get("volume", 0)) if row.get("volume") is not None else 0,
+            })
+        if rows:
+            save_price_history(symbol, rows)
+    except Exception as e:
+        logger.debug("Failed to save price history for %s: %s", symbol, e)
+
+def _save_fundamentals_to_db(symbol: str, data: dict):
+    """Save fundamentals to persistent DB."""
+    try:
+        from persistent_cache import save_ticker_info
+        db_data = {
+            "symbol": symbol,
+            "roe": data.get("roe"),
+            "debt_to_equity": data.get("debt_to_equity"),
+            "avg_volume": data.get("avg_volume"),
+            "shortName": data.get("shortName", symbol),
+        }
+        # Add any extra fields from bulk fetch
+        for key in ["market_cap", "trailing_pe", "forward_pe", "price_to_book",
+                     "price_to_sales", "trailing_eps", "forward_eps", "roa",
+                     "current_ratio", "free_cashflow", "total_debt", "total_cash",
+                     "revenue_growth", "earnings_growth", "revenue", "net_income",
+                     "dividend_yield", "dividend_rate", "payout_ratio", "beta",
+                     "fifty_two_week_high", "fifty_two_week_low", "shares_outstanding"]:
+            if key in data:
+                db_data[key] = data[key]
+        save_ticker_info(db_data)
+    except Exception as e:
+        logger.debug("Failed to save fundamentals for %s: %s", symbol, e)
 from screener import SECTOR_ETFS, SECTOR_STOCKS, get_sector_stocks
 from cache_utils import fetch_with_retry, timed_cache
 from data_client import get_ticker_info, get_price_history
@@ -262,9 +309,12 @@ def _fetch_batch_history(tickers: List[str], days: int = 252) -> Dict[str, pd.Da
                             "close": data[("Close", sym)].dropna(),
                             "high": data[("High", sym)].dropna(),
                             "low": data[("Low", sym)].dropna(),
+                            "open": data[("Open", sym)].dropna() if ("Open", sym) in data.columns else None,
+                            "volume": data[("Volume", sym)].dropna() if ("Volume", sym) in data.columns else None,
                         })
                         if not df.empty:
                             hist_cache[sym] = df
+                            _save_hist_to_db(sym, df)
                     except Exception:
                         pass
             else:
@@ -275,9 +325,12 @@ def _fetch_batch_history(tickers: List[str], days: int = 252) -> Dict[str, pd.Da
                         "close": data["Close"].dropna() if "Close" in data.columns else data["close"].dropna(),
                         "high": data["High"].dropna() if "High" in data.columns else data["high"].dropna(),
                         "low": data["Low"].dropna() if "Low" in data.columns else data["low"].dropna(),
+                        "open": data["Open"].dropna() if "Open" in data.columns else data.get("open", pd.Series()).dropna(),
+                        "volume": data["Volume"].dropna() if "Volume" in data.columns else data.get("volume", pd.Series()).dropna(),
                     })
                     if not df.empty:
                         hist_cache[sym] = df
+                        _save_hist_to_db(sym, df)
         except Exception:
             continue
 
@@ -361,6 +414,7 @@ def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
     """
     Fast bulk fundamentals fetch using yahooquery.
     Uses parallel ThreadPoolExecutor to fetch multiple batches concurrently.
+    Saves data to persistent DB for future instant reads.
     """
     from yahooquery import Ticker
     
@@ -379,19 +433,86 @@ def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
             financial_data = tq.financial_data
             summary_detail = tq.summary_detail
             price_data = tq.price
+            key_stats = tq.key_stats
+            asset_profile = tq.asset_profile
             
             for sym in batch:
                 try:
                     fd = financial_data.get(sym, {}) if isinstance(financial_data, dict) else {}
                     sd = summary_detail.get(sym, {}) if isinstance(summary_detail, dict) else {}
                     pd_data = price_data.get(sym, {}) if isinstance(price_data, dict) else {}
+                    ks = key_stats.get(sym, {}) if isinstance(key_stats, dict) else {}
+                    ap = asset_profile.get(sym, {}) if isinstance(asset_profile, dict) else {}
+                    
+                    roe = float(fd.get("returnOnEquity", 0) or 0)
+                    de_ratio = float(fd.get("debtToEquity", 0) or 0)
+                    mkt_cap = float(pd_data.get("marketCap", 0) or 0)
+                    pe = float(sd.get("trailingPE", 0) or 0)
+                    fpe = float(sd.get("forwardPE", 0) or 0)
+                    pb = float(sd.get("priceToBook", 0) or 0)
+                    ps = float(sd.get("priceToSalesTrailing12Months", 0) or 0)
+                    eps = float(sd.get("trailingEps", 0) or 0)
+                    feps = float(sd.get("forwardEps", 0) or 0)
+                    roa = float(ks.get("returnOnAssets", 0) or 0)
+                    cr = float(sd.get("currentRatio", 0) or 0)
+                    fcf = float(fd.get("freeCashflow", 0) or 0)
+                    td = float(fd.get("totalDebt", 0) or 0)
+                    tc = float(fd.get("totalCash", 0) or 0)
+                    rg = float(fd.get("revenueGrowth", 0) or 0)
+                    eg = float(fd.get("earningsGrowth", 0) or 0)
+                    rev = float(fd.get("totalRevenue", 0) or 0)
+                    ni = float(fd.get("netIncomeToCommon", 0) or 0)
+                    dy = float(sd.get("dividendYield", 0) or 0)
+                    dr = float(sd.get("dividendRate", 0) or 0)
+                    pr = float(sd.get("payoutRatio", 0) or 0)
+                    beta = float(pd_data.get("beta", 0) or sd.get("beta", 0) or 0)
+                    high52 = float(pd_data.get("fiftyTwoWeekHigh", 0) or 0)
+                    low52 = float(pd_data.get("fiftyTwoWeekLow", 0) or 0)
+                    shares = float(pd_data.get("sharesOutstanding", 0) or 0)
+                    avg_vol = float(sd.get("averageVolume", 0) or 0)
+                    current_price = float(pd_data.get("currentPrice", 0) or pd_data.get("regularMarketPrice", 0) or 0)
                     
                     batch_out[sym] = {
-                        "roe": float(fd.get("returnOnEquity", 0) or 0),
-                        "debt_to_equity": float(fd.get("debtToEquity", 0) or 0),
+                        "roe": roe / 100 if roe > 1 else roe,
+                        "debt_to_equity": de_ratio,
                         "shortName": pd_data.get("shortName") or sym,
-                        "avg_volume": float(sd.get("averageVolume", 0) or 0),
+                        "avg_volume": avg_vol,
+                        "market_cap": mkt_cap,
+                        "trailing_pe": pe,
+                        "forward_pe": fpe,
+                        "price_to_book": pb,
+                        "price_to_sales": ps,
+                        "trailing_eps": eps,
+                        "forward_eps": feps,
+                        "roa": roa,
+                        "current_ratio": cr,
+                        "free_cashflow": fcf,
+                        "total_debt": td,
+                        "total_cash": tc,
+                        "revenue_growth": rg,
+                        "earnings_growth": eg,
+                        "revenue": rev,
+                        "net_income": ni,
+                        "dividend_yield": dy / 100 if dy > 1 else dy,
+                        "dividend_rate": dr,
+                        "payout_ratio": pr,
+                        "beta": beta,
+                        "fifty_two_week_high": high52,
+                        "fifty_two_week_low": low52,
+                        "shares_outstanding": shares,
+                        "price": current_price,
+                        "name": pd_data.get("shortName") or sym,
+                        "sector": ap.get("sector") or "Unknown",
+                        "industry": ap.get("industry") or "Unknown",
+                        "longBusinessSummary": ap.get("longBusinessSummary") or "No business summary available.",
                     }
+                    
+                    # Save to persistent DB in background
+                    try:
+                        from persistent_cache import save_ticker_info
+                        save_ticker_info(batch_out[sym])
+                    except Exception:
+                        pass
                 except Exception:
                     continue
         except Exception:
@@ -404,6 +525,8 @@ def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
         for future in concurrent.futures.as_completed(futures):
             batch_result = future.result()
             out.update(batch_result)
+    
+    return out
     
     return out
 
@@ -531,14 +654,22 @@ def scan_stock_dips(min_quality_score: float = 0) -> List[Dict]:
     - Sector crash: ~150-250 tickers (expanded), first run ~3-5 min, cached <1ms
     - SWR: returns stale data instantly while refreshing in background
     """
+    import time as _time
+    _t0 = _time.time()
+    
     # Build dynamic task list
     tasks, ticker_sector = _build_scan_tasks()
-    unique_tickers = list(ticker_sector.keys())
+    # Filter out invalid symbols (e.g., those with $ prefix that cause yfinance errors)
+    unique_tickers = [t for t in ticker_sector.keys() if not t.startswith('$') and len(t) <= 5]
+    # Rebuild ticker_sector with filtered tickers
+    ticker_sector = {t: s for t, s in ticker_sector.items() if t in unique_tickers}
     
     print(f"[Dip Hunter] Scanning {len(unique_tickers)} tickers ({len(_get_bleeding_sectors())} bleeding sectors)")
     
     # === PHASE 1: Batch price download (fast, ~3-6s for 100-250 tickers) ===
+    print(f"[Dip Hunter] Phase 1/3: Downloading price history for {len(unique_tickers)} tickers...")
     hist_cache = _fetch_batch_history(unique_tickers, days=252)
+    print(f"[Dip Hunter] Phase 1/3: Done in {_time.time()-_t0:.1f}s ({len(hist_cache)} tickers cached, saved to DB)")
     
     # === PHASE 2: Pre-filter by drop %, fetch fundamentals only for candidates ===
     candidate_tickers = _quick_filter(hist_cache, min_drop_pct=3.0)
@@ -547,11 +678,13 @@ def scan_stock_dips(min_quality_score: float = 0) -> List[Dict]:
         if s == "Tracked" and t not in candidate_tickers:
             candidate_tickers.append(t)
     
-    print(f"[Dip Hunter] {len(candidate_tickers)} candidates after pre-filter (drop >= 3%)")
+    print(f"[Dip Hunter] Phase 2/3: {len(candidate_tickers)} candidates after pre-filter. Fetching fundamentals...")
     
     fund_map = _bulk_fundamentals_fast(candidate_tickers) if candidate_tickers else {}
+    print(f"[Dip Hunter] Phase 2/3: Done in {_time.time()-_t0:.1f}s ({len(fund_map)} fundamentals fetched, saved to DB)")
     
     # === PHASE 3: Score all candidates locally (no network calls) ===
+    print(f"[Dip Hunter] Phase 3/3: Scoring {len(candidate_tickers)} candidates...")
     results = []
     for ticker in candidate_tickers:
         sector = ticker_sector.get(ticker, "Unknown")
@@ -560,6 +693,7 @@ def scan_stock_dips(min_quality_score: float = 0) -> List[Dict]:
             results.append(res)
     
     results.sort(key=lambda x: (-x["quality_score"], x["drop_pct"]))
+    print(f"[Dip Hunter] Complete: {len(results)} opportunities found in {_time.time()-_t0:.1f}s")
     return results[:100]
 
 

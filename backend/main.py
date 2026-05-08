@@ -13,6 +13,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+API_TIMEOUT = 60  # seconds (default for fast endpoints)
+SLOW_API_TIMEOUT = 300  # 5 min for scans that download lots of data
+
+async def _to_thread_with_timeout(fn, *args, timeout: float = API_TIMEOUT, **kwargs):
+    """Run a blocking function in a thread with a timeout."""
+    import functools
+    wrapped = functools.partial(fn, *args, **kwargs)
+    return await asyncio.wait_for(asyncio.to_thread(wrapped), timeout=timeout)
+
 app = FastAPI(title="Rational Equity API")
 
 # Fire background universe scoring immediately on startup
@@ -20,9 +29,37 @@ app = FastAPI(title="Rational Equity API")
 async def _startup_background_tasks():
     """
     Kick off async background tasks as soon as the server is ready:
-    1. Dynamic universe scoring (takes ~30-45s)
-    2. Cache warming for critical paths (market-status, macro, industries)
+    1. Persistent DB warming (pre-populate SQLite with common symbols)
+    2. Dynamic universe scoring (takes ~30-45s)
+    3. Cache warming for critical paths (market-status, macro, industries)
     """
+    # 1. Warm persistent DB — fetches data in background, instant reads afterward
+    def warm_db():
+        try:
+            import logging
+            log = logging.getLogger(__name__)
+            from screener import SECTOR_STOCKS
+            from dip_hunter import DIP_UNIVERSE
+            from persistent_cache import init_db
+
+            init_db()
+            # Collect all unique symbols from sector lists and dip universe
+            symbols = set()
+            for tickers in SECTOR_STOCKS.values():
+                symbols.update(tickers)
+            for stocks in DIP_UNIVERSE.values():
+                symbols.update(stocks)
+
+            from data_client import warm_db_for_symbols
+            warm_db_for_symbols(list(symbols))
+            log.info("[DB WARMUP] Started background warming for %d symbols", len(symbols))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("[DB WARMUP] Failed to start: %s", exc)
+
+    import threading
+    threading.Thread(target=warm_db, daemon=True).start()
+
     try:
         import dynamic_universe  # noqa: PLC0415
         asyncio.create_task(dynamic_universe.background_score_all())
@@ -195,17 +232,22 @@ async def money_flow():
 @app.get("/api/small-caps")
 async def small_caps(min_growth: float = 0.05, max_pe: float = 25.0, min_roe: float = 0.10):
     try:
-        data = await asyncio.to_thread(get_small_cap_gems, min_growth=min_growth, max_pe=max_pe, min_roe=min_roe)
+        data = await _to_thread_with_timeout(get_small_cap_gems, min_growth=min_growth, max_pe=max_pe, min_roe=min_roe, timeout=SLOW_API_TIMEOUT)
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Small caps scan timed out. Try again in a moment.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/international/picks")
 async def international_picks():
     try:
+        from international import InternationalScanner  # noqa: PLC0415
         scanner = InternationalScanner()
-        data = await asyncio.to_thread(scanner.get_picks)
+        data = await _to_thread_with_timeout(scanner.get_picks, timeout=SLOW_API_TIMEOUT)
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="International scan timed out. Try again in a moment.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -238,8 +280,10 @@ async def research_trends(symbol: str, range: str = '5y'):
 @app.get("/api/contrarian/opportunities")
 async def contrarian_opportunities():
     try:
-        data = await asyncio.to_thread(get_contrarian_opportunities)
+        data = await _to_thread_with_timeout(get_contrarian_opportunities, timeout=SLOW_API_TIMEOUT)
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Contrarian scan timed out. Try again in a moment.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -254,14 +298,16 @@ async def market_news():
 @app.get("/api/superinvestors")
 async def superinvestors_endpoint():
     try:
-        investors = await asyncio.to_thread(get_live_superinvestors)
-        next_filing = await asyncio.to_thread(get_next_filing_info)
-        filing_status = await asyncio.to_thread(get_filing_status)
+        investors = await _to_thread_with_timeout(get_live_superinvestors, timeout=SLOW_API_TIMEOUT)
+        next_filing = await _to_thread_with_timeout(get_next_filing_info, timeout=SLOW_API_TIMEOUT)
+        filing_status = await _to_thread_with_timeout(get_filing_status, timeout=SLOW_API_TIMEOUT)
         return {
             "investors": investors,
             "next_filing": next_filing,
             "filing_status": filing_status
         }
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Superinvestors data fetch timed out. Try again in a moment.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -287,17 +333,26 @@ async def update_universe_endpoint():
 
 @app.get("/api/copycat")
 async def get_copycat():
-    return await asyncio.to_thread(get_copycat_performance)
+    try:
+        return await _to_thread_with_timeout(get_copycat_performance, timeout=SLOW_API_TIMEOUT)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Copycat data fetch timed out. Try again in a moment.")
 
 @app.get("/api/moonshots")
 async def get_moonshots():
-    scanner = MoonshotScanner()
-    return await asyncio.to_thread(scanner.get_moonshots)
+    try:
+        scanner = MoonshotScanner()
+        return await _to_thread_with_timeout(scanner.get_moonshots, timeout=SLOW_API_TIMEOUT)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Moonshot scan timed out. Try again in a moment.")
 
 @app.get("/api/screeners/{strategy_id}")
 async def get_screeners(strategy_id: str):
     engine = get_screener_engine()
-    stocks = await asyncio.to_thread(engine.run_screen, strategy_id)
+    try:
+        stocks = await _to_thread_with_timeout(engine.run_screen, strategy_id, timeout=SLOW_API_TIMEOUT)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail=f"Screener {strategy_id} timed out.")
     return {
         "stocks": stocks,
         "universe_meta": get_sector_meta(),
@@ -308,8 +363,10 @@ async def get_screeners(strategy_id: str):
 async def dip_hunter_etfs():
     """Get ETF dips with classifications"""
     try:
-        data = await asyncio.to_thread(scan_etf_dips)
+        data = await _to_thread_with_timeout(scan_etf_dips, timeout=SLOW_API_TIMEOUT)
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="ETF dip scan timed out — try again in a moment.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -317,11 +374,13 @@ async def dip_hunter_etfs():
 async def dip_hunter_stocks(min_quality: int = 0):
     """Get quality stock dips with classifications"""
     try:
-        data = await asyncio.to_thread(scan_stock_dips, min_quality)
+        data = await _to_thread_with_timeout(scan_stock_dips, min_quality, timeout=SLOW_API_TIMEOUT)
         return {
             "results": data,
             "universe_meta": get_sector_meta(),
         }
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Dip scan timed out — try again in a moment.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -329,8 +388,10 @@ async def dip_hunter_stocks(min_quality: int = 0):
 async def dip_hunter_summary():
     """Get dip market summary statistics"""
     try:
-        data = await asyncio.to_thread(get_dip_summary)
+        data = await _to_thread_with_timeout(get_dip_summary, timeout=SLOW_API_TIMEOUT)
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Dip summary timed out — try again in a moment.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -483,17 +544,55 @@ def reset_portfolio_endpoint(portfolio_id: str, pm: PortfolioManager = Depends(g
 
 from cache_utils import clear_cache, get_cache_stats
 from data_client import set_defeatbeta_enabled, get_data_source_status
+from persistent_cache import get_db_stats as _get_db_stats, clear_db as _clear_db
+import time as _time
+
+# Scan progress tracker: {scan_name: {"started_at": float, "phase": str, "total": int, "current": int}}
+_scan_progress: dict = {}
+
+def report_scan_progress(scan_name: str, phase: str, total: int = 0, current: int = 0):
+    """Report progress for a long-running scan."""
+    _scan_progress[scan_name] = {
+        "started_at": _scan_progress.get(scan_name, {}).get("started_at", _time.time()),
+        "phase": phase,
+        "total": total,
+        "current": current,
+        "elapsed_s": round(_time.time() - _scan_progress.get(scan_name, {}).get("started_at", _time.time()), 1),
+    }
+
+def clear_scan_progress(scan_name: str):
+    """Remove completed scan from progress tracker."""
+    _scan_progress.pop(scan_name, None)
 
 @app.get("/api/admin/cache/stats")
 def cache_stats():
-    """Returns current cache and circuit breaker statistics."""
-    return get_cache_stats()
+    """Returns current cache, circuit breaker, and persistent DB statistics."""
+    return {
+        "memory_cache": get_cache_stats(),
+        "persistent_db": _get_db_stats(),
+    }
 
 @app.post("/api/admin/cache/clear")
 def clear_all_cache():
-    """Force clear all caches and circuit breakers. Use for testing."""
+    """Force clear all caches, circuit breakers, and persistent DB. Use for testing."""
     clear_cache()
-    return {"status": "success", "message": "All caches and circuit breakers cleared"}
+    _clear_db()
+    return {"status": "success", "message": "All caches, circuit breakers, and persistent DB cleared"}
+
+@app.get("/api/scan/progress")
+def scan_progress():
+    """Returns progress of any currently running scans."""
+    result = {}
+    for name, info in _scan_progress.items():
+        elapsed = _time.time() - info["started_at"]
+        result[name] = {
+            "phase": info["phase"],
+            "total": info["total"],
+            "current": info["current"],
+            "elapsed_s": round(elapsed, 1),
+            "pct": round(info["current"] / max(info["total"], 1) * 100) if info["total"] > 0 else None,
+        }
+    return result
 
 @app.get("/api/admin/data-source")
 def data_source_status():
