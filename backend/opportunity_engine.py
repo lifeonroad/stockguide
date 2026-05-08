@@ -393,7 +393,7 @@ def _get_sector_etf_drops() -> Dict[str, float]:
     from screener import SECTOR_ETFS
     
     sector_names = {v: k for k, v in SECTOR_ETFS.items()}
-    tickers = list(SECTOR_ETFS.keys())
+    tickers = list(SECTOR_ETFS.values())  # Fix: use ticker symbols, not sector names
     
     drops = {}
     try:
