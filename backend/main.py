@@ -251,6 +251,15 @@ async def international_picks():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/international/picks")
+async def international_picks():
+    try:
+        scanner = InternationalScanner()
+        data = await asyncio.to_thread(scanner.get_picks)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/research/{symbol}")
 async def research(symbol: str):
     try:
