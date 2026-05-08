@@ -320,3 +320,7 @@ export function sortDipStocks(column) {
 
     renderOpportunities();
 }
+
+// Attach to window for HTML onclick handlers
+window.loadOpportunities = loadOpportunities;
+window.sortDipStocks = sortDipStocks;

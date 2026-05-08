@@ -190,7 +190,7 @@ async function toggleDataSource() {
 
         updateDataSourceUI({
             defeatbeta_enabled: newState,
-            current_source: data.current
+            current_source: data.current || sourceName
         });
         btn.classList.remove('animate-pulse');
 
@@ -210,8 +210,11 @@ window.toggleDataSource = toggleDataSource;
 // --- Init Event ---
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    await loadMarketStatus();
-    await loadMacroTrends();
-    await loadIndustries();
-    await loadDataSourceStatus();
+    // Fire independent loads in parallel — no blocking
+    Promise.allSettled([
+        loadMarketStatus(),
+        loadMacroTrends(),
+        loadIndustries(),
+        loadDataSourceStatus(),
+    ]);
 });

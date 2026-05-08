@@ -1,6 +1,7 @@
 
 import time
 import yfinance as yf
+import concurrent.futures
 from typing import Optional
 import pandas as pd
 import random
@@ -151,6 +152,7 @@ def get_sector_meta(sector: Optional[str] = None) -> dict:
         }
 
 
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_sector_metrics_from_constituents(sector_name):
     """
     Calculate sector average ROE and Debt/Equity from top constituent stocks.
@@ -162,31 +164,29 @@ def get_sector_metrics_from_constituents(sector_name):
     
     roe_values = []
     debt_values = []
+    sample = stocks[:5]
     
-    # Sample top 5 stocks for speed (instead of all)
-    for symbol in stocks[:5]:  # noqa: E501
+    def fetch_metric(symbol):
         try:
             info = get_ticker_info(symbol)
             if not info:
-                continue
-
+                return None, None
             roe = info.get('returnOnEquity', 0)
             debt = info.get('debtToEquity', 0)
-
-            # Only include valid values
-            if roe and roe > 0:
-                roe_values.append(roe * 100)  # Convert to percentage
-            if debt and debt >= 0:  # 0 debt is valid
-                debt_values.append(debt)
+            return (roe * 100 if roe and roe > 0 else None,
+                    debt if debt and debt >= 0 else None)
         except Exception:
-            # Skip stocks with errors
-            continue
-        time.sleep(0.2)  # gentle throttle between per-stock calls
+            return None, None
     
-    # Calculate averages
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        for roe, debt in executor.map(fetch_metric, sample):
+            if roe is not None:
+                roe_values.append(roe)
+            if debt is not None:
+                debt_values.append(debt)
+    
     avg_roe = sum(roe_values) / len(roe_values) if roe_values else 0
     avg_debt = sum(debt_values) / len(debt_values) if debt_values else 0
-    
     return round(avg_roe, 2), round(avg_debt, 2)
 
 
@@ -198,31 +198,34 @@ def get_industry_rankings():
     """
     results = []
     
-    for sector, ticker_symbol in SECTOR_ETFS.items():
-        ticker = yf.Ticker(ticker_symbol)
+    # Fetch ETF info in parallel using ThreadPoolExecutor
+    def fetch_etf_info(sector, ticker_symbol):
         try:
+            ticker = yf.Ticker(ticker_symbol)
             info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=3, base_delay=1.5)
+            pe = info.get('trailingPE') or info.get('forwardPE') or 20
+            div_yield = info.get('yield', 0) or info.get('trailingAnnualDividendYield', 0)
+            return sector, ticker_symbol, pe, div_yield
         except Exception:
-            info = {}
-        time.sleep(0.2)  # gentle throttle between ETF calls
-
-        # Extract ETF-level metrics
-        pe = info.get('trailingPE') or info.get('forwardPE') or 20
-        div_yield = info.get('yield', 0) or info.get('trailingAnnualDividendYield', 0)
-        
-        # Calculate constituent-based metrics
-        avg_roe, avg_debt = get_sector_metrics_from_constituents(sector)
-        
-        results.append({
-            "industry": sector,
-            "etf": ticker_symbol,
-            "pe": round(pe, 2),
-            "dividend_yield": round(div_yield * 100, 2) if div_yield else 0,
-            "roe": avg_roe,
-            "debt_to_equity": avg_debt
-        })
-
-    # Sort by 'Value' (Low PE)
+            return sector, ticker_symbol, 20, 0
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(fetch_etf_info, sector, ticker): sector
+            for sector, ticker in SECTOR_ETFS.items()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            sector, ticker_symbol, pe, div_yield = future.result()
+            avg_roe, avg_debt = get_sector_metrics_from_constituents(sector)
+            results.append({
+                "industry": sector,
+                "etf": ticker_symbol,
+                "pe": round(pe, 2),
+                "dividend_yield": round(div_yield * 100, 2) if div_yield else 0,
+                "roe": avg_roe,
+                "debt_to_equity": avg_debt
+            })
+    
     sorted_results = sorted(results, key=lambda x: x['pe'])
     return sorted_results
 
