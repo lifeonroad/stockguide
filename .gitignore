@@ -7,10 +7,6 @@ __pycache__/
 .env
 .env.local
 
-# Database
-backend/data/*.db
-*.sqlite3
-
 # IDEs
 .idea/
 .vscode/
