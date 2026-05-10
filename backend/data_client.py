@@ -228,12 +228,23 @@ def get_ticker_info(symbol: str) -> dict:
     return _build_ticker_info_from_cache(fresh or {}, symbol)
 
 
+def _val(data, key, default=None):
+    """Return value only if it's valid (non-zero, non-None)."""
+    v = data.get(key)
+    if v is None or v == 0 or v == "":
+        return default
+    return v
+
+def _val_allow_zero(data, key, default=None):
+    """Return value, allowing 0 as valid."""
+    return data.get(key, default)
+
+
 def _build_ticker_info_from_cache(data: dict, symbol: str) -> dict:
     """Build full yfinance-compatible dict from cached/partial data."""
-    high_52w = data.get("fifty_two_week_high") or 0.0
-    low_52w = data.get("fifty_two_week_low") or 0.0
+    high_52w = _val_allow_zero(data, "fifty_two_week_high") or 0.0
+    low_52w = _val_allow_zero(data, "fifty_two_week_low") or 0.0
 
-    # Try to get price history from persistent DB for 52-week change
     change_52w = 0.0
     hist = get_price_history_cached(symbol, days=252)
     if hist and len(hist) > 2:
@@ -245,54 +256,86 @@ def _build_ticker_info_from_cache(data: dict, symbol: str) -> dict:
         except Exception:
             pass
 
-    return {
-        "symbol": data.get("symbol", symbol),
-        "shortName": data.get("name") or data.get("longName", symbol),
-        "longName": data.get("name") or data.get("longName", symbol),
-        "sector": data.get("sector", "Unknown"),
-        "industry": data.get("industry", "Unknown"),
-        "longBusinessSummary": data.get("summary") or data.get("longBusinessSummary", "No business summary available."),
-        "currentPrice": data.get("price") or data.get("currentPrice", 0.0),
-        "regularMarketPrice": data.get("price") or data.get("currentPrice") or data.get("regularMarketPrice", 0.0),
-        "regularMarketChangePercent": data.get("regularMarketChangePercent", 0.0),
-        "regularMarketVolume": data.get("avg_volume") or data.get("averageVolume", 0),
-        "regularMarketPreviousClose": data.get("price") or data.get("currentPrice", 0.0),
-        "marketCap": data.get("market_cap", 0.0),
-        "trailingPE": data.get("trailing_pe", 0.0),
-        "forwardPE": data.get("forward_pe", data.get("trailing_pe", 0.0)),
-        "trailingEps": data.get("trailing_eps", 0.0),
-        "forwardEps": data.get("forward_eps", data.get("trailing_eps", 0.0)),
-        "priceToBook": data.get("price_to_book", 0.0),
-        "priceToSalesTrailing12Months": data.get("price_to_sales", 0.0),
-        "pegRatio": data.get("peg_ratio", 0.0),
-        "returnOnEquity": data.get("roe", 0.0),
-        "returnOnAssets": data.get("roa", 0.0),
-        "debtToEquity": data.get("debt_to_equity", 0.0),
-        "currentRatio": data.get("current_ratio", 0.0),
-        "freeCashflow": data.get("free_cashflow", 0.0),
-        "totalDebt": data.get("total_debt", 0.0),
-        "totalCash": data.get("total_cash", 0.0),
-        "revenueGrowth": data.get("revenue_growth", 0.0),
-        "earningsGrowth": data.get("earnings_growth", 0.0),
-        "totalRevenue": data.get("revenue", 0.0),
-        "netIncomeToCommon": data.get("net_income", 0.0),
-        "operatingCashflow": data.get("operating_cashflow", 0.0),
+    result = {
+        "symbol": _val_allow_zero(data, "symbol", symbol),
+        "shortName": _val(data, "name") or _val(data, "longName", symbol),
+        "longName": _val(data, "name") or _val(data, "longName", symbol),
+        "sector": _val(data, "sector", "Unknown"),
+        "industry": _val(data, "industry", "Unknown"),
+        "longBusinessSummary": _val(data, "summary") or _val(data, "longBusinessSummary") or "No business summary available.",
+        "currentPrice": _val_allow_zero(data, "price", 0.0),
+        "marketCap": _val_allow_zero(data, "market_cap", 0.0),
+        "averageVolume": _val_allow_zero(data, "avg_volume") or _val_allow_zero(data, "averageVolume", 0),
         "52WeekChange": change_52w,
         "fiftyTwoWeekHigh": high_52w,
         "fiftyTwoWeekLow": low_52w,
-        "averageVolume": data.get("avg_volume") or data.get("averageVolume", 0),
-        "volume": data.get("avg_volume") or data.get("averageVolume") or data.get("volume", 0),
-        "beta": data.get("beta", 0.0),
-        "trailingAnnualDividendYield": data.get("dividend_yield", 0.0),
-        "dividendRate": data.get("dividend_rate", 0.0),
-        "dividendYield": data.get("dividend_yield", 0.0),
-        "payoutRatio": data.get("payout_ratio", 0.0),
-        "shortRatio": data.get("short_ratio", 0.0),
-        "sharesOutstanding": data.get("shares_outstanding", 0.0),
-        "enterpriseToEbitda": data.get("ev_ebitda", 0.0),
-        "profitMargin": data.get("profit_margin", 0.0),
-        "bookValue": data.get("book_value", 0.0),
+        "beta": _val_allow_zero(data, "beta", 0.0),
+        "sharesOutstanding": _val_allow_zero(data, "shares_outstanding", 0.0),
     }
+    
+    # Valuation metrics - only include if non-zero
+    trailing_pe = _val(data, "trailing_pe")
+    if trailing_pe:
+        result["trailingPE"] = trailing_pe
+        result["forwardPE"] = _val(data, "forward_pe") or trailing_pe
+        result["trailingEps"] = _val_allow_zero(data, "trailing_eps", 0.0)
+        result["forwardEps"] = _val(data, "forward_eps") or _val_allow_zero(data, "trailing_eps", 0.0)
+    
+    for key in ["priceToBook", "priceToSalesTrailing12Months", "pegRatio"]:
+        db_key = key.replace("priceToBook", "price_to_book").replace("priceToSalesTrailing12Months", "price_to_sales")
+        v = _val(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    # Quality metrics - only include if non-zero
+    for key in ["returnOnEquity", "returnOnAssets"]:
+        db_key = "roe" if key == "returnOnEquity" else "roa"
+        v = _val(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    # Financial metrics - only include if non-zero
+    for key in ["debtToEquity", "currentRatio"]:
+        db_key = "debt_to_equity" if key == "debtToEquity" else "current_ratio"
+        v = _val(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    for key in ["freeCashflow", "totalDebt", "totalCash"]:
+        db_key = key.replace("freeCashflow", "free_cashflow").replace("totalDebt", "total_debt").replace("totalCash", "total_cash")
+        v = _val(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    # Growth metrics - only include if non-zero
+    for key in ["revenueGrowth", "earningsGrowth"]:
+        db_key = "revenue_growth" if key == "revenueGrowth" else "earnings_growth"
+        v = _val(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    # Financial totals - only include if non-zero
+    for key in ["totalRevenue", "netIncomeToCommon", "operatingCashflow"]:
+        db_key = key.replace("totalRevenue", "revenue").replace("netIncomeToCommon", "net_income").replace("operatingCashflow", "operating_cashflow")
+        v = _val(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    # Dividend metrics - allow 0 as valid (no dividend)
+    for key in ["trailingAnnualDividendYield", "dividendRate", "dividendYield", "payoutRatio"]:
+        db_key = "dividend_yield" if "Yield" in key else key.replace("dividendRate", "dividend_rate").replace("payoutRatio", "payout_ratio")
+        v = _val_allow_zero(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    # Other metrics
+    for key in ["shortRatio", "enterpriseToEbitda", "profitMargin", "bookValue"]:
+        db_key = key.replace("shortRatio", "short_ratio").replace("enterpriseToEbitda", "ev_ebitda").replace("profitMargin", "profit_margin").replace("bookValue", "book_value")
+        v = _val(data, db_key)
+        if v is not None:
+            result[key] = v
+    
+    return result
 
 
 def _get_fundamentals_raw(symbol: str) -> dict:

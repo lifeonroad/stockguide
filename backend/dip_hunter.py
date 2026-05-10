@@ -282,16 +282,34 @@ def scan_etf_dips() -> List[Dict]:
     return results
 
 def _fetch_batch_history(tickers: List[str], days: int = 252) -> Dict[str, pd.DataFrame]:
-    """Fetch 1-year price history for many tickers in a single yf.download() call."""
+    """Fetch 1-year price history. DB-first, then yfinance for missing/stale."""
     hist_cache = {}
     if not tickers:
         return hist_cache
-
-    # yf.download() with ~80 tickers in one go is much faster than individual calls
-    # Split into batches of 50 to avoid timeout
+    
+    # Step 1: Try DB first (instant for 500+ tickers)
+    from persistent_cache import get_price_history_cached, needs_refresh
+    missing_tickers = []
+    
+    for sym in tickers:
+        rows = get_price_history_cached(sym, days=days)
+        if rows and len(rows) >= 200 and not needs_refresh(sym, "history"):
+            # Convert DB rows to DataFrame (keep lowercase columns for consistency)
+            import pandas as pd
+            df = pd.DataFrame(rows)
+            df.set_index(pd.to_datetime(df['date']), inplace=True)
+            df.sort_index(inplace=True)
+            hist_cache[sym] = df
+        else:
+            missing_tickers.append(sym)
+    
+    if not missing_tickers:
+        return hist_cache  # All found in DB
+    
+    # Step 2: Fetch missing from yfinance
     batch_size = 50
-    for i in range(0, len(tickers), batch_size):
-        batch = tickers[i:i + batch_size]
+    for i in range(0, len(missing_tickers), batch_size):
+        batch = missing_tickers[i:i + batch_size]
         try:
             data = fetch_with_retry(
                 lambda b=batch: yf.download(b, period="1y", progress=False, threads=True),
@@ -347,10 +365,10 @@ def _score_stock(ticker, sector, fund_data, hist_cache):
         if not fd:
             return None
 
-        roe = fd.get("roe", 0)
-        debt_equity = fd.get("debt_to_equity", 0)
-        pe_ratio = fd.get("trailing_pe", 0)
-        profit_margin = fd.get("profit_margin", 0)
+        roe = fd.get("roe", 0) or 0
+        debt_equity = fd.get("debt_to_equity", 0) or 0
+        pe_ratio = fd.get("trailing_pe")  # Can be None if invalid
+        profit_margin = fd.get("profit_margin", 0) or 0
 
         # Compute drop from cached history
         hist = hist_cache.get(ticker)
@@ -398,10 +416,10 @@ def _score_stock(ticker, sector, fund_data, hist_cache):
             "high_52w": round(high_price, 2),
             "drop_pct": drop_pct,
             "rsi": round(rsi, 1),
-            "roe": roe_pct,
-            "debt_equity": round(debt_equity, 2) if debt_equity else 0,
-            "profit_margin": round(profit_margin * 100, 2) if profit_margin else 0,
-            "pe_ratio": round(pe_ratio, 2) if pe_ratio else 0,
+            "roe": roe_pct if roe_pct else None,
+            "debt_equity": round(debt_equity, 2) if debt_equity else None,
+            "profit_margin": round(profit_margin * 100, 2) if profit_margin else None,
+            "pe_ratio": round(pe_ratio, 2) if pe_ratio else None,
             "recovery_5d": recovery_5d,
             "recovery_15d": recovery_15d,
             "quality_score": quality_score,
@@ -415,19 +433,64 @@ def _score_stock(ticker, sector, fund_data, hist_cache):
 
 def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
     """
-    Fast bulk fundamentals fetch using yahooquery.
-    Uses parallel ThreadPoolExecutor to fetch multiple batches concurrently.
-    Saves data to persistent DB for future instant reads.
+    Fetch fundamentals. DB-first for cached tickers, yahooquery for missing.
     """
     from yahooquery import Ticker
+    from persistent_cache import get_bulk_ticker_info
     
     out = {}
     if not tickers:
         return out
     
-    # Split into batches of 40
+    # Step 1: Try DB first (instant for 500+ tickers)
+    cached = get_bulk_ticker_info(tickers)
+    for sym in tickers:
+        data = cached.get(sym.upper(), {})
+        if data and data.get('price') and data.get('price') > 0:
+            out[sym.upper()] = {
+                "roe": data.get("roe"),
+                "debt_to_equity": data.get("debt_to_equity"),
+                "shortName": data.get("name") or sym,
+                "avg_volume": data.get("avg_volume"),
+                "market_cap": data.get("market_cap"),
+                "trailing_pe": data.get("trailing_pe"),
+                "forward_pe": data.get("forward_pe"),
+                "price_to_book": data.get("price_to_book"),
+                "price_to_sales": data.get("price_to_sales"),
+                "trailing_eps": data.get("trailing_eps"),
+                "forward_eps": data.get("forward_eps"),
+                "roa": data.get("roa"),
+                "current_ratio": data.get("current_ratio"),
+                "free_cashflow": data.get("free_cashflow"),
+                "total_debt": data.get("total_debt"),
+                "total_cash": data.get("total_cash"),
+                "revenue_growth": data.get("revenue_growth"),
+                "earnings_growth": data.get("earnings_growth"),
+                "revenue": data.get("revenue"),
+                "net_income": data.get("net_income"),
+                "dividend_yield": data.get("dividend_yield"),
+                "dividend_rate": data.get("dividend_rate"),
+                "payout_ratio": data.get("payout_ratio"),
+                "beta": data.get("beta"),
+                "fifty_two_week_high": data.get("fifty_two_week_high"),
+                "fifty_two_week_low": data.get("fifty_two_week_low"),
+                "shares_outstanding": data.get("shares_outstanding"),
+                "price": data.get("price"),
+                "profit_margin": data.get("profit_margin"),
+                "peg_ratio": data.get("peg_ratio"),
+                "ev_ebitda": data.get("ev_ebitda"),
+                "book_value": data.get("book_value"),
+                "short_ratio": data.get("short_ratio"),
+                "operating_cashflow": data.get("operating_cashflow"),
+            }
+    
+    # Step 2: Fetch missing from yahooquery
+    missing = [t for t in tickers if t.upper() not in out]
+    if not missing:
+        return out
+    
     batch_size = 40
-    batches = [tickers[i:i + batch_size] for i in range(0, len(tickers), batch_size)]
+    batches = [missing[i:i + batch_size] for i in range(0, len(missing), batch_size)]
     
     def fetch_batch(batch):
         batch_out = {}
@@ -476,13 +539,13 @@ def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
                     current_price = float(pd_data.get("currentPrice", 0) or pd_data.get("regularMarketPrice", 0) or 0)
                     
                     batch_out[sym] = {
-                        "roe": roe / 100 if roe > 1 else roe,
+                        "roe": roe,  # yahooquery already returns as decimal (1.41 = 141%)
                         "debt_to_equity": de_ratio,
                         "shortName": pd_data.get("shortName") or sym,
                         "avg_volume": avg_vol,
                         "market_cap": mkt_cap,
-                        "trailing_pe": pe,
-                        "forward_pe": fpe,
+                        "trailing_pe": pe if pe and pe > 0 else None,
+                        "forward_pe": fpe if fpe and fpe > 0 else None,
                         "price_to_book": pb,
                         "price_to_sales": ps,
                         "trailing_eps": eps,
@@ -509,11 +572,11 @@ def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
                         "industry": ap.get("industry") or "Unknown",
                         "longBusinessSummary": ap.get("longBusinessSummary") or "No business summary available.",
                         "profit_margin": float(ks.get("profitMargin", 0) or 0) / 100 if float(ks.get("profitMargin", 0) or 0) > 1 else float(ks.get("profitMargin", 0) or 0),
-                        "peg_ratio": float(sd.get("pegRatio", 0) or 0),
-                        "ev_ebitda": float(sd.get("enterpriseToEbitda", 0) or 0),
-                        "book_value": float(ks.get("bookValue", 0) or 0),
-                        "short_ratio": float(sd.get("shortRatio", 0) or 0),
-                        "operating_cashflow": float(fd.get("operatingCashflow", 0) or 0),
+                        "peg_ratio": float(sd.get("pegRatio")) if sd.get("pegRatio") else None,
+                        "ev_ebitda": float(sd.get("enterpriseToEbitda")) if sd.get("enterpriseToEbitda") else None,
+                        "book_value": float(ks.get("bookValue")) if ks.get("bookValue") else None,
+                        "short_ratio": float(sd.get("shortRatio")) if sd.get("shortRatio") else None,
+                        "operating_cashflow": float(fd.get("operatingCashflow")) if fd.get("operatingCashflow") else None,
                     }
                     
                     # Save to persistent DB in background
