@@ -6,7 +6,7 @@ SQLite database for instant data reads, background refresh, and reduced API call
 
 ## Tables
 
-### `ticker_info` (293 rows)
+### `ticker_info` (300+ rows)
 Stores fundamental data and metrics for each stock.
 
 | Column | Type | Description |
@@ -43,6 +43,12 @@ Stores fundamental data and metrics for each stock.
 | `fifty_two_week_low` | REAL | 52W low |
 | `avg_volume` | INTEGER | Avg daily volume |
 | `shares_outstanding` | REAL | Shares outstanding |
+| `profit_margin` | REAL | Net profit margin (%) |
+| `peg_ratio` | REAL | Price/Earnings to Growth |
+| `ev_ebitda` | REAL | Enterprise value / EBITDA |
+| `book_value` | REAL | Book value per share |
+| `short_ratio` | REAL | Short interest ratio |
+| `operating_cashflow` | REAL | Operating cash flow |
 | `fetched_at` | REAL | Unix timestamp |
 | `price_fetched_at` | REAL | Price fetch time |
 

@@ -45,28 +45,43 @@ def get_cycle_intelligence():
     """
     try:
         tickers = list(SECTOR_MAP.values())
-        # SPY as baseline
         tickers.append("SPY")
         
-        # Fetch 1-year history to calculate multi-timeframe returns
-        data = fetch_with_retry(
-            lambda: yf.download(tickers, period="1y", interval="1d", progress=False, threads=True),
-            max_attempts=2
-        )
+        # DB-first: try to read history from cache
+        from persistent_cache import get_price_history_cached
+        cached_data = {}
+        for sym in tickers:
+            rows = get_price_history_cached(sym, days=252)
+            if rows and len(rows) >= 126:
+                cached_data[sym] = rows
         
-        if data.empty:
+        if len(cached_data) >= len(tickers) * 0.7:
+            # Use cached data if we have >=70% of tickers
+            close = pd.DataFrame({
+                sym: pd.Series({r['date']: r['close'] for r in rows[::-1]})
+                for sym, rows in cached_data.items()
+            })
+            data_source = "db"
+        else:
+            # Fetch from yfinance
+            data = fetch_with_retry(
+                lambda: yf.download(tickers, period="1y", interval="1d", progress=False, threads=True),
+                max_attempts=2
+            )
+            data_source = "yf"
+        
+        if data_source == "yf" and data.empty:
             return {"error": "No data available"}
             
-        # Extract Close prices - handle MultiIndex and single level index
-        if isinstance(data.columns, pd.MultiIndex):
-            if 'Close' in data.columns.levels[0]:
-                close = data['Close']
+        if data_source == "yf":
+            # Extract Close prices - handle MultiIndex and single level index
+            if isinstance(data.columns, pd.MultiIndex):
+                if 'Close' in data.columns.levels[0]:
+                    close = data['Close']
+                else:
+                    close = data.xs('Close', axis=1, level=0) if 'Close' in data.columns.get_level_values(0) else data
             else:
-                # Some versions of yfinance might have a different structure
-                # Attempt to find a level that contains 'Close'
-                close = data.xs('Close', axis=1, level=0) if 'Close' in data.columns.get_level_values(0) else data
-        else:
-            close = data['Close'] if 'Close' in data.columns else data
+                close = data['Close'] if 'Close' in data.columns else data
             
         # Calculate returns for different windows
         rotation = []

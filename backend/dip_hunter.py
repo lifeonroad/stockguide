@@ -69,7 +69,10 @@ def _save_fundamentals_to_db(symbol: str, data: dict):
                      "current_ratio", "free_cashflow", "total_debt", "total_cash",
                      "revenue_growth", "earnings_growth", "revenue", "net_income",
                      "dividend_yield", "dividend_rate", "payout_ratio", "beta",
-                     "fifty_two_week_high", "fifty_two_week_low", "shares_outstanding"]:
+                     "fifty_two_week_high", "fifty_two_week_low", "shares_outstanding",
+                     "profit_margin", "peg_ratio", "ev_ebitda", "book_value",
+                     "short_ratio", "operating_cashflow", "price", "name", "sector",
+                     "longBusinessSummary"]:
             if key in data:
                 db_data[key] = data[key]
         save_ticker_info(db_data)
@@ -346,8 +349,8 @@ def _score_stock(ticker, sector, fund_data, hist_cache):
 
         roe = fd.get("roe", 0)
         debt_equity = fd.get("debt_to_equity", 0)
-        pe_ratio = 0
-        profit_margin = 0
+        pe_ratio = fd.get("trailing_pe", 0)
+        profit_margin = fd.get("profit_margin", 0)
 
         # Compute drop from cached history
         hist = hist_cache.get(ticker)
@@ -505,6 +508,12 @@ def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
                         "sector": ap.get("sector") or "Unknown",
                         "industry": ap.get("industry") or "Unknown",
                         "longBusinessSummary": ap.get("longBusinessSummary") or "No business summary available.",
+                        "profit_margin": float(ks.get("profitMargin", 0) or 0) / 100 if float(ks.get("profitMargin", 0) or 0) > 1 else float(ks.get("profitMargin", 0) or 0),
+                        "peg_ratio": float(sd.get("pegRatio", 0) or 0),
+                        "ev_ebitda": float(sd.get("enterpriseToEbitda", 0) or 0),
+                        "book_value": float(ks.get("bookValue", 0) or 0),
+                        "short_ratio": float(sd.get("shortRatio", 0) or 0),
+                        "operating_cashflow": float(fd.get("operatingCashflow", 0) or 0),
                     }
                     
                     # Save to persistent DB in background
@@ -525,8 +534,6 @@ def _bulk_fundamentals_fast(tickers: List[str]) -> Dict[str, dict]:
         for future in concurrent.futures.as_completed(futures):
             batch_result = future.result()
             out.update(batch_result)
-    
-    return out
     
     return out
 

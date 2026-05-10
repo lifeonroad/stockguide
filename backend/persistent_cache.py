@@ -41,7 +41,6 @@ _db_initialized = False
 def _is_market_hours() -> bool:
     """Check if US market is open (Mon-Fri, 9:30 AM - 4:00 PM ET)."""
     now = datetime.now(timezone.utc)
-    # ET is UTC-5 (standard) or UTC-4 (DST). Rough approximation:
     hour_et = (now.hour - 4) % 24  # DST offset approximation
     return now.weekday() < 5 and 13 <= hour_et < 21
 
@@ -60,12 +59,11 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def init_db():
-    """Initialize database schema. Idempotent."""
+    """Initialize DB with schema. Safe to call multiple times."""
     global _db_initialized
-    if _db_initialized:
-        return
-
     with _lock:
+        if _db_initialized:
+            return
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         conn = _get_conn()
         conn.executescript("""
@@ -102,6 +100,12 @@ def init_db():
                 fifty_two_week_low REAL,
                 avg_volume REAL,
                 shares_outstanding REAL,
+                profit_margin REAL,
+                peg_ratio REAL,
+                ev_ebitda REAL,
+                book_value REAL,
+                short_ratio REAL,
+                operating_cashflow REAL,
                 fetched_at REAL,
                 price_fetched_at REAL
             );
@@ -124,35 +128,13 @@ def init_db():
                 fetched_at REAL NOT NULL,
                 PRIMARY KEY (scan_name, params)
             );
-
+            
             CREATE INDEX IF NOT EXISTS idx_price_history_symbol ON price_history(symbol);
             CREATE INDEX IF NOT EXISTS idx_price_history_date ON price_history(date);
-            CREATE INDEX IF NOT EXISTS idx_ticker_info_price ON ticker_info(price_fetched_at);
         """)
         conn.commit()
         conn.close()
         _db_initialized = True
-        logger.info("Persistent DB initialized at %s", DB_PATH)
-
-
-def get_ticker_info_cached(symbol: str) -> Optional[Dict]:
-    """Read ticker info from DB. Returns None if not found or very stale."""
-    init_db()
-    conn = _get_conn()
-    try:
-        row = conn.execute(
-            "SELECT * FROM ticker_info WHERE symbol = ?", (symbol.upper(),)
-        ).fetchone()
-        if not row:
-            return None
-        d = dict(row)
-        age = time.time() - (d.get("price_fetched_at") or d.get("fetched_at") or 0)
-        # Return stale data up to 2x TTL, beyond that return None to force refresh
-        if age > _price_ttl() * 4:
-            return None
-        return d
-    finally:
-        conn.close()
 
 
 def save_ticker_info(data: Dict):
@@ -162,7 +144,6 @@ def save_ticker_info(data: Dict):
     if not symbol:
         return
 
-    # Normalize keys: prefer yfinance-style, fall back to snake_case
     def _val(*keys):
         for k in keys:
             v = data.get(k)
@@ -180,8 +161,10 @@ def save_ticker_info(data: Dict):
                 total_cash, revenue_growth, earnings_growth, revenue,
                 net_income, dividend_yield, dividend_rate, payout_ratio,
                 beta, fifty_two_week_high, fifty_two_week_low, avg_volume,
-                shares_outstanding, fetched_at, price_fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                shares_outstanding, profit_margin, peg_ratio, ev_ebitda,
+                book_value, short_ratio, operating_cashflow,
+                fetched_at, price_fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 name=excluded.name, sector=excluded.sector, industry=excluded.industry,
                 summary=excluded.summary, price=excluded.price, market_cap=excluded.market_cap,
@@ -198,6 +181,9 @@ def save_ticker_info(data: Dict):
                 fifty_two_week_high=excluded.fifty_two_week_high,
                 fifty_two_week_low=excluded.fifty_two_week_low,
                 avg_volume=excluded.avg_volume, shares_outstanding=excluded.shares_outstanding,
+                profit_margin=excluded.profit_margin, peg_ratio=excluded.peg_ratio,
+                ev_ebitda=excluded.ev_ebitda, book_value=excluded.book_value,
+                short_ratio=excluded.short_ratio, operating_cashflow=excluded.operating_cashflow,
                 fetched_at=excluded.fetched_at, price_fetched_at=excluded.price_fetched_at
         """, (
             symbol,
@@ -232,9 +218,29 @@ def save_ticker_info(data: Dict):
             _val("fiftyTwoWeekLow", "fifty_two_week_low"),
             _val("averageVolume", "avg_volume"),
             _val("sharesOutstanding", "shares_outstanding"),
+            _val("profitMargin", "profit_margin"),
+            _val("pegRatio", "peg_ratio"),
+            _val("enterpriseToEbitda", "ev_ebitda"),
+            _val("bookValue", "book_value"),
+            _val("shortRatio", "short_ratio"),
+            _val("operatingCashflow", "operating_cashflow"),
             time.time(), time.time()
         ))
         conn.commit()
+    finally:
+        conn.close()
+
+
+def get_ticker_info_cached(symbol: str) -> Optional[Dict]:
+    """Read ticker info from DB. Returns None if not found."""
+    init_db()
+    symbol = symbol.upper()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM ticker_info WHERE symbol = ?", (symbol,)
+        ).fetchone()
+        return dict(row) if row else None
     finally:
         conn.close()
 
@@ -248,9 +254,7 @@ def get_price_history_cached(symbol: str, days: int = 252) -> Optional[List[Dict
             "SELECT * FROM price_history WHERE symbol = ? ORDER BY date DESC LIMIT ?",
             (symbol.upper(), days)
         ).fetchall()
-        if not rows:
-            return None
-        return [dict(r) for r in rows]
+        return [dict(r) for r in rows] if rows else None
     finally:
         conn.close()
 
@@ -264,87 +268,49 @@ def save_price_history(symbol: str, rows: List[Dict]):
         conn.executemany("""
             INSERT OR REPLACE INTO price_history (symbol, date, open, high, low, close, volume)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, [(symbol, r.get("date", ""), r.get("open"), r.get("high"), r.get("low"), r.get("close"), r.get("volume"))
-              for r in rows])
+        """, [(symbol, r.get("date", ""), r.get("open"), r.get("high"), 
+               r.get("low"), r.get("close"), r.get("volume")) for r in rows])
         conn.commit()
     finally:
         conn.close()
 
 
-def get_scan_cached(scan_name: str, params: str = "") -> Optional[Any]:
-    """Read cached scan results."""
+def get_bulk_ticker_info(symbols: List[str]) -> Dict[str, Dict]:
+    """Read multiple tickers from DB in one query."""
     init_db()
+    if not symbols:
+        return {}
+    symbols = [s.upper() for s in symbols]
+    placeholders = ",".join(["?"] * len(symbols))
     conn = _get_conn()
     try:
-        row = conn.execute(
-            "SELECT * FROM scan_cache WHERE scan_name = ? AND params = ?",
-            (scan_name, params)
-        ).fetchone()
-        if not row:
-            return None
-        age = time.time() - row["fetched_at"]
-        if age > SCAN_CACHE_TTL * 2:
-            return None
-        return json.loads(row["results"])
-    finally:
-        conn.close()
-
-
-def save_scan(scan_name: str, params: str, results: Any):
-    """Cache scan results."""
-    init_db()
-    conn = _get_conn()
-    try:
-        conn.execute("""
-            INSERT OR REPLACE INTO scan_cache (scan_name, params, results, fetched_at)
-            VALUES (?, ?, ?, ?)
-        """, (scan_name, params, json.dumps(results), time.time()))
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def get_bulk_ticker_info(symbols: List[str]) -> Dict[str, Optional[Dict]]:
-    """Bulk read ticker info from DB. Returns dict of symbol -> data (or None)."""
-    init_db()
-    conn = _get_conn()
-    try:
-        symbols_upper = [s.upper() for s in symbols]
-        placeholders = ",".join("?" * len(symbols_upper))
         rows = conn.execute(
             f"SELECT * FROM ticker_info WHERE symbol IN ({placeholders})",
-            symbols_upper
+            symbols
         ).fetchall()
-        result = {}
-        for s in symbols_upper:
-            result[s] = None
-        for row in rows:
-            d = dict(row)
-            age = time.time() - (d.get("price_fetched_at") or d["fetched_at"])
-            if age <= _price_ttl() * 4:
-                result[d["symbol"]] = d
-        return result
+        return {dict(r)["symbol"]: dict(r) for r in rows}
     finally:
         conn.close()
 
 
-def needs_refresh(symbol: str, field: str = "price") -> bool:
-    """Check if a symbol's data needs background refresh."""
+def needs_refresh(symbol: str, data_type: str = "price") -> bool:
+    """Check if cached data needs refresh based on TTL."""
     init_db()
+    symbol = symbol.upper()
     conn = _get_conn()
     try:
         row = conn.execute(
-            "SELECT price_fetched_at, fetched_at FROM ticker_info WHERE symbol = ?",
-            (symbol.upper(),)
+            "SELECT fetched_at, price_fetched_at FROM ticker_info WHERE symbol = ?",
+            (symbol,)
         ).fetchone()
         if not row:
             return True
-        if field == "price":
-            age = time.time() - (row["price_fetched_at"] or row["fetched_at"])
+        
+        age = time.time() - (row["price_fetched_at"] or row["fetched_at"] or 0)
+        
+        if data_type == "price":
             return age > _price_ttl()
-        else:
-            age = time.time() - row["fetched_at"]
-            return age > FUNDAMENTALS_TTL
+        return age > FUNDAMENTALS_TTL
     finally:
         conn.close()
 
@@ -356,25 +322,20 @@ def get_db_stats() -> Dict:
     try:
         ticker_count = conn.execute("SELECT COUNT(*) FROM ticker_info").fetchone()[0]
         price_count = conn.execute("SELECT COUNT(*) FROM price_history").fetchone()[0]
-        scan_count = conn.execute("SELECT COUNT(*) FROM scan_cache").fetchone()[0]
-        oldest_price = conn.execute(
-            "SELECT MIN(price_fetched_at) FROM ticker_info"
+        symbols_with_history = conn.execute(
+            "SELECT COUNT(DISTINCT symbol) FROM price_history"
         ).fetchone()[0]
-        db_size = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
         return {
             "ticker_count": ticker_count,
             "price_history_rows": price_count,
-            "cached_scans": scan_count,
-            "oldest_data_age_hours": round((time.time() - oldest_price) / 3600, 1) if oldest_price else 0,
-            "db_size_mb": round(db_size / 1024 / 1024, 1),
-            "db_path": DB_PATH,
+            "symbols_with_history": symbols_with_history,
         }
     finally:
         conn.close()
 
 
 def clear_db():
-    """Clear all data from the database."""
+    """Clear all cached data. Use with caution."""
     init_db()
     conn = _get_conn()
     try:
@@ -384,9 +345,3 @@ def clear_db():
         conn.commit()
     finally:
         conn.close()
-
-
-def close_db():
-    """Close any open connections (for cleanup)."""
-    global _db_initialized
-    _db_initialized = False

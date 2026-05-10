@@ -40,29 +40,40 @@ def get_money_flow_data():
     """
     results = []
     
-    # Fetch data for all symbols
-    tickers = yf.Tickers(' '.join(SYMBOLS.keys()))
+    # Try DB-first for price history (25d of data)
+    from persistent_cache import get_price_history_cached, save_price_history
+    from datetime import datetime, timedelta
     
     for symbol, meta in SYMBOLS.items():
         try:
-            ticker = tickers.tickers[symbol]
-            hist = ticker.history(period="25d") # Get enough for averages and CMF
+            # DB-first: read cached history
+            hist_rows = get_price_history_cached(symbol, days=30)
             
-            if len(hist) < 20:
-                continue
-                
+            if hist_rows and len(hist_rows) >= 20:
+                import pandas as pd
+                df = pd.DataFrame(hist_rows)
+                df.set_index(pd.to_datetime(df['date']), inplace=True)
+                df.sort_index(inplace=True)
+            else:
+                # Fallback to yfinance
+                tickers = yf.Tickers(' '.join(SYMBOLS.keys()))
+                ticker = tickers.tickers[symbol]
+                df = ticker.history(period="25d")
+                if len(df) < 20:
+                    continue
+            
             # Calculate CMF
-            hist['CMF'] = calculate_cmf(hist)
+            df['CMF'] = calculate_cmf(df)
             
-            latest = hist.iloc[-1]
-            prev = hist.iloc[-2]
+            latest = df.iloc[-1]
+            prev = df.iloc[-2]
             
             # 1. Chaikin Money Flow (Institutional indicator)
             # CMF > 0 is accumulation, < 0 is distribution
             cmf_val = latest['CMF']
             
             # 2. Relative Volume (RVOL)
-            avg_vol = hist['Volume'].iloc[-10:-1].mean()
+            avg_vol = df['Volume'].iloc[-10:-1].mean()
             rvol = latest['Volume'] / avg_vol
             
             # 3. Price Trend

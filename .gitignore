@@ -33,3 +33,7 @@ htmlcov/
 
 # Artifacts
 .gemini/
+
+# SQLite DBs (application data - always track these)
+# Exception: backup files
+**/stockguide_backup.db

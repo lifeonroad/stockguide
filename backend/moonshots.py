@@ -56,22 +56,20 @@ class MoonshotScanner:
         discovery_count: int = 0
         
         for sector in innovation_sectors:
-            sector_data = get_sector_stocks_cached(sector)
-            # Take top 3 that aren't already in foundations
-            top_scorers = sorted(sector_data, key=lambda x: x.get('score', 0), reverse=True)
+            universe = get_sector_stocks_cached(n=25)
+            sector_tickers = universe.get(sector, {}).get("tickers", [])
             
             added_in_sector: int = 0
-            for stock in top_scorers:
+            for sym in sector_tickers:
                 if added_in_sector >= 3 or discovery_count >= 6:
                     break
                 
-                sym = stock['symbol']
                 if sym not in foundational_symbols:
                     discovery_count += 1
                     added_in_sector += 1
                     
                     meta = {
-                        "name": stock.get('name', sym),
+                        "name": sym,
                         "role": "Direct (Discovery)",
                         "horizon": "5y",
                         "desc": f"Top-ranked innovator in {sector} based on momentum and quality.",

@@ -105,7 +105,7 @@ def _get_yq_info(symbol: str) -> dict:
 
 
 def _get_yf_fundamentals(symbol: str) -> dict:
-    """Get fundamentals directly from yfinance (defeatbeta bypass)."""
+    """Get fundamentals from yfinance. DB handles caching/persistence."""
     try:
         info = _get_yq_info(symbol)
         mkt_cap = info.get("marketCap", 0.0)
@@ -124,10 +124,11 @@ def _get_yf_fundamentals(symbol: str) -> dict:
             "priceToBook": info.get("priceToBook", 0.0),
             "pegRatio": info.get("pegRatio", 0.0),
             "trailingEps": info.get("trailingEps", 0.0),
+            "forwardEps": info.get("forwardEps", 0.0),
             "returnOnEquity": info.get("returnOnEquity", 0.0),
             "returnOnAssets": info.get("returnOnAssets", 0.0),
-            "roic": 0.0,
-            "wacc": 0.0,
+            "roic": info.get("roic", 0.0),
+            "wacc": info.get("wacc", 0.0),
             "totalDebt": info.get("totalDebt", 0.0),
             "totalCash": info.get("totalCash", 0.0),
             "debtToEquity": info.get("debtToEquity", 0.0),
@@ -139,6 +140,19 @@ def _get_yf_fundamentals(symbol: str) -> dict:
             "revenue": info.get("totalRevenue", 0.0),
             "netIncome": info.get("netIncomeToCommon", 0.0),
             "marketCap": mkt_cap,
+            "profitMargin": info.get("profitMargin", 0.0),
+            "enterpriseToEbitda": info.get("enterpriseToEbitda", 0.0),
+            "bookValue": info.get("bookValue", 0.0),
+            "shortRatio": info.get("shortRatio", 0.0),
+            "operatingCashflow": info.get("operatingCashflow", 0.0),
+            "dividendYield": info.get("dividendYield", 0.0),
+            "dividendRate": info.get("dividendRate", 0.0),
+            "payoutRatio": info.get("payoutRatio", 0.0),
+            "beta": info.get("beta", 0.0),
+            "fiftyTwoWeekHigh": info.get("fiftyTwoWeekHigh", 0.0),
+            "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow", 0.0),
+            "averageVolume": info.get("averageVolume", 0),
+            "sharesOutstanding": info.get("sharesOutstanding", 0.0),
         }
     except Exception as e:
         logger.error("yfinance fundamentals failed for %s: %s", symbol, e)
@@ -194,6 +208,7 @@ def get_ticker_info(symbol: str) -> dict:
 
     # 1. Try persistent DB first (instant)
     cached = get_ticker_info_cached(symbol)
+    logger.info("get_ticker_info(%s): DB lookup result=%s, price=%s", symbol, "found" if cached else "miss", cached.get("price") if cached else "N/A")
     if cached:
         logger.info("get_ticker_info(%s): from persistent DB, price=%s", symbol, cached.get("price"))
         # Schedule background refresh if stale
@@ -249,7 +264,7 @@ def _build_ticker_info_from_cache(data: dict, symbol: str) -> dict:
         "forwardEps": data.get("forward_eps", data.get("trailing_eps", 0.0)),
         "priceToBook": data.get("price_to_book", 0.0),
         "priceToSalesTrailing12Months": data.get("price_to_sales", 0.0),
-        "pegRatio": 0.0,
+        "pegRatio": data.get("peg_ratio", 0.0),
         "returnOnEquity": data.get("roe", 0.0),
         "returnOnAssets": data.get("roa", 0.0),
         "debtToEquity": data.get("debt_to_equity", 0.0),
@@ -261,7 +276,7 @@ def _build_ticker_info_from_cache(data: dict, symbol: str) -> dict:
         "earningsGrowth": data.get("earnings_growth", 0.0),
         "totalRevenue": data.get("revenue", 0.0),
         "netIncomeToCommon": data.get("net_income", 0.0),
-        "operatingCashflow": data.get("free_cashflow", 0.0),
+        "operatingCashflow": data.get("operating_cashflow", 0.0),
         "52WeekChange": change_52w,
         "fiftyTwoWeekHigh": high_52w,
         "fiftyTwoWeekLow": low_52w,
@@ -272,92 +287,17 @@ def _build_ticker_info_from_cache(data: dict, symbol: str) -> dict:
         "dividendRate": data.get("dividend_rate", 0.0),
         "dividendYield": data.get("dividend_yield", 0.0),
         "payoutRatio": data.get("payout_ratio", 0.0),
-        "shortRatio": 0.0,
+        "shortRatio": data.get("short_ratio", 0.0),
         "sharesOutstanding": data.get("shares_outstanding", 0.0),
-        "enterpriseToEbitda": 0.0,
+        "enterpriseToEbitda": data.get("ev_ebitda", 0.0),
+        "profitMargin": data.get("profit_margin", 0.0),
+        "bookValue": data.get("book_value", 0.0),
     }
 
 
 def _get_fundamentals_raw(symbol: str) -> dict:
-    """Fetch fundamentals without any caching."""
-    if not is_defeatbeta_enabled():
-        return _get_yf_fundamentals(symbol)
-    try:
-        t = _db_ticker(symbol)
-    except Exception:
-        return _get_yf_fundamentals(symbol)
-
-    def _fetch(method_name, col):
-        try:
-            df = getattr(t, method_name)()
-            return _safe_scalar(df, col)
-        except Exception:
-            return 0.0
-
-    ttm_pe = _fetch("ttm_pe", "ttm_pe")
-    pb = _fetch("pb_ratio", "pb_ratio")
-    ps = _fetch("ps_ratio", "ps_ratio")
-    ttm_eps = _fetch("ttm_eps", "tailing_eps")
-    ttm_rev = _fetch("ttm_revenue", "ttm_total_revenue")
-    ttm_fcf = _fetch("ttm_fcf", "ttm_fcf")
-    ttm_ni = _fetch("ttm_net_income_common_stockholders", "ttm_net_income")
-    roe_val = _fetch("roe", "roe")
-    roa_val = _fetch("roa", "roa")
-    rev_growth = _fetch("quarterly_revenue_yoy_growth", "yoy_growth")
-    eps_growth = _fetch("quarterly_eps_yoy_growth", "yoy_growth")
-    mkt_cap = _fetch("market_capitalization", "market_capitalization")
-
-    total_debt = total_cash = 0.0
-    try:
-        bs_stmt = t.quarterly_balance_sheet()
-        if bs_stmt is not None and hasattr(bs_stmt, "data"):
-            bs = bs_stmt.data
-            if bs is not None and not bs.empty:
-                total_debt = _safe_scalar(bs, "total_debt") if "total_debt" in bs.columns else 0.0
-                total_cash = _safe_scalar(bs, "cash_cash_equivalents_and_short_term_investments") if "cash_cash_equivalents_and_short_term_investments" in bs.columns else 0.0
-    except Exception:
-        pass
-
-    debt_to_equity = (total_debt / ((total_debt / (_fetch("debt_to_equity", "debt_to_equity") / 100)) if _fetch("debt_to_equity", "debt_to_equity") else total_debt + 1)) if total_debt else 0.0
-
-    name = symbol
-    sector = "Unknown"
-    industry = "Unknown"
-    summary = "No business summary available."
-    if is_defeatbeta_enabled():
-        try:
-            meta = t.info() or {}
-            name = meta.get("longName") or meta.get("shortName") or symbol
-            sector = meta.get("sector") or "Unknown"
-            industry = meta.get("industry") or "Unknown"
-            summary = meta.get("longBusinessSummary") or "No business summary available."
-        except Exception:
-            pass
-
-    return {
-        "symbol": symbol,
-        "longName": name,
-        "shortName": name,
-        "sector": sector,
-        "industry": industry,
-        "longBusinessSummary": summary,
-        "trailing_pe": ttm_pe,
-        "forward_pe": ttm_pe,
-        "price_to_book": pb,
-        "price_to_sales": ps,
-        "trailing_eps": ttm_eps,
-        "roe": roe_val,
-        "roa": roa_val,
-        "debt_to_equity": debt_to_equity,
-        "free_cashflow": ttm_fcf,
-        "total_debt": total_debt,
-        "total_cash": total_cash,
-        "revenue_growth": rev_growth,
-        "earnings_growth": eps_growth,
-        "market_cap": mkt_cap,
-        "revenue": ttm_rev,
-        "net_income": ttm_ni,
-    }
+    """Fetch fundamentals using yfinance only. DB handles caching/persistence."""
+    return _get_yf_fundamentals(symbol)
 
 
 def _get_price_live_raw(symbol: str) -> dict:
@@ -437,126 +377,10 @@ def get_price_live(symbol: str) -> dict:
 @timed_cache(ttl_seconds=86400, soft_ttl_seconds=43200)   # 24h hard, 12h soft (SWR)
 def get_fundamentals(symbol: str) -> dict:
     """
-    Returns a yfinance-compatible fundamentals dict built from defeatbeta.
-    Each metric is fetched in isolation — one failure does not block others.
+    Returns fundamentals dict from yfinance. Cached for 5 minutes.
+    DB handles persistent caching; this function handles short-term in-memory cache.
     """
-    if not is_defeatbeta_enabled():
-        return _get_yf_fundamentals(symbol)
-    try:
-        t = _db_ticker(symbol)
-    except Exception as e:
-        logger.warning("defeatbeta init failed (%s), falling back to yfinance for fundamentals: %s", symbol, e)
-        return _get_yf_fundamentals(symbol)
-
-    def _fetch(method_name, col):
-        try:
-            df = getattr(t, method_name)()
-            return _safe_scalar(df, col)
-        except Exception as e:
-            logger.debug("defeatbeta %s.%s(%s): %s", symbol, method_name, col, e)
-            return 0.0
-
-    ttm_pe    = _fetch("ttm_pe",    "ttm_pe")
-    pb        = _fetch("pb_ratio",  "pb_ratio")
-    ps        = _fetch("ps_ratio",  "ps_ratio")
-    ttm_eps   = _fetch("ttm_eps",   "tailing_eps")  # defeatbeta typo: 'tailing_eps'
-    ttm_rev   = _fetch("ttm_revenue", "ttm_total_revenue")
-    ttm_fcf   = _fetch("ttm_fcf",   "ttm_fcf")
-    ttm_ni    = _fetch("ttm_net_income_common_stockholders", "ttm_net_income")
-    roe_val   = _fetch("roe",  "roe")
-    roa_val   = _fetch("roa",  "roa")
-    roic_val  = _fetch("roic", "roic")
-    wacc_val  = _fetch("wacc", "wacc")
-    rev_growth = _fetch("quarterly_revenue_yoy_growth", "yoy_growth")
-    eps_growth = _fetch("quarterly_eps_yoy_growth",     "yoy_growth")
-    mkt_cap   = _fetch("market_capitalization", "market_capitalization")
-
-    peg = (ttm_pe / (eps_growth * 100)) if eps_growth and eps_growth != 0 else 0.0
-
-    # Balance sheet (debt, cash, equity)
-    total_debt = total_cash = total_equity = 0.0
-    try:
-        bs_stmt = t.quarterly_balance_sheet()
-        if bs_stmt is not None and hasattr(bs_stmt, "data"):
-            bs = bs_stmt.data
-            if bs is not None and not bs.empty:
-                if "total_debt" in bs.columns:
-                    total_debt = _safe_scalar(bs, "total_debt")
-                if "cash_cash_equivalents_and_short_term_investments" in bs.columns:
-                    total_cash = _safe_scalar(bs, "cash_cash_equivalents_and_short_term_investments")
-                if "stockholders_equity" in bs.columns:
-                    total_equity = _safe_scalar(bs, "stockholders_equity")
-    except Exception as e:
-        logger.debug("defeatbeta balance_sheet(%s): %s", symbol, e)
-
-    debt_to_equity = (total_debt / total_equity * 100) if total_equity else 0.0
-    fcf_yield      = (ttm_fcf / mkt_cap) if mkt_cap else 0.0
-
-    # Company identity — try defeatbeta info() first, fall back to yfinance
-    name = symbol
-    sector = "Unknown"
-    industry = "Unknown"
-    summary = "No business summary available."
-    if is_defeatbeta_enabled():
-        try:
-            meta = t.info() or {}
-            name     = meta.get("longName") or meta.get("shortName") or symbol
-            sector   = meta.get("sector")   or "Unknown"
-            industry = meta.get("industry") or "Unknown"
-            summary  = meta.get("longBusinessSummary") or "No business summary available."
-        except Exception:
-            pass
-    # Always try yfinance if identity is still default
-    if name == symbol:
-        try:
-            yf_info = yf.Ticker(symbol).info or {}
-            name     = yf_info.get("longName") or yf_info.get("shortName") or symbol
-            sector   = yf_info.get("sector")   or "Unknown"
-            industry = yf_info.get("industry") or "Unknown"
-            summary  = yf_info.get("longBusinessSummary") or "No business summary available."
-        except Exception:
-            pass
-
-    return {
-        "symbol":   symbol,
-        "longName": name,
-        "shortName": name,
-        "sector":   sector,
-        "industry": industry,
-        "longBusinessSummary": summary,
-        "data_as_of": "2026-02-20" if is_defeatbeta_enabled() else str(date.today()),  # defeatbeta weekly snapshot
-
-        # Valuation
-        "trailingPE":                   ttm_pe,
-        "forwardPE":                    ttm_pe,
-        "priceToSalesTrailing12Months": ps,
-        "priceToBook":                  pb,
-        "pegRatio":                     peg,
-        "trailingEps":                  ttm_eps,
-
-        # Quality
-        "returnOnEquity": roe_val,
-        "returnOnAssets": roa_val,
-        "roic":           roic_val,
-        "wacc":           wacc_val,
-
-        # Balance sheet
-        "totalDebt":    total_debt,
-        "totalCash":    total_cash,
-        "debtToEquity": debt_to_equity,
-        "currentRatio": 0.0,
-        "freeCashflow": ttm_fcf,
-        "fcf_yield":    fcf_yield,
-
-        # Growth
-        "revenueGrowth":  rev_growth,
-        "earningsGrowth": eps_growth,
-        "revenue":        ttm_rev,
-        "netIncome":      ttm_ni,
-
-        # Market
-        "marketCap": mkt_cap,
-    }
+    return _get_yf_fundamentals(symbol)
 
 
 # ──────────────────────────────────────────────────────────
@@ -602,19 +426,7 @@ def get_price_history(symbol: str, days: int = 90):
                 conn.close()
         return df
 
-    # 2. No cached data — fetch from source
-    if is_defeatbeta_enabled():
-        try:
-            t = _db_ticker(symbol)
-            df = t.price()
-            if df is not None and not df.empty:
-                df = df.tail(days).reset_index(drop=True)
-                _save_history_to_db(symbol, df)
-                return df
-        except Exception as e:
-            logger.warning("get_price_history defeatbeta(%s) failed: %s", symbol, e)
-
-    # 3. yfinance fallback
+    # 2. No cached data — fetch from yfinance and persist to DB
     try:
         hist = yf.Ticker(symbol).history(period=f"{days}d")
         if hist.empty:
@@ -628,7 +440,7 @@ def get_price_history(symbol: str, days: int = 90):
         _save_history_to_db(symbol, df)
         return df
     except Exception as e2:
-        logger.error("get_price_history yfinance fallback(%s) failed: %s", symbol, e2)
+        logger.error("get_price_history yfinance(%s) failed: %s", symbol, e2)
         return None
 
 
@@ -683,28 +495,23 @@ def get_news(symbol: str, n: int = 5) -> list:
     """
     Returns a list of recent news dicts: [{title, date, source, url}]
     """
-    if is_defeatbeta_enabled():
-        try:
-            t = _db_ticker(symbol)
-            news_obj = t.news()
-            if hasattr(news_obj, "get_news_list"):
-                items = news_obj.get_news_list()
-            elif hasattr(news_obj, "to_dict"):
-                items = news_obj.to_dict("records")
-            else:
-                pass
-            if items:
-                result = []
-                for item in items[:n]:
-                    result.append({
-                        "title":  item.get("title") or item.get("headline") or "",
-                        "date":   str(item.get("publish_date") or item.get("date") or ""),
-                        "source": item.get("source") or item.get("publisher") or "",
-                        "url":    item.get("url") or item.get("link") or "#",
-                    })
-                return result
-        except Exception as e:
-            logger.warning("get_news(%s) failed: %s", symbol, e)
+    try:
+        news = yf.Ticker(symbol).news
+        if not news:
+            return []
+        result = []
+        for item in news[:n]:
+            if isinstance(item, dict):
+                result.append({
+                    "title": item.get("title") or "",
+                    "date": str(item.get("pubDate") or item.get("publishedAt") or ""),
+                    "source": item.get("source") or "",
+                    "url": item.get("link") or item.get("canonicalUrl") or "#",
+                })
+        return result
+    except Exception as e:
+        logger.debug("get_news(%s) failed: %s", symbol, e)
+        return []
 
 
 # ──────────────────────────────────────────────────────────
@@ -715,31 +522,9 @@ def get_news(symbol: str, n: int = 5) -> list:
 def get_dcf(symbol: str) -> dict:
     """
     Returns a DCF valuation summary: {fair_value, current_price, upside_pct, wacc, recommendation}
+    Note: yfinance doesn't provide DCF data. Returns empty dict for now.
+    TODO: Implement DCF calculation or find alternative data source.
     """
-    if is_defeatbeta_enabled():
-        try:
-            t = _db_ticker(symbol)
-            dcf_obj = t.dcf()
-            data = {}
-            if hasattr(dcf_obj, "get_summary"):
-                data = dcf_obj.get_summary() or {}
-            elif hasattr(dcf_obj, "to_dict"):
-                data = dcf_obj.to_dict() or {}
-            fair_value = _safe_float(data.get("fair_value") or data.get("intrinsic_value"))
-            wacc_val   = _safe_float(data.get("wacc"))
-            recommendation = data.get("recommendation") or data.get("action") or "N/A"
-            live = get_price_live(symbol)
-            current_price = live.get("price", 0.0)
-            upside_pct = ((fair_value - current_price) / current_price * 100) if current_price else 0.0
-            return {
-                "fair_value":     round(fair_value, 2),
-                "current_price":  round(current_price, 2),
-                "upside_pct":     round(upside_pct, 1),
-                "wacc":           round(wacc_val * 100, 2) if wacc_val < 1 else round(wacc_val, 2),
-                "recommendation": recommendation,
-            }
-        except Exception as e:
-            logger.warning("get_dcf(%s) failed: %s", symbol, e)
     return {}
 
 

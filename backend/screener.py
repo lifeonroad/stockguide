@@ -168,18 +168,30 @@ def get_sector_metrics_from_constituents(sector_name):
     debt_values = []
     
     try:
-        from yahooquery import Ticker
-        tq = Ticker(sample)
-        fd = tq.financial_data
-        if isinstance(fd, dict):
-            for sym in sample:
-                data = fd.get(sym, {})
-                roe = data.get("returnOnEquity")
-                debt = data.get("debtToEquity")
-                if roe and roe > 0:
-                    roe_values.append(roe * 100)
-                if debt is not None and debt >= 0:
-                    debt_values.append(debt)
+        from persistent_cache import get_bulk_ticker_info
+        cached = get_bulk_ticker_info(sample)
+        for sym in sample:
+            data = cached.get(sym.upper(), {})
+            roe = data.get("roe")
+            debt = data.get("debt_to_equity")
+            if roe is not None and roe > 0:
+                roe_values.append(float(roe) * 100)
+            if debt is not None and debt >= 0:
+                debt_values.append(float(debt))
+        
+        if not roe_values and not debt_values:
+            from yahooquery import Ticker
+            tq = Ticker(sample)
+            fd = tq.financial_data
+            if isinstance(fd, dict):
+                for sym in sample:
+                    data = fd.get(sym, {})
+                    roe = data.get("returnOnEquity")
+                    debt = data.get("debtToEquity")
+                    if roe and roe > 0:
+                        roe_values.append(roe * 100)
+                    if debt is not None and debt >= 0:
+                        debt_values.append(debt)
     except Exception:
         pass
     
