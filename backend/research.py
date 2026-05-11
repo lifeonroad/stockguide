@@ -1,7 +1,8 @@
 
-from data_client import get_ticker_info
+from data_client import get_ticker_info, get_price_history
 from analyst import BuffettStrategy, BurryStrategy, LynchStrategy
 from cache_utils import timed_cache, fetch_with_retry
+from indicators import calculate_rsi, calculate_sma
 
 def safe_float(value, default=0.0):
     """Safely coerce a value to float, returning default if None or invalid."""
@@ -210,6 +211,25 @@ def get_comprehensive_research(symbol):
         "verdict": "Undervalued" if multiples_mos > 0 else "Overvalued"
     })
 
+    # ═══════════════════════════════════════════════════════
+    # 8. TECHNICAL INDICATORS (RSI, SMA)
+    # ═══════════════════════════════════════════════════════
+    technical = {}
+    try:
+        hist = get_price_history(symbol, days=252)
+        if hist is not None and not hist.empty and 'close' in hist.columns:
+            closes = hist['close'].dropna()
+            rsi_val = calculate_rsi(closes, 14)
+            technical["rsi_14"] = round(rsi_val, 1)
+            sma_9 = calculate_sma(closes, 9)
+            sma_50 = calculate_sma(closes, 50)
+            sma_180 = calculate_sma(closes, 180)
+            technical["sma_9"] = round(sma_9, 2) if sma_9 is not None else None
+            technical["sma_50"] = round(sma_50, 2) if sma_50 is not None else None
+            technical["sma_180"] = round(sma_180, 2) if sma_180 is not None else None
+    except Exception:
+        technical = {"rsi_14": None, "sma_9": None, "sma_50": None, "sma_180": None}
+
     # Consensus intrinsic value (average of valid models)
     valid_ivs = [m['intrinsic_value'] for m in valuation_models if m['intrinsic_value'] > 0]
     consensus_iv = round(sum(valid_ivs) / len(valid_ivs), 2) if valid_ivs else 0.0
@@ -277,7 +297,8 @@ def get_comprehensive_research(symbol):
             "margin_of_safety": consensus_mos,
             "models_used": len(valid_ivs),
             "verdict": "Undervalued" if consensus_mos > 0 else "Overvalued"
-        }
+        },
+        "technical_indicators": technical
     }
 
 @timed_cache(ttl_seconds=86400, soft_ttl_seconds=43200) # 24h hard, 12h soft (SWR)
@@ -368,3 +389,22 @@ def get_historical_trends(symbol: str, time_range: str = '5y'):
         }
     except Exception as e:
         return {"error": f"Trend fetch failed: {str(e)}"}
+
+
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=1800)
+def get_price_chart(symbol: str, days: int = 365):
+    try:
+        from indicators import get_research_indicators
+        indicators = get_research_indicators(symbol)
+        if not indicators or not indicators.get("price_history"):
+            return {"symbol": symbol, "error": "No price history available"}
+        return {
+            "symbol": symbol,
+            "price_history": indicators["price_history"],
+            "rsi_14": indicators.get("rsi"),
+            "sma_9_current": indicators.get("sma_9"),
+            "sma_50_current": indicators.get("sma_50"),
+            "sma_180_current": indicators.get("sma_180"),
+        }
+    except Exception as e:
+        return {"error": f"Price chart fetch failed: {str(e)}"}

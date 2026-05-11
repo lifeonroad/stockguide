@@ -108,6 +108,42 @@ def get_data_source_status() -> dict:
     }
 
 # ──────────────────────────────────────────────────────────
+# Failed-ticker tracking
+# ──────────────────────────────────────────────────────────
+
+_failed_tickers: Dict[str, float] = {}  # symbol -> timestamp of last failed fetch
+_FAILED_TICKER_RETRY_HOURS = 24  # Don't retry bad tickers for 24 hours
+
+
+def _is_failed_ticker(symbol: str) -> bool:
+    """Check if a ticker is known to be invalid/bad data."""
+    entry = _failed_tickers.get(symbol)
+    if entry is None:
+        return False
+    age_hours = (time.time() - entry) / 3600
+    if age_hours > _FAILED_TICKER_RETRY_HOURS:
+        del _failed_tickers[symbol]
+        return False
+    return True
+
+
+def _mark_ticker_failed(symbol: str):
+    """Mark a ticker as failed (no data / invalid)."""
+    _failed_tickers[symbol] = time.time()
+    logger.info("Marked %s as failed ticker (no valid data)", symbol)
+
+
+def _mark_ticker_valid(symbol: str):
+    """Clear failed-ticker status on successful fetch."""
+    _failed_tickers.pop(symbol, None)
+
+
+def get_failed_tickers() -> list:
+    """Return list of currently known bad tickers."""
+    return list(_failed_tickers.keys())
+
+
+# ──────────────────────────────────────────────────────────
 # Internal helpers
 # ──────────────────────────────────────────────────────────
 
@@ -291,6 +327,11 @@ def get_ticker_info(symbol: str) -> dict:
     symbol = symbol.upper()
     init_db()
 
+    # 0. Check if ticker is known invalid — skip network calls
+    if _is_failed_ticker(symbol):
+        logger.debug("get_ticker_info(%s): skipping — known bad ticker", symbol)
+        return {}
+
     # 1. Try persistent DB first (instant)
     cached = get_ticker_info_cached(symbol)
     logger.info("get_ticker_info(%s): DB lookup result=%s, price=%s", symbol, "found" if cached else "miss", cached.get("price") if cached else "N/A")
@@ -312,8 +353,13 @@ def get_ticker_info(symbol: str) -> dict:
     logger.info("get_ticker_info(%s): fresh fetch, currentPrice=%s", symbol, fresh.get("currentPrice"))
     if fresh and fresh.get("symbol") and fresh.get("currentPrice", 0) > 0:
         save_ticker_info(fresh)
+        _mark_ticker_valid(symbol)
     elif fresh and fresh.get("symbol"):
         logger.warning("get_ticker_info(%s): skipping DB save — price is 0.0", symbol)
+        _mark_ticker_failed(symbol)
+    else:
+        logger.warning("get_ticker_info(%s): fetch returned no data — marking failed", symbol)
+        _mark_ticker_failed(symbol)
     return _build_ticker_info_from_cache(fresh or {}, symbol)
 
 

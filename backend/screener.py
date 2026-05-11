@@ -269,8 +269,8 @@ def analyze_sector_fundamentals(sector_name):
     
     for symbol in stocks:
         i = get_ticker_info(symbol)
-        if not i:
-            i = {}
+        if not i or 'symbol' not in i:
+            continue
         
         # Check rate limiter before any network call (throttle)
         can_fetch, _ = limiter.can_fetch(symbol, "fundamentals")
@@ -279,33 +279,40 @@ def analyze_sector_fundamentals(sector_name):
         else:
             time.sleep(0.3)  # Normal throttle
         
-        # Fundamental checks (from cached data)
-        roe = i.get('returnOnEquity', 0) or i.get('roe', 0)
-        de = i.get('debtToEquity', 0) or i.get('debt_to_equity', 0)
-        pe = i.get('trailingPE', 99) or i.get('trailing_pe', 99)
-        profit_margin = i.get('profitMargins', 0) or i.get('profit_margin', 0)
+        # Fundamental checks — only use keys that actually exist in the data
+        # (missing key means fetch genuinely failed for this ticker)
+        roe = i.get('returnOnEquity') or i.get('roe')
+        de = i.get('debtToEquity') or i.get('debt_to_equity')
+        pe = i.get('trailingPE') or i.get('trailing_pe')
+        profit_margin = i.get('profitMargins') or i.get('profit_margin')
+        price = i.get('currentPrice') or i.get('price')
         
         stock_data.append({
             "symbol": symbol,
             "name": i.get('shortName', symbol) or i.get('name', symbol),
-            "price": i.get('currentPrice', 0) or i.get('price', 0),
-            "pe": round(float(pe), 2) if pe else 0,
-            "roe": round(float(roe) * 100, 2) if roe else 0,
-            "debt_to_equity": round(float(de), 2) if de else 0,
-            "profit_margin": round(float(profit_margin) * 100, 2) if profit_margin else 0
+            "price": round(float(price), 2) if price else 0,
+            "pe": round(float(pe), 2) if pe is not None else None,
+            "roe": round(float(roe) * 100, 2) if roe is not None else None,
+            "debt_to_equity": round(float(de), 2) if de is not None else None,
+            "profit_margin": round(float(profit_margin) * 100, 2) if profit_margin is not None else None
         })
         
-    # Calculate Sector Averages
-    avg_roe = sum(s['roe'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_pe = sum(s['pe'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_de = sum(s['debt_to_equity'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_margin = sum(s['profit_margin'] for s in stock_data) / len(stock_data) if stock_data else 0
+    # Calculate Sector Averages (filter out None values)
+    roe_vals = [s['roe'] for s in stock_data if s['roe'] is not None]
+    pe_vals = [s['pe'] for s in stock_data if s['pe'] is not None]
+    de_vals = [s['debt_to_equity'] for s in stock_data if s['debt_to_equity'] is not None]
+    margin_vals = [s['profit_margin'] for s in stock_data if s['profit_margin'] is not None]
+    avg_roe = sum(roe_vals) / len(roe_vals) if roe_vals else 0
+    avg_pe = sum(pe_vals) / len(pe_vals) if pe_vals else 0
+    avg_de = sum(de_vals) / len(de_vals) if de_vals else 0
+    avg_margin = sum(margin_vals) / len(margin_vals) if margin_vals else 0
     
     # Filter for "Warren's Picks"
     # Logic: High ROE (>15), Healthy Debt (<100 approx), Fair PE
     top_picks = [
         s for s in stock_data 
-        if s['roe'] > 15 and s['debt_to_equity'] < 200 # Relaxed for MVP (Banks have high D/E)
+        if s.get('roe') is not None and s['roe'] > 15 
+        and s.get('debt_to_equity') is not None and s['debt_to_equity'] < 200
     ]
     
     # Tie-breaker: PE (Lower is better)

@@ -208,7 +208,7 @@ from moonshots import MoonshotScanner
 from screeners import ScreenerEngine
 from updater import update_universe_file
 from small_caps import get_small_cap_gems
-from research import get_comprehensive_research, get_historical_trends
+from research import get_comprehensive_research, get_historical_trends, get_price_chart
 from international import InternationalScanner
 
 @app.get("/api/economic-indicators")
@@ -276,6 +276,18 @@ async def research(symbol: str):
 async def research_trends(symbol: str, range: str = '5y'):
     try:
         data = await asyncio.to_thread(get_historical_trends, symbol, range)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return data
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/research/price-chart/{symbol}")
+async def research_price_chart(symbol: str, days: int = 365):
+    try:
+        data = await asyncio.to_thread(get_price_chart, symbol, days)
         if "error" in data:
             raise HTTPException(status_code=404, detail=data["error"])
         return data
@@ -550,7 +562,7 @@ def reset_portfolio_endpoint(portfolio_id: str, pm: PortfolioManager = Depends(g
     return {"success": True}
 
 from cache_utils import clear_cache, get_cache_stats
-from data_client import set_defeatbeta_enabled, get_data_source_status
+from data_client import set_defeatbeta_enabled, get_data_source_status, get_failed_tickers
 from persistent_cache import get_db_stats as _get_db_stats, clear_db as _clear_db
 import time as _time
 
@@ -577,7 +589,13 @@ def cache_stats():
     return {
         "memory_cache": get_cache_stats(),
         "persistent_db": _get_db_stats(),
+        "failed_tickers": get_failed_tickers(),
     }
+
+@app.get("/api/admin/failed-tickers")
+def failed_tickers_endpoint():
+    """Returns list of tickers known to be invalid/bad data."""
+    return {"failed_tickers": get_failed_tickers()}
 
 @app.post("/api/admin/cache/clear")
 def clear_all_cache():
