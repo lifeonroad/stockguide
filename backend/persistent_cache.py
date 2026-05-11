@@ -4,14 +4,19 @@ Persistent SQLite cache for stock data.
 Architecture:
 - SQLite with WAL mode for concurrent reads
 - Three core tables: ticker_info, price_history, scan_cache
-- Background refresh on stale records
+- Background refresh on stale records (rate-limited)
 - API endpoints read from DB instantly, refresh in background
 
-Staleness rules:
-- Price: stale after 5 minutes (market hours), 30 minutes (off-hours)
-- Fundamentals: stale after 24 hours
-- Price history: stale after 6 hours
-- Scan results: stale after 1 hour
+Staleness rules (with intelligent TTL):
+- Price: stale after 30 minutes (floor), adjusted by beta/earnings/sector
+- Fundamentals: stale after 24 hours (adjusted by sector)
+- Price history: stale after 12 hours
+- Scan results: stale after 2 hours
+
+Rate Limiting:
+- MIN_REFRESH_INTERVAL: 1800s (30 min) between same ticker fetches
+- DAILY_FETCH_LIMIT: 48 fetches per ticker per day
+- Intelligent TTL: beta-based, earnings-aware, sector-adjusted
 """
 
 import sqlite3
@@ -20,7 +25,7 @@ import json
 import time
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,11 +33,20 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.environ.get("PERSISTENT_DB", os.path.join(os.path.dirname(__file__), "data", "stockguide.db"))
 
 # Staleness thresholds (seconds)
-PRICE_TTL = 300        # 5 min (market hours)
-PRICE_TTL_OFFHOURS = 1800  # 30 min (off-hours)
-FUNDAMENTALS_TTL = 86400  # 24 hours
-PRICE_HISTORY_TTL = 21600  # 6 hours
-SCAN_CACHE_TTL = 3600     # 1 hour
+# CONSERVATIVE SETTINGS: Prevent rate limiting
+# Minimum refresh interval per ticker: 30 minutes (1800s)
+# This prevents hitting yfinance rate limits while maintaining data freshness
+
+PRICE_TTL = 1800          # 30 min (market hours) - MINIMUM FLOOR
+PRICE_TTL_OFFHOURS = 3600 # 60 min (off-hours) - generous for inactive period
+FUNDAMENTALS_TTL = 86400  # 24 hours - quarterly data doesn't change hourly
+PRICE_HISTORY_TTL = 43200 # 12 hours - historical data rarely needs refresh
+SCAN_CACHE_TTL = 7200     # 2 hours - scan results are expensive to compute
+
+# Rate limiting constants
+MIN_REFRESH_INTERVAL = 1800  # Never fetch same ticker more than once per 30 min
+DAILY_FETCH_LIMIT = 48      # Max fetches per ticker per day (prevents DOS)
+BULK_FETCH_BATCH = 10       # Max tickers per bulk request to spread load
 
 _lock = threading.Lock()
 _db_initialized = False
@@ -293,8 +307,16 @@ def get_bulk_ticker_info(symbols: List[str]) -> Dict[str, Dict]:
         conn.close()
 
 
-def needs_refresh(symbol: str, data_type: str = "price") -> bool:
-    """Check if cached data needs refresh based on TTL."""
+def needs_refresh(symbol: str, data_type: str = "price", effective_ttl: int = None) -> bool:
+    """
+    Check if cached data needs refresh based on TTL.
+    
+    Args:
+        symbol: Ticker symbol
+        data_type: Type of data ('price', 'fundamentals', 'history')
+        effective_ttl: Override TTL with intelligent TTL (from intelligent_ttl module)
+                       If None, uses default TTL from constants.
+    """
     init_db()
     symbol = symbol.upper()
     conn = _get_conn()
@@ -308,11 +330,42 @@ def needs_refresh(symbol: str, data_type: str = "price") -> bool:
         
         age = time.time() - (row["price_fetched_at"] or row["fetched_at"] or 0)
         
+        # Use effective_ttl if provided (intelligent TTL), otherwise use default
+        if effective_ttl is not None:
+            return age > effective_ttl
+        
         if data_type == "price":
             return age > _price_ttl()
         return age > FUNDAMENTALS_TTL
     finally:
         conn.close()
+
+
+def needs_refresh_intelligent(symbol: str, data_type: str) -> Tuple[bool, str]:
+    """
+    Check if data needs refresh using intelligent TTL with detailed reasoning.
+    
+    Returns:
+        (needs_refresh, reason)
+    """
+    from intelligent_ttl import get_cached_ttl, get_adjusted_ttl
+    
+    cached = get_ticker_info_cached(symbol)
+    if not cached:
+        return True, "No cached data"
+    
+    fetched_at = cached.get("price_fetched_at") or cached.get("fetched_at", 0)
+    if fetched_at == 0:
+        return True, "No fetch timestamp"
+    
+    # Get intelligent TTL
+    ttl = get_cached_ttl(symbol, data_type)
+    age = time.time() - fetched_at
+    
+    needs = age > ttl
+    reason = f"Age: {age:.0f}s, TTL: {ttl}s"
+    
+    return needs, reason
 
 
 def get_db_stats() -> Dict:

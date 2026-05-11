@@ -4,6 +4,9 @@ import numpy as np
 from datetime import datetime, timedelta
 from cache_utils import timed_cache
 
+# Import rate limiting
+from rate_limiter import get_rate_limiter
+
 # Major Indices and Sector ETFs with Descriptions
 SYMBOLS = {
     'SPY': {'name': 'S&P 500', 'desc': 'Track the 500 largest US companies. The "Market" barometor.'},
@@ -54,13 +57,38 @@ def get_money_flow_data():
                 df = pd.DataFrame(hist_rows)
                 df.set_index(pd.to_datetime(df['date']), inplace=True)
                 df.sort_index(inplace=True)
+                df.columns = [c.capitalize() for c in df.columns]
             else:
-                # Fallback to yfinance
+                # Check rate limiter before yfinance call
+                limiter = get_rate_limiter()
+                can_fetch, reason = limiter.can_fetch(symbol, "history")
+                
+                if not can_fetch:
+                    print(f"[MoneyFlow] Rate limited for {symbol}: {reason}")
+                    continue  # Skip this symbol, use next
+                
                 tickers = yf.Tickers(' '.join(SYMBOLS.keys()))
                 ticker = tickers.tickers[symbol]
                 df = ticker.history(period="25d")
                 if len(df) < 20:
                     continue
+                
+                # Record fetch for rate limiting
+                limiter.record_fetch(symbol, "history")
+                
+                # Save to DB for future use
+                if len(df) >= 20:
+                    rows = []
+                    for idx, row in df.iterrows():
+                        rows.append({
+                            "date": idx.strftime("%Y-%m-%d"),
+                            "open": float(row['Open']),
+                            "high": float(row['High']),
+                            "low": float(row['Low']),
+                            "close": float(row['Close']),
+                            "volume": float(row['Volume']),
+                        })
+                    save_price_history(symbol, rows)
             
             # Calculate CMF
             df['CMF'] = calculate_cmf(df)

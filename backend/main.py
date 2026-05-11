@@ -33,88 +33,86 @@ async def _startup_background_tasks():
     2. Dynamic universe scoring (takes ~30-45s)
     3. Cache warming for critical paths (market-status, macro, industries)
     """
-    # 1. Warm persistent DB — fetches data in background, instant reads afterward
-    def warm_db():
-        try:
-            import logging
-            log = logging.getLogger(__name__)
-            from screener import SECTOR_STOCKS
-            from dip_hunter import DIP_UNIVERSE
-            from persistent_cache import init_db
-
-            init_db()
-            # Collect all unique symbols from sector lists and dip universe
-            symbols = set()
-            for tickers in SECTOR_STOCKS.values():
-                symbols.update(tickers)
-            for stocks in DIP_UNIVERSE.values():
-                symbols.update(stocks)
-
-            from data_client import warm_db_for_symbols
-            warm_db_for_symbols(list(symbols))
-            log.info("[DB WARMUP] Started background warming for %d symbols", len(symbols))
-        except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("[DB WARMUP] Failed to start: %s", exc)
-
+    import asyncio
     import threading
-    threading.Thread(target=warm_db, daemon=True).start()
+    import logging
+    import time as time_module
 
-    try:
-        import dynamic_universe  # noqa: PLC0415
-        asyncio.create_task(dynamic_universe.background_score_all())
-    except Exception as exc:
-        import logging  # noqa: PLC0415
-        logging.getLogger(__name__).warning("Could not start background scoring: %s", exc)
+    log = logging.getLogger(__name__)
 
-    # Warm critical caches so first user gets instant data
-    async def _warm_caches():
-        import logging
-        log = logging.getLogger(__name__)
-        log.info("[WARMUP] Starting cache warming for critical paths...")
-        tasks = []
+    # Delay startup warming by 60s to allow the server to serve fast requests
+    # before triggering yahoo API rate limits
+    async def _delayed_warming():
+        await asyncio.sleep(60)
+
+        # 1. Warm critical caches FIRST (sequential to avoid rate limiting)
+        log.info("[WARMUP] Phase 1/4: Warming critical caches (sequential)...")
         try:
             from market_data import get_buffett_indicator
-            tasks.append(asyncio.to_thread(get_buffett_indicator))
+            await asyncio.to_thread(get_buffett_indicator)
+            await asyncio.sleep(5)
         except Exception: pass
         try:
             from macro import get_macro_trends
-            tasks.append(asyncio.to_thread(get_macro_trends))
+            await asyncio.to_thread(get_macro_trends)
+            await asyncio.sleep(5)
         except Exception: pass
         try:
             from screener import get_industry_rankings
-            tasks.append(asyncio.to_thread(get_industry_rankings))
-        except Exception: pass
-        try:
-            from filing_calendar import get_filing_status
-            tasks.append(asyncio.to_thread(get_filing_status))
+            await asyncio.to_thread(get_industry_rankings)
+            await asyncio.sleep(5)
         except Exception: pass
         try:
             from data_client import get_data_source_status
-            tasks.append(asyncio.to_thread(get_data_source_status))
+            await asyncio.to_thread(get_data_source_status)
         except Exception: pass
 
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            success = sum(1 for r in results if not isinstance(r, Exception))
-            log.info("[WARMUP] Completed: %d/%d caches warmed successfully", success, len(results))
+        # 2. Warm persistent DB (single-threaded, slow)
+        def warm_db():
+            try:
+                from screener import SECTOR_STOCKS
+                from dip_hunter import DIP_UNIVERSE
+                from persistent_cache import init_db
 
-        # Warm dip hunter cache in background (delayed to not compete with startup)
+                init_db()
+                symbols = set()
+                for tickers in SECTOR_STOCKS.values():
+                    symbols.update(tickers)
+                for stocks in DIP_UNIVERSE.values():
+                    symbols.update(stocks)
+
+                from data_client import warm_db_for_symbols
+                warm_db_for_symbols(list(symbols))
+                log.info("[DB WARMUP] Completed background warming for %d symbols", len(symbols))
+            except Exception as exc:
+                log.warning("[DB WARMUP] Failed: %s", exc)
+
+        threading.Thread(target=warm_db, daemon=True).start()
+        await asyncio.sleep(10)
+
+        # 3. Dynamic universe scoring (delayed further)
+        try:
+            import dynamic_universe
+            asyncio.create_task(dynamic_universe.background_score_all())
+        except Exception as exc:
+            log.warning("Could not start background scoring: %s", exc)
+        await asyncio.sleep(10)
+
+        # 4. Warm dip hunter cache (last, with longer delay)
         def warm_dip_hunter():
             try:
                 from dip_hunter import scan_stock_dips
-                log.info("[WARMUP] Starting dip hunter scan (first run, ~2-5 min)...")
-                t0 = __import__('time').time()
+                log.info("[WARMUP] Starting dip hunter scan...")
+                t0 = time_module.time()
                 result = scan_stock_dips()
-                elapsed = __import__('time').time() - t0
+                elapsed = time_module.time() - t0
                 log.info("[WARMUP] Dip hunter warmed: %d dips in %.0fs", len(result), elapsed)
             except Exception as exc:
                 log.warning("[WARMUP] Dip hunter warm failed: %s", exc)
 
-        import threading
-        threading.Timer(10, warm_dip_hunter).start()
+        threading.Timer(30, warm_dip_hunter).start()
 
-    asyncio.create_task(_warm_caches())
+    asyncio.create_task(_delayed_warming())
 
 # Enable CORS for frontend (if running separately, though we serve static now)
 app.add_middleware(

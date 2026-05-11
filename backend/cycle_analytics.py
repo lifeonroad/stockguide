@@ -17,6 +17,9 @@ from datetime import datetime, timedelta
 from cache_utils import timed_cache, fetch_with_retry, sanitize_metric
 from macro import get_macro_trends, SECTOR_MAP
 
+# Import rate limiting
+from rate_limiter import get_rate_limiter
+
 # Invert SECTOR_MAP for easy name lookups
 NAME_MAP = {v: k for k, v in SECTOR_MAP.items()}
 
@@ -63,12 +66,30 @@ def get_cycle_intelligence():
             })
             data_source = "db"
         else:
-            # Fetch from yfinance
-            data = fetch_with_retry(
-                lambda: yf.download(tickers, period="1y", interval="1d", progress=False, threads=True),
-                max_attempts=2
-            )
-            data_source = "yf"
+            # Fetch from yfinance with rate limiting
+            limiter = get_rate_limiter()
+            
+            # Check if we can fetch (use first ticker as representative)
+            can_fetch, reason = limiter.can_fetch(tickers[0], "history")
+            if not can_fetch:
+                # Use whatever cached data we have, even if incomplete
+                if cached_data:
+                    close = pd.DataFrame({
+                        sym: pd.Series({r['date']: r['close'] for r in rows[::-1]})
+                        for sym, rows in cached_data.items()
+                    })
+                    data_source = "db"
+                else:
+                    return {"error": f"Rate limited: {reason}. Try again later."}
+            else:
+                data = fetch_with_retry(
+                    lambda: yf.download(tickers, period="1y", interval="1d", progress=False, threads=True),
+                    max_attempts=2
+                )
+                data_source = "yf"
+                # Record fetch for rate limiting
+                for sym in tickers[:10]:  # Record first 10 to avoid overhead
+                    limiter.record_fetch(sym, "history")
         
         if data_source == "yf" and data.empty:
             return {"error": "No data available"}

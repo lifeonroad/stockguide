@@ -1,12 +1,22 @@
 """
 data_client.py — Unified Data Abstraction Layer
-===============================================
-Routes calls to the right data source:
+================================================
+DB-first architecture with rate limiting. Routes calls to:
   - persistent_db: primary source (SQLite, instant reads, background refresh)
-  - defeatbeta: fundamentals, historical data, news, DCF  (weekly snapshots, no rate limits)
-  - yfinance:   live price & % change only                (real-time)
+  - rate_limiter: enforces conservative limits (30min floor, 48/day)
+  - yfinance: data source (with yahooquery fallback)
 
 All callers import from here — never directly from yfinance or defeatbeta.
+
+Architecture:
+  Business Logic → data_client (public) → RateLimiter + PersistentCache (DB)
+                                ↓
+                          yfinance/yahooquery (private network calls)
+
+Rate Limiting:
+  - MIN_REFRESH_INTERVAL: 1800s (30 min) between same ticker fetches
+  - DAILY_FETCH_LIMIT: 48 fetches per ticker per day
+  - Returns stale data with warning when rate limited
 """
 
 import logging
@@ -14,6 +24,7 @@ import os
 import time
 import threading
 from datetime import date
+from typing import Dict, List, Optional, Tuple, Any
 
 import yfinance as yf
 
@@ -22,49 +33,78 @@ from persistent_cache import (
     init_db, get_ticker_info_cached, save_ticker_info,
     get_price_history_cached, save_price_history,
     needs_refresh, get_bulk_ticker_info,
+    PRICE_TTL, FUNDAMENTALS_TTL,
 )
+
+# Import new orchestrator components
+from rate_limiter import get_rate_limiter, RateLimiter
+from network_client import get_network_client
+from intelligent_ttl import get_adjusted_ttl, get_cached_ttl, calculate_refresh_priority, set_next_earnings
 
 logger = logging.getLogger(__name__)
 
-# Toggle defeatbeta on/off — runtime mutable, set via env var.
-# Initialized from env var, but can be changed at runtime without restart.
-_DEFEATBETA_ENABLED = os.getenv("DEFEATBETA_ENABLED", "1") != "0"
+# ─────────────────────────────────────────────────────────────────────────────
+# Rate Limiter Singleton
+# ─────────────────────────────────────────────────────────────────────────────
+
+_rate_limiter: Optional[RateLimiter] = None
+
+
+def _get_rate_limiter() -> RateLimiter:
+    """Get or create the global rate limiter."""
+    global _rate_limiter
+    if _rate_limiter is None:
+        _rate_limiter = get_rate_limiter()
+    return _rate_limiter
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Network Client (Private - internal use only)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_network_client = None
+
+
+def _get_network_client():
+    """Get the private network client."""
+    global _network_client
+    if _network_client is None:
+        _network_client = get_network_client()
+    return _network_client
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Data Source Configuration (defeatbeta disabled - using yfinance only)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# defeatbeta is disabled - we use yfinance only with DB-first architecture
+# This toggle is kept for backward compatibility but has no effect
+_DEFEATBETA_ENABLED = False
 
 
 def is_defeatbeta_enabled() -> bool:
-    """Returns whether defeatbeta is currently the primary data source."""
-    return _DEFEATBETA_ENABLED
+    """Returns whether defeatbeta is enabled (always False - using yfinance)."""
+    return False
 
 
 def set_defeatbeta_enabled(enabled: bool) -> dict:
     """
     Toggle defeatbeta on/off at runtime.
-    Returns dict with status info and whether a reload is recommended.
+    Note: defeatbeta is disabled - this is a no-op.
     """
-    global _DEFEATBETA_ENABLED
-    old_value = _DEFEATBETA_ENABLED
-    _DEFEATBETA_ENABLED = enabled
-
-    # Clear caches so the new data source isn't contaminated by old cached data
-    from cache_utils import clear_cache
-    clear_cache()
-    from persistent_cache import clear_db
-    clear_db()
-
     return {
-        "previous": "defeatbeta" if old_value else "yfinance",
+        "previous": "defeatbeta" if _DEFEATBETA_ENABLED else "yfinance",
         "current": "defeatbeta" if enabled else "yfinance",
-        "reload_recommended": True,
-        "message": f"Switched to {'defeatbeta' if enabled else 'yfinance'}. Hard refresh (Ctrl+Shift+R) to apply."
+        "reload_recommended": False,
+        "message": "defeatbeta is disabled. Using yfinance with DB-first architecture."
     }
 
 
 def get_data_source_status() -> dict:
     """Returns current data source configuration."""
     return {
-        "defeatbeta_enabled": _DEFEATBETA_ENABLED,
-        "current_source": "defeatbeta" if _DEFEATBETA_ENABLED else "yfinance",
-        "env_default": os.getenv("DEFEATBETA_ENABLED", "1") != "0",
+        "defeatbeta_enabled": False,
+        "current_source": "yfinance (DB-first)",
+        "rate_limiting": "enabled (30min floor, 48/day limit)",
     }
 
 # ──────────────────────────────────────────────────────────
@@ -160,30 +200,75 @@ def _get_yf_fundamentals(symbol: str) -> dict:
 
 
 # ──────────────────────────────────────────────────────────
-# Unified Ticker Info  (respects defeatbeta toggle)
+# Unified Ticker Info  (DB-first with rate limiting)
 # ──────────────────────────────────────────────────────────
 
 def _background_refresh_ticker(symbol: str):
-    """Refresh ticker data in the background (fire-and-forget)."""
+    """Refresh ticker data in the background (fire-and-forget) with intelligent TTL."""
     def _worker():
+        limiter = _get_rate_limiter()
+        
+        # Get cached info for beta/sector if available
+        cached = get_ticker_info_cached(symbol)
+        beta = cached.get("beta") if cached else None
+        sector = cached.get("sector") if cached else None
+        
+        # Calculate priority based on intelligent TTL
+        priority = calculate_refresh_priority(symbol, "fundamentals", beta, sector)
+        
+        # Check rate limiter before fetch
+        can_fetch, reason = limiter.can_fetch(symbol, "fundamentals")
+        
+        if not can_fetch:
+            logger.debug("Rate limited for %s/fundamentals: %s", symbol, reason)
+            # Delay based on priority (higher priority = shorter delay)
+            delay = 300 if priority == 1 else (600 if priority == 2 else 900)
+            _schedule_delayed_refresh(symbol, delay=delay)
+            return
+        
         try:
             fresh = _fetch_ticker_info_raw(symbol)
             if fresh and fresh.get("symbol"):
                 save_ticker_info(fresh)
-                logger.debug("Background refresh complete for %s", symbol)
+                
+                # Extract and cache earnings date if available
+                if fresh.get("earningsTimestamp"):
+                    set_next_earnings(symbol, fresh["earningsTimestamp"])
+                
+                logger.debug("Background refresh complete for %s (priority=%d)", symbol, priority)
         except Exception as e:
             logger.warning("Background refresh failed for %s: %s", symbol, e)
     threading.Thread(target=_worker, daemon=True).start()
 
 
+def _schedule_delayed_refresh(symbol: str, delay: int = 600):
+    """Schedule a delayed refresh."""
+    def _delayed():
+        time.sleep(delay)
+        _background_refresh_ticker(symbol)
+    threading.Thread(target=_delayed, daemon=True).start()
+
+
 def _fetch_ticker_info_raw(symbol: str) -> dict:
     """Fetch ticker info from source (no caching). Used by background refresh."""
     symbol = symbol.upper()
+    limiter = _get_rate_limiter()
+    
+    # Check rate limiting before fetch
+    can_fetch, reason = limiter.can_fetch(symbol, "fundamentals")
+    if not can_fetch:
+        logger.debug("Rate limited: %s/fundamentals - %s", symbol, reason)
+        return {}
+    
     try:
         base = _get_fundamentals_raw(symbol)
         if not base:
             return {}
         live = _get_price_live_raw(symbol)
+        
+        # Record successful fetch
+        limiter.record_fetch(symbol, "fundamentals")
+        
         return {
             **base,
             "currentPrice": live.get("price", 0.0),
@@ -211,8 +296,12 @@ def get_ticker_info(symbol: str) -> dict:
     logger.info("get_ticker_info(%s): DB lookup result=%s, price=%s", symbol, "found" if cached else "miss", cached.get("price") if cached else "N/A")
     if cached:
         logger.info("get_ticker_info(%s): from persistent DB, price=%s", symbol, cached.get("price"))
-        # Schedule background refresh if stale
-        if needs_refresh(symbol, "price"):
+        # Schedule background refresh if stale (using intelligent TTL)
+        from intelligent_ttl import get_cached_ttl
+        from persistent_cache import needs_refresh_intelligent
+        needs, reason = needs_refresh_intelligent(symbol, "fundamentals")
+        if needs:
+            logger.debug("get_ticker_info(%s): data is stale (%s)", symbol, reason)
             _background_refresh_ticker(symbol)
         # Build full dict from cached DB data
         return _build_ticker_info_from_cache(cached, symbol)
@@ -368,30 +457,50 @@ def _get_price_live_raw(symbol: str) -> dict:
 
 
 # ──────────────────────────────────────────────────────────
-# Live Price  (yfinance — real-time, cached in persistent DB)
+# Live Price  (yfinance — real-time, cached in persistent DB, rate-limited)
 # ──────────────────────────────────────────────────────────
 
 @timed_cache(ttl_seconds=60, soft_ttl_seconds=30)
 def get_price_live(symbol: str) -> dict:
     """
     Returns real-time price data. Reads from persistent DB first,
-    schedules background refresh if stale.
+    schedules background refresh if stale (with rate limiting).
     """
     init_db()
+    limiter = _get_rate_limiter()
+    
+    # Check rate limit before any network call
+    can_fetch_price, reason = limiter.can_fetch(symbol, "price")
+    
     cached = get_ticker_info_cached(symbol)
     if cached and cached.get("price") and cached.get("price") > 0:
         if needs_refresh(symbol, "price"):
-            _background_refresh_ticker(symbol)
+            if can_fetch_price:
+                _background_refresh_ticker(symbol)
+            else:
+                logger.debug("Rate limited: %s/price - %s", symbol, reason)
         return {
             "price": cached["price"],
             "change_pct": 0.0,
             "volume": cached.get("avg_volume", 0),
             "mkt_cap": cached.get("market_cap", 0.0),
+            "stale": can_fetch_price is False,  # Flag if we're returning stale due to rate limit
         }
 
-    # No cached price — fetch fresh
+    # No cached price — check if we can fetch
+    if not can_fetch_price:
+        logger.info("Rate limited for %s/price, returning partial data", symbol)
+        return {
+            "price": cached.get("price", 0) if cached else 0,
+            "change_pct": 0.0,
+            "volume": cached.get("avg_volume", 0) if cached else 0,
+            "stale": True,
+            "warning": f"Rate limited. {reason}",
+        }
+    
     result = _get_price_live_raw(symbol)
     if result.get("price", 0) > 0:
+        limiter.record_fetch(symbol, "price")
         # Update price in DB without re-fetching fundamentals
         init_db()
         conn = None
@@ -511,7 +620,15 @@ def _save_history_to_db(symbol: str, df):
 
 
 def _background_refresh_history(symbol: str, days: int = 252):
-    """Refresh price history in background."""
+    """Refresh price history in background with rate limiting."""
+    limiter = _get_rate_limiter()
+    can_fetch, reason = limiter.can_fetch(symbol, "history")
+    
+    if not can_fetch:
+        logger.debug("Rate limited for %s/history: %s", symbol, reason)
+        _schedule_delayed_refresh_history(symbol, days, delay=600)
+        return
+    
     try:
         import pandas as pd
         logger.info("Background refresh: price history for %s", symbol)
@@ -524,9 +641,18 @@ def _background_refresh_history(symbol: str, days: int = 252):
             })
             df = hist[["report_date", "open", "close", "high", "low", "volume"]]
             _save_history_to_db(symbol, df)
+            limiter.record_fetch(symbol, "history")
             logger.info("Background refresh complete: price history for %s", symbol)
     except Exception as e:
         logger.warning("Background refresh failed: price history for %s: %s", symbol, e)
+
+
+def _schedule_delayed_refresh_history(symbol: str, days: int, delay: int = 600):
+    """Schedule a delayed history refresh."""
+    def _delayed():
+        time.sleep(delay)
+        _background_refresh_history(symbol, days)
+    threading.Thread(target=_delayed, daemon=True).start()
 
 
 # ──────────────────────────────────────────────────────────
@@ -580,6 +706,7 @@ def warm_db_for_symbols(symbols: list):
     Fetch and persist data for a list of symbols in parallel.
     Called on startup to pre-populate the DB so users get instant data.
     Runs in a background thread — does not block server startup.
+    Rate-limited: max 5 concurrent workers, spread requests.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     import random
@@ -588,27 +715,41 @@ def warm_db_for_symbols(symbols: list):
         symbol = symbol.upper()
         # Skip if we have fresh data
         if not needs_refresh(symbol, "price"):
-            return
+            return "skipped"
+        
+        limiter = _get_rate_limiter()
+        can_fetch, reason = limiter.can_fetch(symbol, "fundamentals")
+        if not can_fetch:
+            logger.debug("Warm rate limited for %s: %s", symbol, reason)
+            return "rate_limited"
+        
         try:
-            time.sleep(random.uniform(0.2, 1.0))  # Spread requests
+            time.sleep(random.uniform(1.5, 3.0))  # Spread requests to avoid rate limits
             fresh = _fetch_ticker_info_raw(symbol)
             price = fresh.get("currentPrice") or fresh.get("price", 0)
             if fresh and fresh.get("symbol") and price > 0:
                 save_ticker_info(fresh)
+                limiter.record_fetch(symbol, "fundamentals")
                 logger.debug("Warmed %s: price=%.2f", symbol, price)
+                return "success"
         except Exception as e:
             logger.debug("Warm failed for %s: %s", symbol, e)
+        return "failed"
 
     def _worker():
-        logger.info("DB warming: starting for %d symbols...", len(symbols))
+        logger.info("DB warming: starting for %d symbols (rate-limited)...", len(symbols))
         t0 = time.time()
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        done = {"success": 0, "skipped": 0, "rate_limited": 0, "failed": 0}
+        
+        # Limit concurrent workers to reduce load
+        with ThreadPoolExecutor(max_workers=1) as executor:  # Single-threaded to avoid rate limits
             futures = {executor.submit(_warm_one, s): s for s in symbols}
-            done = 0
-            for f in as_completed(futures):
-                done += 1
-                if done % 20 == 0:
-                    logger.info("DB warming: %d/%d done (%.0fs)", done, len(symbols), time.time()-t0)
-        logger.info("DB warming: complete for %d symbols in %.0fs", len(symbols), time.time()-t0)
+            for future in as_completed(futures):
+                result = future.result()
+                done[result] = done.get(result, 0) + 1
+        
+        logger.info("DB warming: %d symbols in %.0fs (success=%d, skipped=%d, rate_limited=%d, failed=%d)",
+                    len(symbols), time.time()-t0, done["success"], done["skipped"], 
+                    done.get("rate_limited", 0), done["failed"])
 
     threading.Thread(target=_worker, daemon=True).start()
