@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Viewer — Stock Guide</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { font-family: 'Inter', sans-serif; }
+body { background: #0f172a; color: #e2e8f0; }
+.card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
+.card-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 0.5rem; }
+.stat-value { font-size: 1.8rem; font-weight: 700; }
+.stat-label { font-size: 0.75rem; color: #94a3b8; }
+.badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+.badge-green { background: #064e3b; color: #6ee7b7; }
+.badge-yellow { background: #451a03; color: #fcd34d; }
+.badge-red { background: #450a0a; color: #fca5a5; }
+.badge-blue { background: #1e3a5f; color: #93c5fd; }
+.badge-gray { background: #334155; color: #94a3b8; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid #334155; color: #94a3b8; font-weight: 600; cursor: pointer; white-space: nowrap; user-select: none; }
+th:hover { color: #e2e8f0; }
+td { padding: 0.4rem 0.75rem; border-bottom: 1px solid #1e293b; white-space: nowrap; }
+tr:hover { background: #1e293b; }
+tr:nth-child(even) { background: #0f172a; }
+tr:nth-child(even):hover { background: #1e293b; }
+.tab-btn { padding: 0.5rem 1rem; border-radius: 8px 8px 0 0; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; background: transparent; color: #64748b; }
+.tab-btn.active { background: #1e293b; color: #e2e8f0; }
+.tab-btn:hover { color: #e2e8f0; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+input.search { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 0.5rem 1rem; color: #e2e8f0; font-size: 0.875rem; width: 100%; max-width: 300px; outline: none; }
+input.search:focus { border-color: #3b82f6; }
+.fresh-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+</style>
+</head>
+<body class="p-6">
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold">DB Viewer</h1>
+      <p class="text-sm text-slate-400 mt-1">Persistent SQLite cache — stockguide.db</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="lastRefresh" class="text-xs text-slate-500"></span>
+      <button onclick="refresh()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition">Refresh</button>
+      <a href="/" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">Back to App</a>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div id="summaryCards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8"></div>
+
+  <!-- Conditional: Fresh/Stale bars -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="card" id="coverageCard"></div>
+    <div class="card" id="freshnessCard"></div>
+    <div class="card" id="updaterCard"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex border-b border-slate-700 mb-4">
+    <button class="tab-btn active" onclick="switchTab('tickers', this)">Tickers</button>
+    <button class="tab-btn" onclick="switchTab('history', this)">Price History</button>
+    <button class="tab-btn" onclick="switchTab('scans', this)">Scan Cache</button>
+  </div>
+
+  <!-- Tab: Tickers -->
+  <div id="tab-tickers" class="tab-content active">
+    <div class="flex items-center gap-3 mb-4">
+      <input class="search" id="tickerSearch" placeholder="Search symbol or name..." oninput="filterTickers()">
+      <select id="freshFilter" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm" onchange="filterTickers()">
+        <option value="all">All</option>
+        <option value="fresh">Fresh (&#60;1h)</option>
+        <option value="stale">Stale (1-24h)</option>
+        <option value="expired">Expired (&#62;24h)</option>
+      </select>
+      <span id="tickerCount" class="text-xs text-slate-500"></span>
+    </div>
+    <div class="overflow-x-auto rounded-lg border border-slate-700">
+      <table>
+        <thead id="tickerHeader"></thead>
+        <tbody id="tickerBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: Price History -->
+  <div id="tab-history" class="tab-content">
+    <p class="text-sm text-slate-400 mb-4">Per-ticker stats: row count, date range</p>
+    <div class="overflow-x-auto rounded-lg border border-slate-700">
+      <table>
+        <thead><tr><th>Symbol</th><th>Rows</th><th>Earliest</th><th>Latest</th><th>Coverage</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab: Scan Cache -->
+  <div id="tab-scans" class="tab-content">
+    <p class="text-sm text-slate-400 mb-4">Cached scan results</p>
+    <div class="overflow-x-auto rounded-lg border border-slate-700">
+      <table>
+        <thead><tr><th>Scan Name</th><th>Params</th><th>Age</th></tr></thead>
+        <tbody id="scanBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/admin/db-viewer';
+const WARMING_API = '/api/admin/warming-status';
+let dbData = null;
+let sortState = { col: 6, asc: false }; // fetched_at desc by default
+const COLS = ['symbol','name','sector','price','trailing_pe','market_cap','roe','debt_to_equity','beta','dividend_yield','fetched_at','price_fetched_at'];
+
+async function refresh() {
+  document.getElementById('lastRefresh').textContent = 'Loading...';
+  try {
+    const [dbRes, warmRes] = await Promise.all([
+      fetch(API).then(r => r.json()),
+      fetch(WARMING_API).then(r => r.json())
+    ]);
+    dbData = dbRes;
+    renderSummary(dbRes);
+    renderCoverage(dbRes);
+    renderFreshness(dbRes);
+    renderUpdater(warmRes);
+    renderTickers(dbRes);
+    renderHistory(dbRes);
+    renderScans(dbRes);
+    document.getElementById('lastRefresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    document.getElementById('lastRefresh').textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderSummary(d) {
+  const o = d.overview;
+  const cards = [
+    { label: 'Tickers', value: o.ticker_count, sub: o.tickers_with_price + ' with price' },
+    { label: 'Price History', value: o.price_history_rows.toLocaleString(), sub: o.symbols_with_history + ' symbols' },
+    { label: 'Coverage (PE)', value: o.tickers_with_pe, sub: (o.tickers_with_pe / Math.max(o.tickers_with_price,1)*100).toFixed(1) + '% of priced' },
+    { label: 'Data Freshness', value: o.tickers_fresh, sub: o.tickers_stale + ' stale (>1h)' },
+    { label: 'History Range', value: o.oldest_history || '—', sub: '→ ' + (o.newest_history || '—') },
+    { label: 'Scan Cache', value: o.scan_cache_entries, sub: 'entries' },
+  ];
+  document.getElementById('summaryCards').innerHTML = cards.map(c => `
+    <div class="card">
+      <div class="card-header">${c.label}</div>
+      <div class="stat-value">${c.value}</div>
+      <div class="stat-label mt-1">${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+function renderCoverage(d) {
+  const c = d.coverage;
+  const total = c.with_price || 1;
+  const items = [
+    { label: 'P/E Ratio', val: c.with_pe, pct: (c.with_pe/total*100).toFixed(0) },
+    { label: 'Market Cap', val: c.with_mcap, pct: (c.with_mcap/total*100).toFixed(0) },
+    { label: 'ROE', val: c.with_roe, pct: (c.with_roe/total*100).toFixed(0) },
+    { label: 'Debt/Equity', val: c.with_dte, pct: (c.with_dte/total*100).toFixed(0) },
+    { label: 'Beta', val: c.with_beta, pct: (c.with_beta/total*100).toFixed(0) },
+    { label: 'Dividend', val: c.with_dividend, pct: (c.with_dividend/total*100).toFixed(0) },
+  ];
+  document.getElementById('coverageCard').innerHTML = `
+    <div class="card-header">Data Coverage</div>
+    ${items.map(i => `
+      <div class="flex items-center justify-between py-1.5">
+        <span class="text-sm">${i.label}</span>
+        <span class="text-sm font-medium">${i.val} <span class="text-slate-500">(${i.pct}%)</span></span>
+      </div>
+      <div class="w-full h-1.5 bg-slate-700 rounded-full mb-1">
+        <div class="h-full bg-blue-500 rounded-full" style="width:${i.pct}%"></div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function renderFreshness(d) {
+  const o = d.overview;
+  const fresh = o.tickers_fresh || 0;
+  const stale = o.tickers_stale || 0;
+  const never = o.ticker_count - fresh - stale;
+  const total = o.ticker_count || 1;
+  document.getElementById('freshnessCard').innerHTML = `
+    <div class="card-header">Data Freshness</div>
+    <div class="flex items-center gap-4 mt-2">
+      <div><span class="fresh-dot bg-emerald-400"></span><span class="text-sm">${fresh} fresh</span></div>
+      <div><span class="fresh-dot bg-amber-400"></span><span class="text-sm">${stale} stale</span></div>
+      <div><span class="fresh-dot bg-slate-500"></span><span class="text-sm">${never} unfetched</span></div>
+    </div>
+    <div class="w-full h-3 bg-slate-700 rounded-full mt-3 overflow-hidden flex">
+      <div class="bg-emerald-400 h-full" style="width:${fresh/total*100}%"></div>
+      <div class="bg-amber-400 h-full" style="width:${stale/total*100}%"></div>
+    </div>
+    <div class="text-xs text-slate-500 mt-2">TTL: 30 min price · 24h fundamentals</div>
+  `;
+}
+
+function renderUpdater(w) {
+  document.getElementById('updaterCard').innerHTML = `
+    <div class="card-header">Continuous Updater</div>
+    <div class="mt-2 space-y-1 text-sm">
+      <div><span class="text-slate-400">Status:</span> ${w.continuous_updater_running ? '<span class="text-emerald-400">Running</span>' : '<span class="text-red-400">Off</span>'}</div>
+      <div><span class="text-slate-400">Cycles:</span> ${w.continuous_updater_cycles}</div>
+      <div><span class="text-slate-400">Last cycle:</span> ${w.last_cycle_end ? Math.round((Date.now()/1000 - w.last_cycle_end)/60) + ' min ago' : '—'}</div>
+      <div><span class="text-slate-400">Last warm:</span> ${w.last_cycle_warmed || 0} / ${w.last_cycle_total || 0} tickers</div>
+      <div><span class="text-slate-400">DB warming:</span> ${w.db_warming_done ? '<span class="text-emerald-400">Done</span>' : '<span class="text-amber-400">Pending</span>'} (${w.db_warming_success || 0} ok, ${w.db_warming_failed || 0} fail)</div>
+      <div><span class="text-slate-400">Dip hunter:</span> ${w.dip_hunter_done ? w.dip_hunter_count + ' dips' : '<span class="text-amber-400">Pending</span>'}</div>
+    </div>
+  `;
+}
+
+function freshnessBadge(fetchedAt) {
+  if (!fetchedAt || fetchedAt === 0) return '<span class="badge badge-gray">Never</span>';
+  const age = Date.now()/1000 - fetchedAt;
+  if (age < 1800) return `<span class="badge badge-green">${Math.round(age/60)}m</span>`;
+  if (age < 86400) return `<span class="badge badge-yellow">${Math.round(age/3600)}h</span>`;
+  return `<span class="badge badge-red">${Math.round(age/86400)}d</span>`;
+}
+
+function renderTickers(d) {
+  const sample = d.ticker_sample || [];
+  // Table header
+  document.getElementById('tickerHeader').innerHTML = `<tr>${COLS.map((c,i) => `<th onclick="sortTickers(${i})">${c}${sortState.col === i ? (sortState.asc ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th>Freshness</th></tr>`;
+  document.getElementById('tickerBody').dataset.all = JSON.stringify(sample);
+  document.getElementById('tickerCount').textContent = sample.length + ' entries';
+  filterTickers();
+}
+
+function filterTickers() {
+  const q = document.getElementById('tickerSearch').value.toLowerCase();
+  const ff = document.getElementById('freshFilter').value;
+  const all = JSON.parse(document.getElementById('tickerBody').dataset.all || '[]');
+  const now = Date.now()/1000;
+  const filtered = all.filter(r => {
+    const sym = (r.symbol || '').toLowerCase();
+    const name = (r.name || '').toLowerCase();
+    if (q && !sym.includes(q) && !name.includes(q)) return false;
+    const age = r.price_fetched_at ? now - r.price_fetched_at : Infinity;
+    if (ff === 'fresh' && age >= 3600) return false;
+    if (ff === 'stale' && (age < 3600 || age >= 86400)) return false;
+    if (ff === 'expired' && age < 86400) return false;
+    return true;
+  });
+  document.getElementById('tickerCount').textContent = filtered.length + ' entries';
+  renderTickerRows(filtered);
+}
+
+function sortTickers(col) {
+  if (sortState.col === col) sortState.asc = !sortState.asc;
+  else { sortState.col = col; sortState.asc = false; }
+  renderTickers(dbData);
+}
+
+function renderTickerRows(rows) {
+  const col = sortState.col;
+  const asc = sortState.asc;
+  rows.sort((a,b) => {
+    const va = a[COLS[col]], vb = b[COLS[col]];
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return asc ? va - vb : vb - va;
+  });
+  document.getElementById('tickerBody').innerHTML = rows.map(r => {
+    const age = r.price_fetched_at ? Math.round((Date.now()/1000 - r.price_fetched_at)/60) : null;
+    return `<tr>
+      <td class="font-medium">${r.symbol || '—'}</td>
+      <td class="max-w-[200px] truncate" title="${r.name || ''}">${r.name || '—'}</td>
+      <td>${r.sector || '—'}</td>
+      <td>${r.price ? '$' + Number(r.price).toFixed(2) : '—'}</td>
+      <td>${r.trailing_pe ? Number(r.trailing_pe).toFixed(2) : '—'}</td>
+      <td>${r.market_cap ? '$' + (r.market_cap/1e9).toFixed(2) + 'B' : '—'}</td>
+      <td>${r.roe ? (r.roe*100).toFixed(1) + '%' : '—'}</td>
+      <td>${r.debt_to_equity ? Number(r.debt_to_equity).toFixed(2) : '—'}</td>
+      <td>${r.beta ? Number(r.beta).toFixed(2) : '—'}</td>
+      <td>${r.dividend_yield ? (r.dividend_yield*100).toFixed(2) + '%' : '—'}</td>
+      <td class="text-xs text-slate-500">${r.fetched_at ? new Date(r.fetched_at*1000).toLocaleString() : '—'}</td>
+      <td class="text-xs text-slate-500">${r.price_fetched_at ? new Date(r.price_fetched_at*1000).toLocaleString() : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderHistory(d) {
+  const rows = d.history_stats || [];
+  document.getElementById('historyBody').innerHTML = rows.map(r => {
+    const first = new Date(r.earliest);
+    const last = new Date(r.latest);
+    const days = Math.round((last - first) / 86400000);
+    return `<tr>
+      <td class="font-medium">${r.symbol}</td>
+      <td>${r.rows.toLocaleString()}</td>
+      <td class="text-xs text-slate-400">${r.earliest}</td>
+      <td class="text-xs text-slate-400">${r.latest}</td>
+      <td><span class="badge ${days > 365 ? 'badge-green' : days > 90 ? 'badge-yellow' : 'badge-red'}">${days}d</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderScans(d) {
+  const entries = d.scan_entries || [];
+  document.getElementById('scanBody').innerHTML = entries.map(r => {
+    const age = r.age_seconds;
+    let badge = 'badge-green';
+    if (age > 7200) badge = 'badge-yellow';
+    if (age > 86400) badge = 'badge-red';
+    return `<tr>
+      <td class="font-medium">${r.scan_name}</td>
+      <td class="text-xs text-slate-400 max-w-[300px] truncate">${r.params || '—'}</td>
+      <td><span class="badge ${badge}">${age < 120 ? Math.round(age) + 's' : age < 7200 ? Math.round(age/60) + 'm' : Math.round(age/3600) + 'h'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+refresh();
+</script>
+</body>
+</html>
