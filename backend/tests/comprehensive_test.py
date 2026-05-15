@@ -128,6 +128,80 @@ def test_updater_script():
         print(f"FAIL ({e})")
         return False
 
+def test_technical_zones():
+    """Test the technical zones scanner endpoint with cached data"""
+    print("Testing Technical Zones...", end=" ")
+    try:
+        res = requests.get(f"{BASE_URL}/technical/zones?zone=all&min_data_days=100", timeout=30)
+        if res.status_code != 200:
+            print(f"FAIL (Status {res.status_code})")
+            return False
+        data = res.json()
+        if "results" in data and "count" in data and "zone" in data:
+            print(f"PASS ({data['count']} tickers classified, {data['zone']} filter)")
+            return True
+        print("FAIL (Missing fields)")
+        return False
+    except Exception as e:
+        print(f"FAIL ({e})")
+        return False
+
+def test_technical_zones_invalid_zone():
+    """Test technical zones endpoint with invalid zone parameter"""
+    print("Testing Technical Zones (invalid zone)...", end=" ")
+    try:
+        res = requests.get(f"{BASE_URL}/technical/zones?zone=invalid", timeout=10)
+        if res.status_code == 400:
+            print("PASS (Got 400 for invalid zone)")
+            return True
+        print(f"FAIL (Expected 400, got {res.status_code})")
+        return False
+    except Exception as e:
+        print(f"FAIL ({e})")
+        return False
+
+def test_technical_zones_institutional():
+    """Test institutional zone filter returns results"""
+    print("Testing Technical Zones (institutional)...", end=" ")
+    try:
+        res = requests.get(f"{BASE_URL}/technical/zones?zone=institutional&min_data_days=100", timeout=30)
+        if res.status_code != 200:
+            print(f"FAIL (Status {res.status_code})")
+            return False
+        data = res.json()
+        if data.get("count", 0) > 0:
+            print(f"PASS ({data['count']} institutional zone tickers)")
+            return True
+        print("FAIL (Expected >0 institutional tickers)")
+        return False
+    except Exception as e:
+        print(f"FAIL ({e})")
+        return False
+
+def test_momentum():
+    """Test momentum picks endpoint"""
+    print("Testing Momentum Picks...", end=" ")
+    try:
+        res = requests.get(f"{BASE_URL}/momentum?min_score=0&limit=20", timeout=120)
+        if res.status_code != 200:
+            print(f"FAIL (Status {res.status_code})")
+            return False
+        data = res.json()
+        if "picks" not in data or "count" not in data:
+            print("FAIL (Missing fields)")
+            return False
+        print(f"PASS ({data['count']} picks)")
+        if data["count"] > 0:
+            p = data["picks"][0]
+            required = ["symbol", "momentum_score", "signal", "action", "price", "rsi_14", "adx"]
+            missing = [f for f in required if f not in p]
+            if missing:
+                print(f"  WARN: missing fields: {missing}")
+        return True
+    except Exception as e:
+        print(f"FAIL ({e})")
+        return False
+
 def main():
     print("=" * 60)
     print("COMPREHENSIVE TEST SUITE - Dynamic Data Features")
@@ -140,7 +214,11 @@ def main():
         ("Moonshots", test_moonshots),
         ("Sector Analysis", test_sector_analysis),
         ("Stock Search", test_stock_search),
-        ("Universe Updater", test_updater_script)
+        ("Universe Updater", test_updater_script),
+        ("Technical Zones (All)", test_technical_zones),
+        ("Technical Zones (Invalid Zone)", test_technical_zones_invalid_zone),
+        ("Technical Zones (Institutional)", test_technical_zones_institutional),
+        ("Momentum Picks", test_momentum)
     ]
     
     results = []
