@@ -297,6 +297,89 @@
         </div>
     </header>
 
+    <!-- Superinvestor Detail Modal -->
+    <div id="superinvestor-detail-modal" class="fixed inset-0 z-[60] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 py-8">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-90" onclick="closeSuperinvestorDetail()"></div>
+            <div class="glass-panel rounded-2xl overflow-hidden shadow-xl relative z-10 w-full max-w-5xl max-h-[90vh] flex flex-col border border-gray-700">
+                <!-- Header -->
+                <div class="p-6 border-b border-gray-700 flex items-start justify-between bg-gray-800/50 shrink-0">
+                    <div class="flex items-center gap-4">
+                        <div id="si-detail-avatar" class="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center text-2xl font-bold text-white shadow-inner">WB</div>
+                        <div>
+                            <h3 id="si-detail-name" class="text-2xl font-bold text-white">Loading...</h3>
+                            <div id="si-detail-firm" class="text-sm text-gray-400"></div>
+                            <div id="si-detail-style" class="mt-1 text-xs text-warren-accent font-medium uppercase tracking-wider"></div>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-xs text-gray-500 uppercase">Quarter</div>
+                        <div id="si-detail-quarter" class="text-lg font-bold text-white">--</div>
+                    </div>
+                </div>
+                <!-- Stats Bar -->
+                <div class="grid grid-cols-4 gap-px bg-gray-700/50 shrink-0">
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Portfolio Value</div>
+                        <div id="si-stat-value" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Holdings</div>
+                        <div id="si-stat-holdings" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Top 3 Concentration</div>
+                        <div id="si-stat-concentration" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Changes</div>
+                        <div id="si-stat-changes" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                </div>
+                <!-- Body -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                    <!-- Sector Breakdown -->
+                    <div id="si-sector-section">
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Sector Allocation</h4>
+                        <div id="si-sector-bars" class="space-y-2"></div>
+                    </div>
+                    <!-- Changes Breakdown -->
+                    <div id="si-changes-section">
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Changes this Quarter</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="si-changes-grid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <!-- Holdings Table -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Holdings</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg">Ticker</th>
+                                        <th class="px-4 py-3">Name</th>
+                                        <th class="px-4 py-3 text-right">Value ($M)</th>
+                                        <th class="px-4 py-3 text-right">Weight</th>
+                                        <th class="px-4 py-3 rounded-r-lg">Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="si-holdings-body" class="divide-y divide-gray-800">
+                                    <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading holdings...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div class="p-4 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center shrink-0">
+                    <span id="si-detail-source" class="text-[10px] text-gray-600"></span>
+                    <button onclick="closeSuperinvestorDetail()" class="px-4 py-2 bg-warren-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Forecast Modal (Hidden by default) -->
     <div id="forecast-modal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title"
         role="dialog" aria-modal="true">
@@ -757,12 +840,25 @@
                             Portfolio <span id="copycat-universe-badge"></span></h2>
                         <span class="text-xs text-gray-400">High Conviction "Clone" Picks</span>
                     </div>
+                    <div class="flex flex-wrap gap-2 mb-4" id="copycat-filters">
+                        <button onclick="loadCopycatPortfolio('all')" data-filter="all"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-warren-accent text-white">All</button>
+                        <button onclick="loadCopycatPortfolio('overlap')" data-filter="overlap"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Multi-Manager</button>
+                        <button onclick="loadCopycatPortfolio('new_buys')" data-filter="new_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">New Buys</button>
+                        <button onclick="loadCopycatPortfolio('increased')" data-filter="increased"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Conviction Up</button>
+                        <button onclick="loadCopycatPortfolio('exits')" data-filter="exits"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Exits</button>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left">
                             <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
                                 <tr>
                                     <th class="px-6 py-3 rounded-l-lg">Stock</th>
                                     <th class="px-6 py-3">Held By</th>
+                                    <th class="px-6 py-3">Signal</th>
                                     <th class="px-6 py-3 text-right">Price</th>
                                     <th class="px-6 py-3 text-right">Daily %</th>
                                     <th class="px-6 py-3 text-right">Yearly %</th>
@@ -774,6 +870,7 @@
                             </tbody>
                         </table>
                     </div>
+                    <div id="copycat-source-note" class="text-[10px] text-gray-600 mt-3 text-center"></div>
                 </div>
             </div>
 
@@ -904,6 +1001,15 @@
                                 <h3 class="font-bold text-white text-sm">Burry's Orphans</h3>
                                 <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Wall St
                                     Neglected</p>
+                            </div>
+
+                            <!-- Row 3: Inflation Busters -->
+                            <div onclick="runScreen('inflation_busters')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-amber-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-amber-400 text-xl mb-2">🛡️</div>
+                                <h3 class="font-bold text-white text-sm">Inflation Busters</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Pricing
+                                    Power + Low Debt + High ROIC</p>
                             </div>
                         </div>
 

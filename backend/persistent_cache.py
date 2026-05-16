@@ -120,6 +120,8 @@ def init_db():
                 book_value REAL,
                 short_ratio REAL,
                 operating_cashflow REAL,
+                gross_margin REAL,
+                roic REAL,
                 fetched_at REAL,
                 price_fetched_at REAL
             );
@@ -178,8 +180,8 @@ def save_ticker_info(data: Dict):
     beta, fifty_two_week_high, fifty_two_week_low, avg_volume,
     shares_outstanding, profit_margin, peg_ratio, ev_ebitda,
     book_value, short_ratio, operating_cashflow,
-    fetched_at, price_fetched_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    gross_margin, roic, fetched_at, price_fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(symbol) DO UPDATE SET
     name=excluded.name, sector=excluded.sector, industry=excluded.industry,
     summary=excluded.summary, price=excluded.price, market_cap=excluded.market_cap,
@@ -199,6 +201,7 @@ def save_ticker_info(data: Dict):
     profit_margin=excluded.profit_margin, peg_ratio=excluded.peg_ratio,
     ev_ebitda=excluded.ev_ebitda, book_value=excluded.book_value,
     short_ratio=excluded.short_ratio, operating_cashflow=excluded.operating_cashflow,
+    gross_margin=excluded.gross_margin, roic=excluded.roic,
     fetched_at=excluded.fetched_at, price_fetched_at=excluded.price_fetched_at
 """, (
                 symbol,
@@ -239,6 +242,8 @@ def save_ticker_info(data: Dict):
                 _val("bookValue", "book_value"),
                 _val("shortRatio", "short_ratio"),
                 _val("operatingCashflow", "operating_cashflow"),
+                _val("grossMargins", "gross_margin"),
+                _val("returnOnInvestedCapital", "roic"),
                 time.time(), time.time()
             ))
             conn.commit()

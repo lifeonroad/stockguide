@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from market_data import get_buffett_indicator
 from screener import get_industry_rankings, analyze_sector_fundamentals, get_sector_stocks, get_sector_meta
 from screeners import get_screener_engine
-from superinvestors_live import get_live_superinvestors, get_next_filing_info
+from superinvestors_live import get_live_superinvestors, get_next_filing_info, get_investor_detail
 from filing_calendar import get_filing_status
 
 from fastapi.staticfiles import StaticFiles
@@ -406,6 +406,20 @@ async def superinvestors_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/superinvestors/{investor_id}")
+async def superinvestor_detail(investor_id: str):
+    try:
+        data = await _to_thread_with_timeout(get_investor_detail, investor_id, timeout=SLOW_API_TIMEOUT)
+        if "_error" in data:
+            raise HTTPException(status_code=404, detail=data["_error"])
+        return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Investor detail fetch timed out.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/admin/update-universe")
 async def update_universe_endpoint():
     """Triggers the weekly scraper for S&P 500 / Nasdaq 100 universe +
@@ -427,9 +441,9 @@ async def update_universe_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/copycat")
-async def get_copycat():
+async def get_copycat(filter: str = "all"):
     try:
-        return await _to_thread_with_timeout(get_copycat_performance, timeout=SLOW_API_TIMEOUT)
+        return await _to_thread_with_timeout(get_copycat_performance, filter, timeout=SLOW_API_TIMEOUT)
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Copycat data fetch timed out. Try again in a moment.")
 

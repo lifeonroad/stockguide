@@ -344,6 +344,100 @@ def get_live_superinvestors():
     return data if data else get_static_superinvestors()
 
 
+def get_investor_detail(investor_id: str) -> dict:
+    """
+    Return detailed breakdown for a single superinvestor.
+    Includes full holdings, computed changes, portfolio stats, and cached prices.
+    Falls back to static data if SEC EDGAR is unavailable.
+    """
+    try:
+        from sec_13f import get_investor_with_changes
+    except ImportError:
+        return {"_error": f"Cannot load SEC EDGAR module"}
+
+    try:
+        result = get_investor_with_changes(investor_id)
+    except Exception as e:
+        logger.warning("get_investor_detail(%s) SEC EDGAR failed: %s", investor_id, e)
+        result = None
+
+    from sec_13f_db import ALL_INVESTOR_CIKS
+    meta = ALL_INVESTOR_CIKS.get(investor_id, {})
+    name = meta.get("name", investor_id.title())
+    firm = meta.get("firm", "")
+    style = meta.get("style", "Value")
+
+    if not result:
+        static = get_static_superinvestors()
+        for inv in static:
+            if inv["id"] == investor_id:
+                return {
+                    "investor_id": investor_id,
+                    "name": inv["name"],
+                    "firm": inv.get("firm", ""),
+                    "style": inv.get("style", ""),
+                    "quarter": (inv.get("history") or [{}])[0].get("quarter", "Unknown"),
+                    "holdings": [],
+                    "changes": {},
+                    "stats": {"total_value_millions": 0, "holdings_count": 0, "top_concentration": 0},
+                    "source": "static_fallback",
+                }
+        return {"_error": f"Investor {investor_id} not found", "_message": "No data available"}
+
+    holdings = result.get("holdings", [])
+    changes = result.get("changes", {})
+    quarter = result.get("quarter", "Unknown")
+
+    holdings_count = len(holdings)
+    total_value = sum(h.get("value_millions", 0) or 0 for h in holdings)
+
+    holdings_sorted = sorted(holdings, key=lambda h: h.get("value_millions", 0) or 0, reverse=True)
+    top3_value = sum(h.get("value_millions", 0) or 0 for h in holdings_sorted[:3])
+    top_concentration = round((top3_value / total_value * 100), 1) if total_value > 0 else 0
+
+    sector_map = {}
+    for h in holdings_sorted:
+        try:
+            from persistent_cache import get_ticker_info_cached
+            cached = get_ticker_info_cached(h.get("ticker", ""))
+            sector = (cached or {}).get("sector", "Unknown")
+        except Exception:
+            sector = "Unknown"
+        sector_map.setdefault(sector, 0)
+        sector_map[sector] += h.get("value_millions", 0) or 0
+
+    sector_breakdown = {}
+    total_allocated = sum(sector_map.values())
+    if total_allocated > 0:
+        for sector, val in sorted(sector_map.items(), key=lambda x: -x[1]):
+            sector_breakdown[sector] = round(val / total_allocated * 100, 1)
+
+    change_counts = {}
+    total_changes = 0
+    for ct, items in changes.items():
+        change_counts[ct] = len(items)
+        total_changes += len(items)
+
+    return {
+        "investor_id": investor_id,
+        "name": name,
+        "firm": firm,
+        "style": style,
+        "quarter": quarter,
+        "holdings": holdings_sorted,
+        "changes": changes,
+        "stats": {
+            "total_value_millions": round(total_value, 1),
+            "holdings_count": holdings_count,
+            "top_concentration": top_concentration,
+            "sector_breakdown": sector_breakdown,
+            "change_counts": change_counts,
+            "total_changes": total_changes,
+        },
+        "source": "sec_edgar",
+    }
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,

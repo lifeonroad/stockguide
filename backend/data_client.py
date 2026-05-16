@@ -272,6 +272,8 @@ def _get_yf_fundamentals(symbol: str) -> dict:
             "currentRatio": info.get("currentRatio", 0.0),
             "freeCashflow": ttm_fcf,
             "fcf_yield": (ttm_fcf / mkt_cap) if mkt_cap else 0.0,
+            "grossMargin": _safe_float(info.get("grossMargins")),
+            "roic": _safe_float(info.get("returnOnInvestedCapital")),
             "revenueGrowth": info.get("revenueGrowth", 0.0),
             "earningsGrowth": info.get("earningsGrowth", 0.0),
             "revenue": info.get("totalRevenue", 0.0),
@@ -702,21 +704,23 @@ def get_price_history(symbol: str, days: int = 90):
                 conn.close()
         return df
 
-    # 2. No cached data — fetch from yfinance and persist to DB
+    # 2. No cached data — fetch from yahooquery and persist to DB
     try:
-        hist = yf.Ticker(symbol).history(period=f"{days}d")
-        if hist.empty:
+        from yahooquery import Ticker as YqTicker
+        yq = YqTicker(symbol)
+        hist = yq.history(period=f"{days}d")
+        if hist is None or hist.empty:
             return None
         hist = hist.reset_index().rename(columns={
-            "Date": "report_date",
-            "Open": "open", "Close": "close",
-            "High": "high", "Low": "low", "Volume": "volume",
+            "date": "report_date",
+            "open": "open", "close": "close",
+            "high": "high", "low": "low", "volume": "volume",
         })
         df = hist[["report_date", "open", "close", "high", "low", "volume"]]
         _save_history_to_db(symbol, df)
         return df
     except Exception as e2:
-        logger.error("get_price_history yfinance(%s) failed: %s", symbol, e2)
+        logger.error("get_price_history yahooquery(%s) failed: %s", symbol, e2)
         return None
 
 
@@ -755,13 +759,15 @@ def _background_refresh_history(symbol: str, days: int = 252):
     
     try:
         import pandas as pd
+        from yahooquery import Ticker as YqTicker
         logger.info("Background refresh: price history for %s", symbol)
-        hist = yf.Ticker(symbol).history(period=f"{days}d")
-        if not hist.empty:
+        yq = YqTicker(symbol)
+        hist = yq.history(period=f"{days}d")
+        if hist is not None and not hist.empty:
             hist = hist.reset_index().rename(columns={
-                "Date": "report_date",
-                "Open": "open", "Close": "close",
-                "High": "high", "Low": "low", "Volume": "volume",
+                "date": "report_date",
+                "open": "open", "close": "close",
+                "high": "high", "low": "low", "volume": "volume",
             })
             df = hist[["report_date", "open", "close", "high", "low", "volume"]]
             _save_history_to_db(symbol, df)
@@ -789,17 +795,25 @@ def get_news(symbol: str, n: int = 5) -> list:
     Returns a list of recent news dicts: [{title, date, source, url}]
     """
     try:
-        news = yf.Ticker(symbol).news
-        if not news:
+        from yahooquery import Ticker as YqTicker
+        yq = YqTicker(symbol)
+        news_data = yq.news
+        if not news_data:
             return []
+        if isinstance(news_data, list):
+            items = news_data[:n]
+        elif isinstance(news_data, dict):
+            items = news_data.get(symbol, [])[:n]
+        else:
+            items = []
         result = []
-        for item in news[:n]:
+        for item in items:
             if isinstance(item, dict):
                 result.append({
                     "title": item.get("title") or "",
-                    "date": str(item.get("pubDate") or item.get("publishedAt") or ""),
-                    "source": item.get("source") or "",
-                    "url": item.get("link") or item.get("canonicalUrl") or "#",
+                    "date": str(item.get("pubDate") or item.get("publishedAt") or item.get("providerPublishTime", "")),
+                    "source": item.get("publisher") or item.get("source") or "",
+                    "url": item.get("link") or item.get("canonicalUrl") or item.get("url") or "#",
                 })
         return result
     except Exception as e:

@@ -4,7 +4,7 @@ import { API_BASE } from './js/api.js';
 import { loadMarketStatus, loadMacroTrends } from './js/components/marketStatus.js';
 import { loadIndustries, loadStocks, searchStock, startResearch, loadResearch, loadTrends, loadPriceChart } from './js/components/researchUi.js';
 import { loadTechnicalZones } from './js/components/technicalZones.js';
-import { loadSuperinvestors, loadCopycatPortfolio, loadMoonshots } from './js/components/thematic.js';
+import { loadSuperinvestors, loadCopycatPortfolio, loadMoonshots, openSuperinvestorDetail, closeSuperinvestorDetail } from './js/components/thematic.js';
 import { runScreen } from './js/components/screenerUi.js';
 import { loadEconomicIndicators, loadMoneyFlow, loadMarketNews, loadContrarianOpportunities, filterContrarian } from './js/components/economics.js';
 import { loadDipHunterData, sortDipStocks } from './js/components/dipHunter.js';
@@ -101,6 +101,9 @@ window.renderUniverseBadge = renderUniverseBadge;
 window.loadTrends = loadTrends;
 window.loadPriceChart = loadPriceChart;
 window.loadTechnicalZones = loadTechnicalZones;
+window.loadCopycatPortfolio = loadCopycatPortfolio;
+window.openSuperinvestorDetail = openSuperinvestorDetail;
+window.closeSuperinvestorDetail = closeSuperinvestorDetail;
 window.closeModal = () => document.getElementById('forecast-modal').classList.add('hidden');
 
 // --- Tab Navigation Orchestrator ---
@@ -128,7 +131,7 @@ function switchTab(tabName) {
     if (activeView) activeView.classList.remove('hidden');
 
     if (tabName === 'superinvestors') loadSuperinvestors();
-    else if (tabName === 'copycat') loadCopycatPortfolio();
+    else if (tabName === 'copycat') loadCopycatPortfolio('all');
     else if (tabName === 'moonshots') loadMoonshots();
     else if (tabName === 'economics') {
         loadEconomicIndicators();
