@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
 
 _rate_limiter: Optional[RateLimiter] = None
 
+# Cap concurrent Yahoo API requests to prevent IP-level rate limiting
+_yahoo_semaphore = threading.Semaphore(3)
+
 
 def _get_rate_limiter() -> RateLimiter:
     """Get or create the global rate limiter."""
@@ -112,35 +115,93 @@ def get_data_source_status() -> dict:
 # ──────────────────────────────────────────────────────────
 
 _failed_tickers: Dict[str, float] = {}  # symbol -> timestamp of last failed fetch
-_FAILED_TICKER_RETRY_HOURS = 24  # Don't retry bad tickers for 24 hours
+_failed_counts: Dict[str, int] = {}     # symbol -> consecutive failure count
+
+
+def _get_retry_hours(symbol: str) -> float:
+    """
+    Exponential backoff for failed tickers:
+    1st failure → 1h, 2nd → 2h, 3rd → 4h, 4th → 8h, capped at 24h.
+    """
+    count = _failed_counts.get(symbol, 0)
+    return min(2 ** max(count - 1, 0), 24)
 
 
 def _is_failed_ticker(symbol: str) -> bool:
-    """Check if a ticker is known to be invalid/bad data."""
+    """Check if a ticker is in backoff."""
     entry = _failed_tickers.get(symbol)
     if entry is None:
         return False
     age_hours = (time.time() - entry) / 3600
-    if age_hours > _FAILED_TICKER_RETRY_HOURS:
+    max_wait = _get_retry_hours(symbol)
+    if age_hours > max_wait:
         del _failed_tickers[symbol]
+        _failed_counts.pop(symbol, None)
         return False
     return True
 
 
 def _mark_ticker_failed(symbol: str):
-    """Mark a ticker as failed (no data / invalid)."""
+    """Mark a ticker as failed with exponential backoff."""
     _failed_tickers[symbol] = time.time()
-    logger.info("Marked %s as failed ticker (no valid data)", symbol)
+    count = _failed_counts.get(symbol, 0) + 1
+    _failed_counts[symbol] = count
+    wait = _get_retry_hours(symbol)
+    logger.info("Marked %s as failed (attempt %d, retry in %.0fh)", symbol, count, wait)
 
 
 def _mark_ticker_valid(symbol: str):
     """Clear failed-ticker status on successful fetch."""
     _failed_tickers.pop(symbol, None)
+    _failed_counts.pop(symbol, None)
 
 
 def get_failed_tickers() -> list:
     """Return list of currently known bad tickers."""
     return list(_failed_tickers.keys())
+
+
+TRULY_PERMANENTLY_SKIPPED: set = set()
+
+
+def permanently_skip_ticker(symbol: str) -> dict:
+    """Mark a ticker to be permanently skipped (never attempt to fetch again)."""
+    symbol = symbol.upper().strip()
+    TRULY_PERMANENTLY_SKIPPED.add(symbol)
+    _mark_ticker_failed(symbol)
+    logger.warning("Permanently skipped ticker: %s", symbol)
+    return {"status": "success", "symbol": symbol, "action": "permanently_skipped"}
+
+
+def dismiss_invalid_ticker(symbol: str) -> dict:
+    """Dismiss/remove a ticker from the invalid list and permanent skip."""
+    symbol = symbol.upper().strip()
+    TRULY_PERMANENTLY_SKIPPED.discard(symbol)
+    _failed_tickers.pop(symbol, None)
+    logger.info("Dismissed invalid ticker: %s", symbol)
+    return {"status": "success", "symbol": symbol, "action": "dismissed"}
+
+
+def get_universe_invalid_ticker_stats() -> dict:
+    """Shows which tickers in our universe are marked as invalid."""
+    try:
+        from screener import SECTOR_STOCKS
+        all_universe = set()
+        for tickers in SECTOR_STOCKS.values():
+            all_universe.update(tickers)
+    except ImportError:
+        all_universe = set()
+
+    failed_in_universe = {s for s in all_universe if s in _failed_tickers}
+    permaskipped_in_universe = {s for s in all_universe if s in TRULY_PERMANENTLY_SKIPPED}
+
+    return {
+        "total_universe": len(all_universe),
+        "failed_tickers_in_universe": sorted(failed_in_universe),
+        "permanently_skipped_in_universe": sorted(permaskipped_in_universe),
+        "failed_tickers_count": len(failed_in_universe),
+        "permanently_skipped_count": len(permaskipped_in_universe),
+    }
 
 
 # ──────────────────────────────────────────────────────────
@@ -257,21 +318,27 @@ def _background_refresh_ticker(symbol: str):
         
         if not can_fetch:
             logger.debug("Rate limited for %s/fundamentals: %s", symbol, reason)
-            # Delay based on priority (higher priority = shorter delay)
             delay = 300 if priority == 1 else (600 if priority == 2 else 900)
             _schedule_delayed_refresh(symbol, delay=delay)
             return
         
         try:
             fresh = _fetch_ticker_info_raw(symbol)
-            if fresh and fresh.get("symbol"):
+            if fresh and fresh.get("symbol") and fresh.get("currentPrice", 0) > 0:
                 save_ticker_info(fresh)
-                
-                # Extract and cache earnings date if available
+                _mark_ticker_valid(symbol)
                 if fresh.get("earningsTimestamp"):
                     set_next_earnings(symbol, fresh["earningsTimestamp"])
-                
                 logger.debug("Background refresh complete for %s (priority=%d)", symbol, priority)
+            elif fresh and fresh.get("symbol"):
+                logger.warning("Background refresh for %s returned price=0, keeping cache", symbol)
+            else:
+                # Only mark permanently failed if we've NEVER had good data for this ticker
+                if not cached or not cached.get("price"):
+                    _mark_ticker_failed(symbol)
+                    logger.warning("Background refresh returned no data for %s, marking failed", symbol)
+                else:
+                    logger.warning("Background refresh returned no data for %s, keeping existing cache", symbol)
         except Exception as e:
             logger.warning("Background refresh failed for %s: %s", symbol, e)
     threading.Thread(target=_worker, daemon=True).start()
@@ -296,25 +363,26 @@ def _fetch_ticker_info_raw(symbol: str) -> dict:
         logger.debug("Rate limited: %s/fundamentals - %s", symbol, reason)
         return {}
     
-    try:
-        base = _get_fundamentals_raw(symbol)
-        if not base:
+    with _yahoo_semaphore:
+        try:
+            base = _get_fundamentals_raw(symbol)
+            if not base:
+                return {}
+            live = _get_price_live_raw(symbol)
+            
+            # Record successful fetch
+            limiter.record_fetch(symbol, "fundamentals")
+            
+            return {
+                **base,
+                "currentPrice": live.get("price", 0.0),
+                "regularMarketPrice": live.get("price", 0.0),
+                "regularMarketChangePercent": live.get("change_pct", 0.0),
+                "averageVolume": live.get("volume", 0),
+            }
+        except Exception as e:
+            logger.warning("Fetch ticker info raw(%s) failed: %s", symbol, e)
             return {}
-        live = _get_price_live_raw(symbol)
-        
-        # Record successful fetch
-        limiter.record_fetch(symbol, "fundamentals")
-        
-        return {
-            **base,
-            "currentPrice": live.get("price", 0.0),
-            "regularMarketPrice": live.get("price", 0.0),
-            "regularMarketChangePercent": live.get("change_pct", 0.0),
-            "averageVolume": live.get("volume", 0),
-        }
-    except Exception as e:
-        logger.warning("Fetch ticker info raw(%s) failed: %s", symbol, e)
-        return {}
 
 
 @timed_cache(ttl_seconds=60, soft_ttl_seconds=30)   # Short in-memory cache; persistent DB is primary
@@ -327,9 +395,13 @@ def get_ticker_info(symbol: str) -> dict:
     symbol = symbol.upper()
     init_db()
 
-    # 0. Check if ticker is known invalid — skip network calls
+    # 0. Check if ticker is known invalid — skip network calls but return stale cache
     if _is_failed_ticker(symbol):
-        logger.debug("get_ticker_info(%s): skipping — known bad ticker", symbol)
+        cached = get_ticker_info_cached(symbol)
+        if cached and cached.get("price"):
+            logger.debug("get_ticker_info(%s): failed ticker, returning stale cache", symbol)
+            return _build_ticker_info_from_cache(cached, symbol)
+        logger.debug("get_ticker_info(%s): failed ticker, no cache available", symbol)
         return {}
 
     # 1. Try persistent DB first (instant)
@@ -338,12 +410,18 @@ def get_ticker_info(symbol: str) -> dict:
     if cached:
         logger.info("get_ticker_info(%s): from persistent DB, price=%s", symbol, cached.get("price"))
         # Schedule background refresh if stale (using intelligent TTL)
-        from intelligent_ttl import get_cached_ttl
+        # Check rate limiter BEFORE spawning a thread — avoids thread explosion
+        # when many tickers' TTLs expire simultaneously
         from persistent_cache import needs_refresh_intelligent
         needs, reason = needs_refresh_intelligent(symbol, "fundamentals")
         if needs:
-            logger.debug("get_ticker_info(%s): data is stale (%s)", symbol, reason)
-            _background_refresh_ticker(symbol)
+            limiter = _get_rate_limiter()
+            can_fetch, rate_reason = limiter.can_fetch(symbol, "fundamentals")
+            if can_fetch:
+                logger.debug("get_ticker_info(%s): data is stale (%s), scheduling refresh", symbol, reason)
+                _background_refresh_ticker(symbol)
+            else:
+                logger.debug("get_ticker_info(%s): stale but rate limited (%s)", symbol, rate_reason)
         # Build full dict from cached DB data
         return _build_ticker_info_from_cache(cached, symbol)
 
@@ -799,3 +877,56 @@ def warm_db_for_symbols(symbols: list):
                     done.get("rate_limited", 0), done["failed"])
 
     threading.Thread(target=_worker, daemon=True).start()
+
+
+# ──────────────────────────────────────────────────────────
+# Warming status tracking
+# ──────────────────────────────────────────────────────────
+
+_warming_status: dict = {
+    "phase": "idle",
+    "dip_hunter_done": False,
+    "dip_hunter_count": 0,
+}
+
+
+def _set_warming(phase: str = "idle", **kwargs):
+    """Update warming status from background tasks."""
+    _warming_status["phase"] = phase
+    for k, v in kwargs.items():
+        _warming_status[k] = v
+
+
+def get_warming_status() -> dict:
+    """Return current warming status."""
+    return dict(_warming_status)
+
+
+def start_continuous_db_updater(interval_minutes: int = 30):
+    """
+    Start a background daemon thread that periodically refreshes
+    stale DB entries for critically-watched tickers.
+    """
+    def _updater_loop():
+        while True:
+            time.sleep(interval_minutes * 60)
+            try:
+                logger.info("[DB UPDATER] Starting periodic refresh...")
+                from persistent_cache import needs_refresh as _pdb_needs_refresh
+                from screener import SECTOR_STOCKS as _SECTOR_STOCKS
+                all_syms = []
+                for tickers in _SECTOR_STOCKS.values():
+                    all_syms.extend(tickers)
+                stale = [s for s in all_syms if _pdb_needs_refresh(s, "price")]
+                if stale:
+                    logger.info("[DB UPDATER] Refreshing %d stale tickers", len(stale))
+                    warm_db_for_symbols(stale[:50])
+                else:
+                    logger.info("[DB UPDATER] No stale tickers found")
+            except Exception as exc:
+                logger.warning("[DB UPDATER] Refresh cycle failed: %s", exc)
+
+    t = threading.Thread(target=_updater_loop, daemon=True)
+    t.name = "db-continuous-updater"
+    t.start()
+    logger.info("Continuous DB updater started (interval=%d min)", interval_minutes)

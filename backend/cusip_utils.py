@@ -297,15 +297,15 @@ def enhance_holding_with_ticker(holding: Dict[str, Any]) -> Dict[str, Any]:
     Add ticker symbol to a holding dict (modifies in-place).
     
     Args:
-        holding: Dict with 'nameOfIssuer' and/or 'cusip'
+        holding: Dict with 'nameOfIssuer'/'name_of_issuer' and/or 'cusip'
     
     Returns:
         Same dict with 'ticker' field added (may be None)
     """
-    name = holding.get('nameOfIssuer', '')
+    name = holding.get('nameOfIssuer') or holding.get('name_of_issuer', '')
     cusip = holding.get('cusip', '')
     
-    ticker = get_ticker(name=name, cusip=cusip)
+    ticker = holding.get('ticker') or get_ticker(name=name, cusip=cusip)
     holding['ticker'] = ticker
     
     if ticker:

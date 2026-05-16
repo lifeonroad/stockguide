@@ -88,6 +88,7 @@ def _get_conn() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
@@ -175,21 +176,34 @@ def save_filing(
     """
     init_13f_db()
     
-    from persistent_cache import _lock as _db_write_lock
+    from persistent_cache import db_write_lock
     
-    with _db_write_lock:
+    cik = filing_data.get('cik', '')
+    accession_number = filing_data.get('accession_number', '')
+    report_date = filing_data.get('report_date')
+    filing_date = filing_data.get('filing_date')
+    holdings_count = len(holdings)
+    total_value_raw = sum(h.get('value_raw', 0) for h in holdings)
+    total_value_millions = total_value_raw / 1_000_000.0 if total_value_raw > 0 else 0.0
+    fetched_at = time.time()
+    
+    rows = [(
+        None, investor_id, quarter,
+        h.get('nameOfIssuer', ''),
+        h.get('titleOfClass', ''),
+        h.get('cusip', ''),
+        h.get('ticker', ''),
+        h.get('value_raw', 0),
+        h.get('value_millions', 0.0),
+        h.get('sshPrnamt', 0),
+        h.get('sshPrnamtType', ''),
+        h.get('_pct_of_portfolio', 0.0) if '_pct_of_portfolio' in h else 0.0
+    ) for h in holdings]
+    
+    with db_write_lock:
         conn = _get_conn()
         
         try:
-            cik = filing_data.get('cik', '')
-            accession_number = filing_data.get('accession_number', '')
-            report_date = filing_data.get('report_date')
-            filing_date = filing_data.get('filing_date')
-            holdings_count = len(holdings)
-            total_value_raw = sum(h.get('value_raw', 0) for h in holdings)
-            total_value_millions = total_value_raw / 1_000_000.0 if total_value_raw > 0 else 0.0
-            fetched_at = time.time()
-            
             cursor = conn.execute("""
                 INSERT OR REPLACE INTO sec_13f_filings
                 (investor_id, cik, accession_number, quarter, report_date, 
@@ -211,24 +225,13 @@ def save_filing(
                     filing_id = row['id']
                     conn.execute("DELETE FROM sec_13f_holdings WHERE filing_id = ?", (filing_id,))
             
-            for h in holdings:
-                conn.execute("""
-                    INSERT INTO sec_13f_holdings
-                    (filing_id, investor_id, quarter, name_of_issuer, title_of_class,
-                     cusip, ticker, value_raw, value_millions, shares, shares_type, pct_of_portfolio)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    filing_id, investor_id, quarter,
-                    h.get('nameOfIssuer', ''),
-                    h.get('titleOfClass', ''),
-                    h.get('cusip', ''),
-                    h.get('ticker', ''),
-                    h.get('value_raw', 0),
-                    h.get('value_millions', 0.0),
-                    h.get('sshPrnamt', 0),
-                    h.get('sshPrnamtType', ''),
-                    h.get('_pct_of_portfolio', 0.0) if '_pct_of_portfolio' in h else 0.0
-                ))
+            rows_with_id = [tuple([filing_id] + list(r[1:])) for r in rows]
+            conn.executemany("""
+                INSERT INTO sec_13f_holdings
+                (filing_id, investor_id, quarter, name_of_issuer, title_of_class,
+                 cusip, ticker, value_raw, value_millions, shares, shares_type, pct_of_portfolio)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, rows_with_id)
             
             conn.commit()
             logger.info("Saved 13F filing for %s/%s with %d holdings (id=%d)",

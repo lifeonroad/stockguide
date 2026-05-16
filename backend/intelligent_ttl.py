@@ -123,6 +123,15 @@ def get_adjusted_ttl(
         adjustments["high_price"] = 1.5
         reasons.append(f"High price=${price:.0f} (1.5x)")
     
+    # 6. Per-ticker jitter: spread refreshes across the day so tickers
+    # fetched at the same time don't all expire simultaneously.
+    # Uses a deterministic hash of the symbol so each ticker's offset
+    # is consistent across restarts (0.7x – 1.3x of the current TTL).
+    jitter = 0.7 + (hash(symbol + "_" + data_type) % 6001) / 10000.0
+    effective_ttl *= jitter
+    adjustments["jitter"] = jitter
+    reasons.append(f"Jitter: {jitter:.2f}x")
+    
     # Enforce minimum TTL (never shorter than 15 min for price)
     min_ttl = 900 if data_type == "price" else 3600
     effective_ttl = max(effective_ttl, min_ttl)

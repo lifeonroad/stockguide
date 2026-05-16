@@ -48,7 +48,7 @@ MIN_REFRESH_INTERVAL = 1800  # Never fetch same ticker more than once per 30 min
 DAILY_FETCH_LIMIT = 48      # Max fetches per ticker per day (prevents DOS)
 BULK_FETCH_BATCH = 10       # Max tickers per bulk request to spread load
 
-_lock = threading.Lock()
+db_write_lock = threading.Lock()
 _db_initialized = False
 
 
@@ -75,7 +75,7 @@ def _get_conn() -> sqlite3.Connection:
 def init_db():
     """Initialize DB with schema. Safe to call multiple times."""
     global _db_initialized
-    with _lock:
+    with db_write_lock:
         if _db_initialized:
             return
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -165,84 +165,85 @@ def save_ticker_info(data: Dict):
                 return v
         return None
 
-    conn = _get_conn()
-    try:
-        conn.execute("""
-            INSERT INTO ticker_info (symbol, name, sector, industry, summary,
-                price, market_cap, trailing_pe, forward_pe, price_to_book,
-                price_to_sales, trailing_eps, forward_eps, roe, roa,
-                debt_to_equity, current_ratio, free_cashflow, total_debt,
-                total_cash, revenue_growth, earnings_growth, revenue,
-                net_income, dividend_yield, dividend_rate, payout_ratio,
-                beta, fifty_two_week_high, fifty_two_week_low, avg_volume,
-                shares_outstanding, profit_margin, peg_ratio, ev_ebitda,
-                book_value, short_ratio, operating_cashflow,
-                fetched_at, price_fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(symbol) DO UPDATE SET
-                name=excluded.name, sector=excluded.sector, industry=excluded.industry,
-                summary=excluded.summary, price=excluded.price, market_cap=excluded.market_cap,
-                trailing_pe=excluded.trailing_pe, forward_pe=excluded.forward_pe,
-                price_to_book=excluded.price_to_book, price_to_sales=excluded.price_to_sales,
-                trailing_eps=excluded.trailing_eps, forward_eps=excluded.forward_eps,
-                roe=excluded.roe, roa=excluded.roa, debt_to_equity=excluded.debt_to_equity,
-                current_ratio=excluded.current_ratio, free_cashflow=excluded.free_cashflow,
-                total_debt=excluded.total_debt, total_cash=excluded.total_cash,
-                revenue_growth=excluded.revenue_growth, earnings_growth=excluded.earnings_growth,
-                revenue=excluded.revenue, net_income=excluded.net_income,
-                dividend_yield=excluded.dividend_yield, dividend_rate=excluded.dividend_rate,
-                payout_ratio=excluded.payout_ratio, beta=excluded.beta,
-                fifty_two_week_high=excluded.fifty_two_week_high,
-                fifty_two_week_low=excluded.fifty_two_week_low,
-                avg_volume=excluded.avg_volume, shares_outstanding=excluded.shares_outstanding,
-                profit_margin=excluded.profit_margin, peg_ratio=excluded.peg_ratio,
-                ev_ebitda=excluded.ev_ebitda, book_value=excluded.book_value,
-                short_ratio=excluded.short_ratio, operating_cashflow=excluded.operating_cashflow,
-                fetched_at=excluded.fetched_at, price_fetched_at=excluded.price_fetched_at
-        """, (
-            symbol,
-            _val("longName", "name"),
-            _val("sector"),
-            _val("industry"),
-            _val("longBusinessSummary", "summary"),
-            _val("currentPrice", "price", "regularMarketPrice"),
-            _val("marketCap", "market_cap"),
-            _val("trailingPE", "trailing_pe"),
-            _val("forwardPE", "forward_pe"),
-            _val("priceToBook", "price_to_book"),
-            _val("priceToSalesTrailing12Months", "price_to_sales"),
-            _val("trailingEps", "trailing_eps"),
-            _val("forwardEps", "forward_eps"),
-            _val("returnOnEquity", "roe"),
-            _val("returnOnAssets", "roa"),
-            _val("debtToEquity", "debt_to_equity"),
-            _val("currentRatio", "current_ratio"),
-            _val("freeCashflow", "free_cashflow"),
-            _val("totalDebt", "total_debt"),
-            _val("totalCash", "total_cash"),
-            _val("revenueGrowth", "revenue_growth"),
-            _val("earningsGrowth", "earnings_growth"),
-            _val("totalRevenue", "revenue"),
-            _val("netIncomeToCommon", "net_income"),
-            _val("dividendYield", "dividend_yield"),
-            _val("dividendRate", "dividend_rate"),
-            _val("payoutRatio", "payout_ratio"),
-            _val("beta"),
-            _val("fiftyTwoWeekHigh", "fifty_two_week_high"),
-            _val("fiftyTwoWeekLow", "fifty_two_week_low"),
-            _val("averageVolume", "avg_volume"),
-            _val("sharesOutstanding", "shares_outstanding"),
-            _val("profitMargin", "profit_margin"),
-            _val("pegRatio", "peg_ratio"),
-            _val("enterpriseToEbitda", "ev_ebitda"),
-            _val("bookValue", "book_value"),
-            _val("shortRatio", "short_ratio"),
-            _val("operatingCashflow", "operating_cashflow"),
-            time.time(), time.time()
-        ))
-        conn.commit()
-    finally:
-        conn.close()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            conn.execute("""
+    INSERT INTO ticker_info (symbol, name, sector, industry, summary,
+    price, market_cap, trailing_pe, forward_pe, price_to_book,
+    price_to_sales, trailing_eps, forward_eps, roe, roa,
+    debt_to_equity, current_ratio, free_cashflow, total_debt,
+    total_cash, revenue_growth, earnings_growth, revenue,
+    net_income, dividend_yield, dividend_rate, payout_ratio,
+    beta, fifty_two_week_high, fifty_two_week_low, avg_volume,
+    shares_outstanding, profit_margin, peg_ratio, ev_ebitda,
+    book_value, short_ratio, operating_cashflow,
+    fetched_at, price_fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(symbol) DO UPDATE SET
+    name=excluded.name, sector=excluded.sector, industry=excluded.industry,
+    summary=excluded.summary, price=excluded.price, market_cap=excluded.market_cap,
+    trailing_pe=excluded.trailing_pe, forward_pe=excluded.forward_pe,
+    price_to_book=excluded.price_to_book, price_to_sales=excluded.price_to_sales,
+    trailing_eps=excluded.trailing_eps, forward_eps=excluded.forward_eps,
+    roe=excluded.roe, roa=excluded.roa, debt_to_equity=excluded.debt_to_equity,
+    current_ratio=excluded.current_ratio, free_cashflow=excluded.free_cashflow,
+    total_debt=excluded.total_debt, total_cash=excluded.total_cash,
+    revenue_growth=excluded.revenue_growth, earnings_growth=excluded.earnings_growth,
+    revenue=excluded.revenue, net_income=excluded.net_income,
+    dividend_yield=excluded.dividend_yield, dividend_rate=excluded.dividend_rate,
+    payout_ratio=excluded.payout_ratio, beta=excluded.beta,
+    fifty_two_week_high=excluded.fifty_two_week_high,
+    fifty_two_week_low=excluded.fifty_two_week_low,
+    avg_volume=excluded.avg_volume, shares_outstanding=excluded.shares_outstanding,
+    profit_margin=excluded.profit_margin, peg_ratio=excluded.peg_ratio,
+    ev_ebitda=excluded.ev_ebitda, book_value=excluded.book_value,
+    short_ratio=excluded.short_ratio, operating_cashflow=excluded.operating_cashflow,
+    fetched_at=excluded.fetched_at, price_fetched_at=excluded.price_fetched_at
+""", (
+                symbol,
+                _val("longName", "name"),
+                _val("sector"),
+                _val("industry"),
+                _val("longBusinessSummary", "summary"),
+                _val("currentPrice", "price", "regularMarketPrice"),
+                _val("marketCap", "market_cap"),
+                _val("trailingPE", "trailing_pe"),
+                _val("forwardPE", "forward_pe"),
+                _val("priceToBook", "price_to_book"),
+                _val("priceToSalesTrailing12Months", "price_to_sales"),
+                _val("trailingEps", "trailing_eps"),
+                _val("forwardEps", "forward_eps"),
+                _val("returnOnEquity", "roe"),
+                _val("returnOnAssets", "roa"),
+                _val("debtToEquity", "debt_to_equity"),
+                _val("currentRatio", "current_ratio"),
+                _val("freeCashflow", "free_cashflow"),
+                _val("totalDebt", "total_debt"),
+                _val("totalCash", "total_cash"),
+                _val("revenueGrowth", "revenue_growth"),
+                _val("earningsGrowth", "earnings_growth"),
+                _val("totalRevenue", "revenue"),
+                _val("netIncomeToCommon", "net_income"),
+                _val("dividendYield", "dividend_yield"),
+                _val("dividendRate", "dividend_rate"),
+                _val("payoutRatio", "payout_ratio"),
+                _val("beta"),
+                _val("fiftyTwoWeekHigh", "fifty_two_week_high"),
+                _val("fiftyTwoWeekLow", "fifty_two_week_low"),
+                _val("averageVolume", "avg_volume"),
+                _val("sharesOutstanding", "shares_outstanding"),
+                _val("profitMargin", "profit_margin"),
+                _val("pegRatio", "peg_ratio"),
+                _val("enterpriseToEbitda", "ev_ebitda"),
+                _val("bookValue", "book_value"),
+                _val("shortRatio", "short_ratio"),
+                _val("operatingCashflow", "operating_cashflow"),
+                time.time(), time.time()
+            ))
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def get_ticker_info_cached(symbol: str) -> Optional[Dict]:
@@ -277,16 +278,17 @@ def save_price_history(symbol: str, rows: List[Dict]):
     """Upsert price history rows into DB."""
     init_db()
     symbol = symbol.upper()
-    conn = _get_conn()
-    try:
-        conn.executemany("""
-            INSERT OR REPLACE INTO price_history (symbol, date, open, high, low, close, volume)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, [(symbol, r.get("date", ""), r.get("open"), r.get("high"), 
-               r.get("low"), r.get("close"), r.get("volume")) for r in rows])
-        conn.commit()
-    finally:
-        conn.close()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            conn.executemany("""
+                INSERT OR REPLACE INTO price_history (symbol, date, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, [(symbol, r.get("date", ""), r.get("open"), r.get("high"), 
+                   r.get("low"), r.get("close"), r.get("volume")) for r in rows])
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def get_bulk_ticker_info(symbols: List[str]) -> Dict[str, Dict]:

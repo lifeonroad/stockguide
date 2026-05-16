@@ -234,5 +234,56 @@ def get_superinvestors():
                     }
                 }
             ]
+        },
+        {
+            "id": "gates",
+            "name": "Bill & Melinda Gates Foundation",
+            "firm": "Bill & Melinda Gates Foundation Trust",
+            "style": "Long Term / Foundation",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Diversified global health and development portfolio. Top holdings in MSFT, WM, BRK.B.",
+                    "top_buys": [
+                        {"symbol": "MSFT", "name": "Microsoft", "change": "CORE"},
+                        {"symbol": "WM", "name": "Waste Management", "change": "STEADY"},
+                        {"symbol": "BRK.B", "name": "Berkshire Hathaway B", "change": "CORE"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "CVS", "name": "CVS Health", "change": "REDUCED"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "WM",
+                        "type": "DEFENSIVE",
+                        "description": "Waste Management is an unusual tech-billionaire pick — signals a very defensive, income-oriented posture."
+                    }
+                }
+            ]
+        },
+        {
+            "id": "einhorn",
+            "name": "David Einhorn",
+            "firm": "Greenlight Capital",
+            "style": "Value / Short Bias",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Deep value positioning with activist tilt. Large Greenhill/Intrepid exposure.",
+                    "top_buys": [
+                        {"symbol": "BRK.B", "name": "Berkshire Hathaway B", "change": "NEW"},
+                        {"symbol": "CPNG", "name": "Coupang", "change": "ADDED"},
+                        {"symbol": "TEVA", "name": "Teva Pharma", "change": "ADDED"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "GOOGL", "name": "Alphabet", "change": "EXIT"},
+                        {"symbol": "CNHI", "name": "CNH Industrial", "change": "REDUCED"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "BRK.B",
+                        "type": "CONTRARIAN",
+                        "description": "Einhorn buying Berkshire? He's criticized Buffett for years — admits defensive/value rotation."
+                    }
+                }
+            ]
         }
     ]

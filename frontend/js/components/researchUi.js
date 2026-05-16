@@ -67,7 +67,7 @@ export async function loadIndustries() {
 
 let priceChartInstance = null;
 
-async function loadPriceChart(symbol) {
+export async function loadPriceChart(symbol) {
     const canvas = document.getElementById('price-chart-canvas');
     if (!canvas) return;
 

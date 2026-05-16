@@ -44,6 +44,16 @@ INVESTOR_FIRMS = {k: v["firm"] for k, v in _ALL_CIKS.items()}
 INVESTOR_STYLES = {k: v["style"] for k, v in _ALL_CIKS.items()}
 
 
+def _enhance_holdings(filing_or_holdings):
+    """Add ticker symbols to holdings in-place (handles both dict and list)."""
+    from cusip_utils import enhance_holdings_with_tickers
+    if isinstance(filing_or_holdings, dict):
+        holdings = filing_or_holdings.get('holdings', [])
+        enhance_holdings_with_tickers(holdings)
+    elif isinstance(filing_or_holdings, list):
+        enhance_holdings_with_tickers(filing_or_holdings)
+
+
 def _get_submissions_url(cik: str) -> str:
     """Get URL for submissions JSON for a CIK."""
     cik_padded = cik.zfill(10)
@@ -413,6 +423,7 @@ def get_investor_13f_holdings(investor_id: str, quarter: Optional[str] = None) -
         cached = get_filing(investor_id, quarter)
         if cached:
             logger.info("Found cached filing for %s/%s", investor_id, quarter)
+            _enhance_holdings(cached)
             return cached
     
     if quarter:
@@ -433,6 +444,8 @@ def get_investor_13f_holdings(investor_id: str, quarter: Optional[str] = None) -
     if not holdings:
         return None
     
+    _enhance_holdings(holdings)
+    
     filing_data = {
         'cik': cik,
         'accession_number': accession,
@@ -442,7 +455,10 @@ def get_investor_13f_holdings(investor_id: str, quarter: Optional[str] = None) -
     
     save_filing(investor_id, quarter_result, filing_data, holdings)
     
-    return get_filing(investor_id, quarter_result)
+    result = get_filing(investor_id, quarter_result)
+    if result:
+        _enhance_holdings(result)
+    return result
 
 
 def fetch_and_store_historical(investor_id: str, quarters: int = 4) -> int:
@@ -514,7 +530,7 @@ def get_investor_with_changes(investor_id: str) -> Optional[Dict[str, Any]]:
     result['changes'] = changes
     
     holdings = result.get('holdings', [])
-    from cusip_utils import enhance_holdings_with_tickers
+    from cusip_utils import enhance_holdings_with_tickers, get_ticker as _lookup_ticker
     enhance_holdings_with_tickers(holdings)
     
     for h in holdings:
@@ -522,6 +538,13 @@ def get_investor_with_changes(investor_id: str) -> Optional[Dict[str, Any]]:
             h['symbol'] = h['ticker']
         else:
             h['symbol'] = h.get('name_of_issuer', h.get('nameOfIssuer', 'Unknown'))[:8]
+    
+    for change_type, items in changes.items():
+        for item in items:
+            if not item.get('symbol') or len(item.get('symbol', '')) < 2:
+                ticker = _lookup_ticker(cusip=item.get('cusip', ''), name=item.get('name', ''))
+                if ticker:
+                    item['symbol'] = ticker
     
     return result
 
