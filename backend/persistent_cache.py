@@ -4,14 +4,19 @@ Persistent SQLite cache for stock data.
 Architecture:
 - SQLite with WAL mode for concurrent reads
 - Three core tables: ticker_info, price_history, scan_cache
-- Background refresh on stale records
+- Background refresh on stale records (rate-limited)
 - API endpoints read from DB instantly, refresh in background
 
-Staleness rules:
-- Price: stale after 5 minutes (market hours), 30 minutes (off-hours)
-- Fundamentals: stale after 24 hours
-- Price history: stale after 6 hours
-- Scan results: stale after 1 hour
+Staleness rules (with intelligent TTL):
+- Price: stale after 30 minutes (floor), adjusted by beta/earnings/sector
+- Fundamentals: stale after 24 hours (adjusted by sector)
+- Price history: stale after 12 hours
+- Scan results: stale after 2 hours
+
+Rate Limiting:
+- MIN_REFRESH_INTERVAL: 1800s (30 min) between same ticker fetches
+- DAILY_FETCH_LIMIT: 48 fetches per ticker per day
+- Intelligent TTL: beta-based, earnings-aware, sector-adjusted
 """
 
 import sqlite3
@@ -20,21 +25,39 @@ import json
 import time
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.environ.get("PERSISTENT_DB", os.path.join(os.path.dirname(__file__), "data", "stockguide.db"))
 
-# Staleness thresholds (seconds)
-PRICE_TTL = 300        # 5 min (market hours)
-PRICE_TTL_OFFHOURS = 1800  # 30 min (off-hours)
-FUNDAMENTALS_TTL = 86400  # 24 hours
-PRICE_HISTORY_TTL = 21600  # 6 hours
-SCAN_CACHE_TTL = 3600     # 1 hour
+# Auto-decompress cached DB snapshot on first run
+_db_gz_path = DB_PATH + ".gz"
+if not os.path.exists(DB_PATH) and os.path.exists(_db_gz_path):
+    import gzip, shutil
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    with gzip.open(_db_gz_path, "rb") as f_in, open(DB_PATH, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    logger.info("Decompressed cached DB snapshot: %s", DB_PATH)
 
-_lock = threading.Lock()
+# Staleness thresholds (seconds)
+# CONSERVATIVE SETTINGS: Prevent rate limiting
+# Minimum refresh interval per ticker: 30 minutes (1800s)
+# This prevents hitting yfinance rate limits while maintaining data freshness
+
+PRICE_TTL = 1800          # 30 min (market hours) - MINIMUM FLOOR
+PRICE_TTL_OFFHOURS = 3600 # 60 min (off-hours) - generous for inactive period
+FUNDAMENTALS_TTL = 86400  # 24 hours - quarterly data doesn't change hourly
+PRICE_HISTORY_TTL = 43200 # 12 hours - historical data rarely needs refresh
+SCAN_CACHE_TTL = 7200     # 2 hours - scan results are expensive to compute
+
+# Rate limiting constants
+MIN_REFRESH_INTERVAL = 1800  # Never fetch same ticker more than once per 30 min
+DAILY_FETCH_LIMIT = 48      # Max fetches per ticker per day (prevents DOS)
+BULK_FETCH_BATCH = 10       # Max tickers per bulk request to spread load
+
+db_write_lock = threading.Lock()
 _db_initialized = False
 
 
@@ -61,7 +84,7 @@ def _get_conn() -> sqlite3.Connection:
 def init_db():
     """Initialize DB with schema. Safe to call multiple times."""
     global _db_initialized
-    with _lock:
+    with db_write_lock:
         if _db_initialized:
             return
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -106,6 +129,8 @@ def init_db():
                 book_value REAL,
                 short_ratio REAL,
                 operating_cashflow REAL,
+                gross_margin REAL,
+                roic REAL,
                 fetched_at REAL,
                 price_fetched_at REAL
             );
@@ -127,6 +152,13 @@ def init_db():
                 results TEXT NOT NULL,
                 fetched_at REAL NOT NULL,
                 PRIMARY KEY (scan_name, params)
+            );
+            
+            CREATE TABLE IF NOT EXISTS dataroma_cache (
+                cache_key TEXT PRIMARY KEY,
+                results TEXT NOT NULL,
+                fetched_at REAL NOT NULL,
+                ttl_hours REAL NOT NULL DEFAULT 720.0
             );
             
             CREATE INDEX IF NOT EXISTS idx_price_history_symbol ON price_history(symbol);
@@ -151,84 +183,88 @@ def save_ticker_info(data: Dict):
                 return v
         return None
 
-    conn = _get_conn()
-    try:
-        conn.execute("""
-            INSERT INTO ticker_info (symbol, name, sector, industry, summary,
-                price, market_cap, trailing_pe, forward_pe, price_to_book,
-                price_to_sales, trailing_eps, forward_eps, roe, roa,
-                debt_to_equity, current_ratio, free_cashflow, total_debt,
-                total_cash, revenue_growth, earnings_growth, revenue,
-                net_income, dividend_yield, dividend_rate, payout_ratio,
-                beta, fifty_two_week_high, fifty_two_week_low, avg_volume,
-                shares_outstanding, profit_margin, peg_ratio, ev_ebitda,
-                book_value, short_ratio, operating_cashflow,
-                fetched_at, price_fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(symbol) DO UPDATE SET
-                name=excluded.name, sector=excluded.sector, industry=excluded.industry,
-                summary=excluded.summary, price=excluded.price, market_cap=excluded.market_cap,
-                trailing_pe=excluded.trailing_pe, forward_pe=excluded.forward_pe,
-                price_to_book=excluded.price_to_book, price_to_sales=excluded.price_to_sales,
-                trailing_eps=excluded.trailing_eps, forward_eps=excluded.forward_eps,
-                roe=excluded.roe, roa=excluded.roa, debt_to_equity=excluded.debt_to_equity,
-                current_ratio=excluded.current_ratio, free_cashflow=excluded.free_cashflow,
-                total_debt=excluded.total_debt, total_cash=excluded.total_cash,
-                revenue_growth=excluded.revenue_growth, earnings_growth=excluded.earnings_growth,
-                revenue=excluded.revenue, net_income=excluded.net_income,
-                dividend_yield=excluded.dividend_yield, dividend_rate=excluded.dividend_rate,
-                payout_ratio=excluded.payout_ratio, beta=excluded.beta,
-                fifty_two_week_high=excluded.fifty_two_week_high,
-                fifty_two_week_low=excluded.fifty_two_week_low,
-                avg_volume=excluded.avg_volume, shares_outstanding=excluded.shares_outstanding,
-                profit_margin=excluded.profit_margin, peg_ratio=excluded.peg_ratio,
-                ev_ebitda=excluded.ev_ebitda, book_value=excluded.book_value,
-                short_ratio=excluded.short_ratio, operating_cashflow=excluded.operating_cashflow,
-                fetched_at=excluded.fetched_at, price_fetched_at=excluded.price_fetched_at
-        """, (
-            symbol,
-            _val("longName", "name"),
-            _val("sector"),
-            _val("industry"),
-            _val("longBusinessSummary", "summary"),
-            _val("currentPrice", "price", "regularMarketPrice"),
-            _val("marketCap", "market_cap"),
-            _val("trailingPE", "trailing_pe"),
-            _val("forwardPE", "forward_pe"),
-            _val("priceToBook", "price_to_book"),
-            _val("priceToSalesTrailing12Months", "price_to_sales"),
-            _val("trailingEps", "trailing_eps"),
-            _val("forwardEps", "forward_eps"),
-            _val("returnOnEquity", "roe"),
-            _val("returnOnAssets", "roa"),
-            _val("debtToEquity", "debt_to_equity"),
-            _val("currentRatio", "current_ratio"),
-            _val("freeCashflow", "free_cashflow"),
-            _val("totalDebt", "total_debt"),
-            _val("totalCash", "total_cash"),
-            _val("revenueGrowth", "revenue_growth"),
-            _val("earningsGrowth", "earnings_growth"),
-            _val("totalRevenue", "revenue"),
-            _val("netIncomeToCommon", "net_income"),
-            _val("dividendYield", "dividend_yield"),
-            _val("dividendRate", "dividend_rate"),
-            _val("payoutRatio", "payout_ratio"),
-            _val("beta"),
-            _val("fiftyTwoWeekHigh", "fifty_two_week_high"),
-            _val("fiftyTwoWeekLow", "fifty_two_week_low"),
-            _val("averageVolume", "avg_volume"),
-            _val("sharesOutstanding", "shares_outstanding"),
-            _val("profitMargin", "profit_margin"),
-            _val("pegRatio", "peg_ratio"),
-            _val("enterpriseToEbitda", "ev_ebitda"),
-            _val("bookValue", "book_value"),
-            _val("shortRatio", "short_ratio"),
-            _val("operatingCashflow", "operating_cashflow"),
-            time.time(), time.time()
-        ))
-        conn.commit()
-    finally:
-        conn.close()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            conn.execute("""
+    INSERT INTO ticker_info (symbol, name, sector, industry, summary,
+    price, market_cap, trailing_pe, forward_pe, price_to_book,
+    price_to_sales, trailing_eps, forward_eps, roe, roa,
+    debt_to_equity, current_ratio, free_cashflow, total_debt,
+    total_cash, revenue_growth, earnings_growth, revenue,
+    net_income, dividend_yield, dividend_rate, payout_ratio,
+    beta, fifty_two_week_high, fifty_two_week_low, avg_volume,
+    shares_outstanding, profit_margin, peg_ratio, ev_ebitda,
+    book_value, short_ratio, operating_cashflow,
+    gross_margin, roic, fetched_at, price_fetched_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(symbol) DO UPDATE SET
+    name=excluded.name, sector=excluded.sector, industry=excluded.industry,
+    summary=excluded.summary, price=excluded.price, market_cap=excluded.market_cap,
+    trailing_pe=excluded.trailing_pe, forward_pe=excluded.forward_pe,
+    price_to_book=excluded.price_to_book, price_to_sales=excluded.price_to_sales,
+    trailing_eps=excluded.trailing_eps, forward_eps=excluded.forward_eps,
+    roe=excluded.roe, roa=excluded.roa, debt_to_equity=excluded.debt_to_equity,
+    current_ratio=excluded.current_ratio, free_cashflow=excluded.free_cashflow,
+    total_debt=excluded.total_debt, total_cash=excluded.total_cash,
+    revenue_growth=excluded.revenue_growth, earnings_growth=excluded.earnings_growth,
+    revenue=excluded.revenue, net_income=excluded.net_income,
+    dividend_yield=excluded.dividend_yield, dividend_rate=excluded.dividend_rate,
+    payout_ratio=excluded.payout_ratio, beta=excluded.beta,
+    fifty_two_week_high=excluded.fifty_two_week_high,
+    fifty_two_week_low=excluded.fifty_two_week_low,
+    avg_volume=excluded.avg_volume, shares_outstanding=excluded.shares_outstanding,
+    profit_margin=excluded.profit_margin, peg_ratio=excluded.peg_ratio,
+    ev_ebitda=excluded.ev_ebitda, book_value=excluded.book_value,
+    short_ratio=excluded.short_ratio, operating_cashflow=excluded.operating_cashflow,
+    gross_margin=excluded.gross_margin, roic=excluded.roic,
+    fetched_at=excluded.fetched_at, price_fetched_at=excluded.price_fetched_at
+""", (
+                symbol,
+                _val("longName", "name"),
+                _val("sector"),
+                _val("industry"),
+                _val("longBusinessSummary", "summary"),
+                _val("currentPrice", "price", "regularMarketPrice"),
+                _val("marketCap", "market_cap"),
+                _val("trailingPE", "trailing_pe"),
+                _val("forwardPE", "forward_pe"),
+                _val("priceToBook", "price_to_book"),
+                _val("priceToSalesTrailing12Months", "price_to_sales"),
+                _val("trailingEps", "trailing_eps"),
+                _val("forwardEps", "forward_eps"),
+                _val("returnOnEquity", "roe"),
+                _val("returnOnAssets", "roa"),
+                _val("debtToEquity", "debt_to_equity"),
+                _val("currentRatio", "current_ratio"),
+                _val("freeCashflow", "free_cashflow"),
+                _val("totalDebt", "total_debt"),
+                _val("totalCash", "total_cash"),
+                _val("revenueGrowth", "revenue_growth"),
+                _val("earningsGrowth", "earnings_growth"),
+                _val("totalRevenue", "revenue"),
+                _val("netIncomeToCommon", "net_income"),
+                _val("dividendYield", "dividend_yield"),
+                _val("dividendRate", "dividend_rate"),
+                _val("payoutRatio", "payout_ratio"),
+                _val("beta"),
+                _val("fiftyTwoWeekHigh", "fifty_two_week_high"),
+                _val("fiftyTwoWeekLow", "fifty_two_week_low"),
+                _val("averageVolume", "avg_volume"),
+                _val("sharesOutstanding", "shares_outstanding"),
+                _val("profitMargin", "profit_margin"),
+                _val("pegRatio", "peg_ratio"),
+                _val("enterpriseToEbitda", "ev_ebitda"),
+                _val("bookValue", "book_value"),
+                _val("shortRatio", "short_ratio"),
+                _val("operatingCashflow", "operating_cashflow"),
+                _val("grossMargins", "gross_margin"),
+                _val("returnOnInvestedCapital", "roic"),
+                time.time(), time.time()
+            ))
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def get_ticker_info_cached(symbol: str) -> Optional[Dict]:
@@ -263,16 +299,17 @@ def save_price_history(symbol: str, rows: List[Dict]):
     """Upsert price history rows into DB."""
     init_db()
     symbol = symbol.upper()
-    conn = _get_conn()
-    try:
-        conn.executemany("""
-            INSERT OR REPLACE INTO price_history (symbol, date, open, high, low, close, volume)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, [(symbol, r.get("date", ""), r.get("open"), r.get("high"), 
-               r.get("low"), r.get("close"), r.get("volume")) for r in rows])
-        conn.commit()
-    finally:
-        conn.close()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            conn.executemany("""
+                INSERT OR REPLACE INTO price_history (symbol, date, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, [(symbol, r.get("date", ""), r.get("open"), r.get("high"), 
+                   r.get("low"), r.get("close"), r.get("volume")) for r in rows])
+            conn.commit()
+        finally:
+            conn.close()
 
 
 def get_bulk_ticker_info(symbols: List[str]) -> Dict[str, Dict]:
@@ -293,8 +330,16 @@ def get_bulk_ticker_info(symbols: List[str]) -> Dict[str, Dict]:
         conn.close()
 
 
-def needs_refresh(symbol: str, data_type: str = "price") -> bool:
-    """Check if cached data needs refresh based on TTL."""
+def needs_refresh(symbol: str, data_type: str = "price", effective_ttl: int = None) -> bool:
+    """
+    Check if cached data needs refresh based on TTL.
+    
+    Args:
+        symbol: Ticker symbol
+        data_type: Type of data ('price', 'fundamentals', 'history')
+        effective_ttl: Override TTL with intelligent TTL (from intelligent_ttl module)
+                       If None, uses default TTL from constants.
+    """
     init_db()
     symbol = symbol.upper()
     conn = _get_conn()
@@ -308,11 +353,42 @@ def needs_refresh(symbol: str, data_type: str = "price") -> bool:
         
         age = time.time() - (row["price_fetched_at"] or row["fetched_at"] or 0)
         
+        # Use effective_ttl if provided (intelligent TTL), otherwise use default
+        if effective_ttl is not None:
+            return age > effective_ttl
+        
         if data_type == "price":
             return age > _price_ttl()
         return age > FUNDAMENTALS_TTL
     finally:
         conn.close()
+
+
+def needs_refresh_intelligent(symbol: str, data_type: str) -> Tuple[bool, str]:
+    """
+    Check if data needs refresh using intelligent TTL with detailed reasoning.
+    
+    Returns:
+        (needs_refresh, reason)
+    """
+    from intelligent_ttl import get_cached_ttl, get_adjusted_ttl
+    
+    cached = get_ticker_info_cached(symbol)
+    if not cached:
+        return True, "No cached data"
+    
+    fetched_at = cached.get("price_fetched_at") or cached.get("fetched_at", 0)
+    if fetched_at == 0:
+        return True, "No fetch timestamp"
+    
+    # Get intelligent TTL
+    ttl = get_cached_ttl(symbol, data_type)
+    age = time.time() - fetched_at
+    
+    needs = age > ttl
+    reason = f"Age: {age:.0f}s, TTL: {ttl}s"
+    
+    return needs, reason
 
 
 def get_db_stats() -> Dict:
@@ -334,6 +410,211 @@ def get_db_stats() -> Dict:
         conn.close()
 
 
+def get_db_viewer_data() -> Dict:
+    """Full DB snapshot for the admin DB viewer page."""
+    init_db()
+    conn = _get_conn()
+    try:
+        now = time.time()
+
+        ticker_count = conn.execute("SELECT COUNT(*) FROM ticker_info").fetchone()[0]
+        price_history_rows = conn.execute("SELECT COUNT(*) FROM price_history").fetchone()[0]
+        symbols_with_history = conn.execute("SELECT COUNT(DISTINCT symbol) FROM price_history").fetchone()[0]
+        scan_cache_entries = conn.execute("SELECT COUNT(*) FROM scan_cache").fetchone()[0]
+
+        tickers_with_price = conn.execute("SELECT COUNT(*) FROM ticker_info WHERE price IS NOT NULL").fetchone()[0]
+        tickers_with_pe = conn.execute("SELECT COUNT(*) FROM ticker_info WHERE trailing_pe IS NOT NULL").fetchone()[0]
+
+        price_ttl = 1800
+        fresh_count = conn.execute(
+            "SELECT COUNT(*) FROM ticker_info WHERE price_fetched_at IS NOT NULL AND ? - price_fetched_at < ?",
+            (now, price_ttl)
+        ).fetchone()[0]
+        stale_count = conn.execute(
+            "SELECT COUNT(*) FROM ticker_info WHERE price_fetched_at IS NOT NULL AND ? - price_fetched_at >= ?",
+            (now, price_ttl)
+        ).fetchone()[0]
+
+        row = conn.execute("SELECT MIN(date) AS oldest, MAX(date) AS newest FROM price_history").fetchone()
+        oldest_history = row["oldest"] if row and row["oldest"] else None
+        newest_history = row["newest"] if row and row["newest"] else None
+
+        overview = {
+            "ticker_count": ticker_count,
+            "tickers_with_price": tickers_with_price,
+            "price_history_rows": price_history_rows,
+            "symbols_with_history": symbols_with_history,
+            "tickers_with_pe": tickers_with_pe,
+            "tickers_fresh": fresh_count,
+            "tickers_stale": stale_count,
+            "oldest_history": oldest_history,
+            "newest_history": newest_history,
+            "scan_cache_entries": scan_cache_entries,
+        }
+
+        coverage = {
+            "with_price": tickers_with_price,
+            "with_pe": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE trailing_pe IS NOT NULL").fetchone()[0],
+            "with_mcap": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE market_cap IS NOT NULL").fetchone()[0],
+            "with_roe": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE roe IS NOT NULL").fetchone()[0],
+            "with_dte": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE debt_to_equity IS NOT NULL").fetchone()[0],
+            "with_beta": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE beta IS NOT NULL").fetchone()[0],
+            "with_dividend": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE dividend_yield IS NOT NULL").fetchone()[0],
+        }
+
+        ticker_sample = []
+        for row in conn.execute(
+            "SELECT symbol, name, sector, price, trailing_pe, market_cap, roe, debt_to_equity, beta, dividend_yield, fetched_at, price_fetched_at FROM ticker_info ORDER BY symbol LIMIT 200"
+        ).fetchall():
+            ticker_sample.append(dict(row))
+
+        history_stats = []
+        for row in conn.execute(
+            "SELECT symbol, COUNT(*) AS rows, MIN(date) AS earliest, MAX(date) AS latest FROM price_history GROUP BY symbol ORDER BY symbol"
+        ).fetchall():
+            history_stats.append(dict(row))
+
+        scan_entries = []
+        for row in conn.execute(
+            "SELECT scan_name, params, fetched_at FROM scan_cache ORDER BY fetched_at DESC"
+        ).fetchall():
+            entry = dict(row)
+            entry["age_seconds"] = now - entry["fetched_at"]
+            scan_entries.append(entry)
+
+        return {
+            "overview": overview,
+            "coverage": coverage,
+            "ticker_sample": ticker_sample,
+            "history_stats": history_stats,
+            "scan_entries": scan_entries,
+        }
+    finally:
+        conn.close()
+
+
+# ─── Dataroma Cache ──────────────────────────────────────────────────────────
+
+DATAROMA_TTL = {
+    "all_managers": 720.0,         # 30 days — static list
+    "grand_portfolio": 720.0,       # 30 days — quarterly data
+    "grand_portfolio_qtr_buys": 720.0,
+    "grand_portfolio_qtr_sells": 720.0,
+    "grand_portfolio_6mo_buys": 720.0,
+    "grand_portfolio_6mo_sells": 720.0,
+    "grand_portfolio_sector": 720.0,
+    "all_activity": 720.0,
+    "holdings": 720.0,
+    "activity": 720.0,
+    "stock_hist": 720.0,
+    "realtime": 24.0,               # 24 hours — insider filings change daily
+}
+
+def dataroma_cache_key(page_type: str, manager: str = "", params: str = "") -> str:
+    parts = [page_type]
+    if manager:
+        parts.append(manager)
+    if params:
+        parts.append(params)
+    return ":".join(parts)
+
+
+def save_dataroma_cache(cache_key: str, results: dict, ttl_hours: float = 720.0):
+    init_db()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO dataroma_cache (cache_key, results, fetched_at, ttl_hours) VALUES (?, ?, ?, ?)",
+                (cache_key, json.dumps(results), time.time(), ttl_hours)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_dataroma_cache(cache_key: str) -> Optional[dict]:
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT results, fetched_at, ttl_hours FROM dataroma_cache WHERE cache_key = ?",
+            (cache_key,)
+        ).fetchone()
+        if not row:
+            return None
+        fetched_at = row["fetched_at"]
+        ttl_hours = row["ttl_hours"]
+        age_hours = (time.time() - fetched_at) / 3600.0
+        if age_hours > ttl_hours:
+            return None
+        return json.loads(row["results"])
+    finally:
+        conn.close()
+
+
+def get_dataroma_cache_info(cache_key: str) -> Optional[dict]:
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT cache_key, fetched_at, ttl_hours FROM dataroma_cache WHERE cache_key = ?",
+            (cache_key,)
+        ).fetchone()
+        if not row:
+            return None
+        now = time.time()
+        age_hours = (now - row["fetched_at"]) / 3600.0
+        return {
+            "cache_key": row["cache_key"],
+            "fetched_at": row["fetched_at"],
+            "ttl_hours": row["ttl_hours"],
+            "age_hours": round(age_hours, 2),
+            "expired": age_hours > row["ttl_hours"],
+        }
+    finally:
+        conn.close()
+
+
+def clear_dataroma_cache(prefix: str = ""):
+    init_db()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            if prefix:
+                conn.execute("DELETE FROM dataroma_cache WHERE cache_key LIKE ?", (prefix + "%",))
+            else:
+                conn.execute("DELETE FROM dataroma_cache")
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def list_dataroma_cache() -> List[dict]:
+    init_db()
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT cache_key, fetched_at, ttl_hours FROM dataroma_cache ORDER BY fetched_at DESC"
+        ).fetchall()
+        now = time.time()
+        result = []
+        for r in rows:
+            age_hours = (now - r["fetched_at"]) / 3600.0
+            result.append({
+                "cache_key": r["cache_key"],
+                "fetched_at": r["fetched_at"],
+                "age_hours": round(age_hours, 2),
+                "ttl_hours": r["ttl_hours"],
+                "expired": age_hours > r["ttl_hours"],
+            })
+        return result
+    finally:
+        conn.close()
+
+
+# ─── End Dataroma Cache ──────────────────────────────────────────────────────
+
 def clear_db():
     """Clear all cached data. Use with caution."""
     init_db()
@@ -342,6 +623,7 @@ def clear_db():
         conn.execute("DELETE FROM ticker_info")
         conn.execute("DELETE FROM price_history")
         conn.execute("DELETE FROM scan_cache")
+        conn.execute("DELETE FROM dataroma_cache")
         conn.commit()
     finally:
         conn.close()

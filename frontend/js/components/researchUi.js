@@ -58,10 +58,192 @@ export async function loadIndustries() {
                 </td>
             `;
             tbody.appendChild(tr);
-        });
+    });
 
     } catch (err) {
         console.error("Failed to load industries", err);
+    }
+}
+
+let priceChartInstance = null;
+
+export async function loadPriceChart(symbol) {
+    const canvas = document.getElementById('price-chart-canvas');
+    if (!canvas) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/research/price-chart/${encodeURIComponent(symbol)}?days=365`);
+        const data = await res.json();
+        if (data.error || !data.price_history) return;
+
+        const ph = data.price_history;
+        const dates = ph.dates || [];
+        const prices = ph.prices || [];
+        const sma9 = ph.sma_9 || [];
+        const sma50 = ph.sma_50 || [];
+        const sma180 = ph.sma_180 || [];
+
+        if (dates.length === 0) return;
+
+        if (priceChartInstance) priceChartInstance.destroy();
+
+        const ctx = canvas.getContext('2d');
+
+        const zoneColors = {
+            dip: 'rgba(34, 197, 94, 0.06)',
+            institutional: 'rgba(59, 130, 246, 0.06)',
+            public: 'rgba(239, 68, 68, 0.06)',
+        };
+
+        priceChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [
+                    {
+                        label: `${symbol} Price`,
+                        data: prices,
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.05)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        fill: false,
+                        order: 1,
+                    },
+                    {
+                        label: 'SMA 9',
+                        data: sma9,
+                        borderColor: '#60a5fa',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        borderDash: [4, 4],
+                        fill: false,
+                        order: 2,
+                    },
+                    {
+                        label: 'SMA 50',
+                        data: sma50,
+                        borderColor: '#a78bfa',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        borderDash: [6, 3],
+                        fill: false,
+                        order: 3,
+                    },
+                    {
+                        label: 'SMA 180',
+                        data: sma180,
+                        borderColor: '#fb923c',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        borderDash: [8, 4],
+                        fill: false,
+                        order: 4,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        titleColor: '#9ca3af',
+                        bodyColor: '#fff',
+                        borderColor: 'rgba(75, 85, 99, 0.3)',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: (ctx) => {
+                                if (ctx.raw == null) return null;
+                                return `${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`;
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            color: '#6b7280',
+                            font: { size: 9 },
+                            maxTicksLimit: 12,
+                            callback: (val, idx) => {
+                                const label = dates[idx];
+                                if (!label) return '';
+                                const parts = label.split('-');
+                                return parts.length >= 2 ? `${parts[0]}-${parts[1]}` : label;
+                            },
+                        },
+                    },
+                    y: {
+                        grid: { color: 'rgba(75, 85, 99, 0.15)' },
+                        ticks: {
+                            color: '#6b7280',
+                            font: { size: 10 },
+                            callback: (val) => '$' + val.toFixed(0),
+                        },
+                    },
+                },
+            },
+            plugins: [{
+                id: 'zoneBackgrounds',
+                beforeDraw(chart) {
+                    const { ctx, chartArea, scales } = chart;
+                    if (!chartArea) return;
+                    const { left, right, top, bottom } = chartArea;
+
+                    const priceData = chart.data.datasets[0].data;
+                    const sma50Data = chart.data.datasets[2].data;
+                    const sma180Data = chart.data.datasets[3].data;
+
+                    if (!priceData || priceData.length === 0) return;
+
+                    const xScale = scales.x;
+                    const yScale = scales.y;
+
+                    let currentZone = null;
+                    let zoneStart = null;
+
+                    for (let i = 0; i < priceData.length; i++) {
+                        const price = priceData[i];
+                        const s50 = sma50Data[i];
+                        const s180 = sma180Data[i];
+
+                        let zone;
+                        if (price != null && s180 != null && price < s180) {
+                            zone = 'dip';
+                        } else if (price != null && s50 != null && price < s50) {
+                            zone = 'institutional';
+                        } else {
+                            zone = 'public';
+                        }
+
+                        const xPos = xScale.getPixelForValue(i);
+
+                        if (zone !== currentZone) {
+                            if (currentZone && zoneStart !== null) {
+                                const xEnd = xPos;
+                                ctx.fillStyle = zoneColors[currentZone];
+                                ctx.fillRect(zoneStart, top, xEnd - zoneStart, bottom - top);
+                            }
+                            currentZone = zone;
+                            zoneStart = xPos;
+                        }
+                    }
+
+                    if (currentZone && zoneStart !== null) {
+                        ctx.fillStyle = zoneColors[currentZone];
+                        ctx.fillRect(zoneStart, top, right - zoneStart, bottom - top);
+                    }
+                },
+            }],
+        });
+    } catch (err) {
+        console.error('Price chart error:', err);
     }
 }
 
@@ -588,6 +770,14 @@ export async function loadResearch(symbol) {
                             ${renderMetricWithContext('Price / Sales', (data.valuation_scorecard.ps || 0).toFixed(2), 2.0)}
                             ${renderMetricWithContext('FCF Yield', (data.valuation_scorecard.fcf_yield || 0).toFixed(1), 5.0, '%')}
                             ${renderMetricWithContext('Debt / Equity', (data.quality_scorecard.debt_to_equity || 0).toFixed(1), 100.0)}
+                            ${data.technical_indicators && data.technical_indicators.rsi_14 != null ? `
+                            <div class="flex justify-between items-center pt-2 border-t border-gray-800/50">
+                                <span class="text-xs text-gray-400" title="Relative Strength Index (14-day)">RSI (14)</span>
+                                <span class="text-sm font-mono font-bold ${data.technical_indicators.rsi_14 < 30 ? 'text-green-400' : data.technical_indicators.rsi_14 > 70 ? 'text-red-400' : 'text-white'}">
+                                    ${data.technical_indicators.rsi_14}
+                                    ${data.technical_indicators.rsi_14 < 30 ? '<span class="text-[9px] ml-1 text-green-400">Oversold</span>' : data.technical_indicators.rsi_14 > 70 ? '<span class="text-[9px] ml-1 text-red-400">Overbought</span>' : ''}
+                                </span>
+                            </div>` : ''}
                         </div>
                     </div>
 
@@ -709,6 +899,40 @@ export async function loadResearch(symbol) {
                 </div>
             </div>
 
+            <!-- Technical Analysis — SMA Trendlines + Zones -->
+            <div class="glass-panel p-8 rounded-2xl border border-gray-800 mt-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+                    <div>
+                        <h3 class="text-lg font-black text-white uppercase tracking-widest">Technical Analysis</h3>
+                        <p class="text-xs text-gray-500 mt-1">Price chart with SMA trendlines and recommendation zones</p>
+                    </div>
+                    <div class="flex items-center gap-4 mt-4 md:mt-0">
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <span class="w-3 h-0.5 rounded bg-blue-400 inline-block"></span><span class="text-gray-400">SMA 9</span>
+                            <span class="w-3 h-0.5 rounded bg-purple-400 inline-block ml-2"></span><span class="text-gray-400">SMA 50</span>
+                            <span class="w-3 h-0.5 rounded bg-orange-400 inline-block ml-2"></span><span class="text-gray-400">SMA 180</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="price-chart-container" style="height: 400px; position: relative;">
+                    <canvas id="price-chart-canvas"></canvas>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mt-4">
+                    <div class="p-3 rounded-xl bg-green-900/20 border border-green-500/20">
+                        <div class="text-[9px] text-green-400 uppercase tracking-widest font-bold mb-1">DIP Zone</div>
+                        <div class="text-[10px] text-gray-400">Price below SMA 180 — early entry</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-blue-900/20 border border-blue-500/20">
+                        <div class="text-[9px] text-blue-400 uppercase tracking-widest font-bold mb-1">Institutional Zone</div>
+                        <div class="text-[10px] text-gray-400">Price between SMA 50 and SMA 180</div>
+                    </div>
+                    <div class="p-3 rounded-xl bg-red-900/20 border border-red-500/20">
+                        <div class="text-[9px] text-red-400 uppercase tracking-widest font-bold mb-1">Public Zone</div>
+                        <div class="text-[10px] text-gray-400">Price above SMA 50 — late stage</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Historical Trends Dashboard — full width, outside the sidebar grid -->
             <div class="glass-panel p-8 rounded-2xl border border-gray-800 mt-6">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
@@ -756,8 +980,9 @@ export async function loadResearch(symbol) {
             </div>
         `;
 
-        // Automatically load trends for 5y
+        // Automatically load trends for 5y and price chart
         setTimeout(() => window.loadTrends(data.symbol, '5y'), 100);
+        setTimeout(() => loadPriceChart(data.symbol), 200);
 
     } catch (err) {
         console.error("Research Hub Error:", err);

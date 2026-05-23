@@ -8,6 +8,10 @@ import random
 from cache_utils import timed_cache, fetch_with_retry
 from data_client import get_ticker_info
 
+# Import rate limiting
+from rate_limiter import get_rate_limiter, MIN_REFRESH_INTERVAL
+from intelligent_ttl import get_cached_ttl
+
 # Mapping Sectors to ETFs (Proxies)
 SECTOR_ETFS = {
     "Technology": "XLK",
@@ -156,7 +160,7 @@ def get_sector_meta(sector: Optional[str] = None) -> dict:
 def get_sector_metrics_from_constituents(sector_name):
     """
     Calculate sector average ROE and Debt/Equity from top constituent stocks.
-    Uses yahooquery bulk fetch for speed (~3s vs ~25s with get_ticker_info).
+    Uses DB-first, then falls back to yahooquery.
     Returns tuple: (avg_roe, avg_debt_equity)
     """
     stocks = get_sector_stocks(sector_name).get("tickers", [])
@@ -180,18 +184,22 @@ def get_sector_metrics_from_constituents(sector_name):
                 debt_values.append(float(debt))
         
         if not roe_values and not debt_values:
-            from yahooquery import Ticker
-            tq = Ticker(sample)
-            fd = tq.financial_data
-            if isinstance(fd, dict):
-                for sym in sample:
-                    data = fd.get(sym, {})
-                    roe = data.get("returnOnEquity")
-                    debt = data.get("debtToEquity")
-                    if roe and roe > 0:
-                        roe_values.append(roe * 100)
-                    if debt is not None and debt >= 0:
-                        debt_values.append(debt)
+            # Check rate limiter before network call
+            limiter = get_rate_limiter()
+            if limiter.can_fetch(sample[0], "fundamentals")[0]:
+                from yahooquery import Ticker
+                tq = Ticker(sample)
+                fd = tq.financial_data
+                if isinstance(fd, dict):
+                    for sym in sample:
+                        data = fd.get(sym, {})
+                        roe = data.get("returnOnEquity")
+                        debt = data.get("debtToEquity")
+                        if roe and roe > 0:
+                            roe_values.append(roe * 100)
+                        if debt is not None and debt >= 0:
+                            debt_values.append(debt)
+                        limiter.record_fetch(sym, "fundamentals")
     except Exception:
         pass
     
@@ -250,47 +258,61 @@ def analyze_sector_fundamentals(sector_name):
     Fetches top stocks, calculates avg ROE, Debt/Eq, P/E.
     Returns: Sector Stats + Top Pick Stocks
     Cached for 30 minutes to prevent repeated API calls.
+    Uses DB-first approach with rate limiting.
     """
     stocks = get_sector_stocks(sector_name).get("tickers", [])
     if not stocks:
-        # Fallback for sectors not in our short list
         return {"error": "Sector data not fully mapped for MVP"}
-        
+    
     stock_data = []
+    limiter = get_rate_limiter()
     
     for symbol in stocks:
         i = get_ticker_info(symbol)
-        if not i:
-            i = {}
-        time.sleep(0.2)  # gentle throttle
+        if not i or 'symbol' not in i:
+            continue
         
-        # Fundamental checks
-        roe = i.get('returnOnEquity', 0)
-        de = i.get('debtToEquity', 0)
-        pe = i.get('trailingPE', 99)
-        profit_margin = i.get('profitMargins', 0)
+        # Check rate limiter before any network call (throttle)
+        can_fetch, _ = limiter.can_fetch(symbol, "fundamentals")
+        if not can_fetch:
+            time.sleep(2)  # Extra throttle when rate limited
+        else:
+            time.sleep(0.3)  # Normal throttle
+        
+        # Fundamental checks — only use keys that actually exist in the data
+        # (missing key means fetch genuinely failed for this ticker)
+        roe = i.get('returnOnEquity') or i.get('roe')
+        de = i.get('debtToEquity') or i.get('debt_to_equity')
+        pe = i.get('trailingPE') or i.get('trailing_pe')
+        profit_margin = i.get('profitMargins') or i.get('profit_margin')
+        price = i.get('currentPrice') or i.get('price')
         
         stock_data.append({
             "symbol": symbol,
-            "name": i.get('shortName', symbol),
-            "price": i.get('currentPrice', 0),
-            "pe": round(pe, 2) if pe else 0,
-            "roe": round(roe * 100, 2) if roe else 0,
-            "debt_to_equity": round(de, 2) if de else 0,
-            "profit_margin": round(profit_margin * 100, 2) if profit_margin else 0
+            "name": i.get('shortName', symbol) or i.get('name', symbol),
+            "price": round(float(price), 2) if price else 0,
+            "pe": round(float(pe), 2) if pe is not None else None,
+            "roe": round(float(roe) * 100, 2) if roe is not None else None,
+            "debt_to_equity": round(float(de), 2) if de is not None else None,
+            "profit_margin": round(float(profit_margin) * 100, 2) if profit_margin is not None else None
         })
         
-    # Calculate Sector Averages
-    avg_roe = sum(s['roe'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_pe = sum(s['pe'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_de = sum(s['debt_to_equity'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_margin = sum(s['profit_margin'] for s in stock_data) / len(stock_data) if stock_data else 0
+    # Calculate Sector Averages (filter out None values)
+    roe_vals = [s['roe'] for s in stock_data if s['roe'] is not None]
+    pe_vals = [s['pe'] for s in stock_data if s['pe'] is not None]
+    de_vals = [s['debt_to_equity'] for s in stock_data if s['debt_to_equity'] is not None]
+    margin_vals = [s['profit_margin'] for s in stock_data if s['profit_margin'] is not None]
+    avg_roe = sum(roe_vals) / len(roe_vals) if roe_vals else 0
+    avg_pe = sum(pe_vals) / len(pe_vals) if pe_vals else 0
+    avg_de = sum(de_vals) / len(de_vals) if de_vals else 0
+    avg_margin = sum(margin_vals) / len(margin_vals) if margin_vals else 0
     
     # Filter for "Warren's Picks"
     # Logic: High ROE (>15), Healthy Debt (<100 approx), Fair PE
     top_picks = [
         s for s in stock_data 
-        if s['roe'] > 15 and s['debt_to_equity'] < 200 # Relaxed for MVP (Banks have high D/E)
+        if s.get('roe') is not None and s['roe'] > 15 
+        and s.get('debt_to_equity') is not None and s['debt_to_equity'] < 200
     ]
     
     # Tie-breaker: PE (Lower is better)

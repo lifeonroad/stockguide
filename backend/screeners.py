@@ -54,31 +54,30 @@ def _bulk_momentum(tickers: List[str]) -> Dict[str, float]:
     return result
 
 def _bulk_fundamentals(tickers: List[str]) -> Dict[str, dict]:
-    """Bulk fetch fundamentals — reads from persistent DB first (instant),
-    only fetches from network for symbols with no/stale cached data."""
-    from data_client import get_fundamentals, get_price_live
-    from persistent_cache import get_bulk_ticker_info, needs_refresh
-    import concurrent.futures
+    """Bulk fetch fundamentals — reads from persistent DB only.
+    Network fetch is disabled because Yahoo Finance fundamentals are
+    blocked for this IP. Uses cached DB data; tickers without cached
+    price data are skipped."""
+    from persistent_cache import get_bulk_ticker_info
 
     if not tickers:
         return {}
 
     out: Dict[str, dict] = {}
-
-    # 1. Try persistent DB first — instant read
     db_data = get_bulk_ticker_info(tickers)
-
-    # 2. Build results from cached data
     cached_count = 0
-    needs_fetch = []
+
     for sym in tickers:
         sym_upper = sym.upper()
         info = db_data.get(sym_upper)
         if info and info.get("price") and info.get("price") > 0:
-            # Calculate margin from cached data
             rev = info.get("revenue", 0) or 0
             ni = info.get("net_income", 0) or 0
             margin = (ni / rev) * 100 if rev else 0.0
+
+            fcf = info.get("free_cashflow", 0) or 0
+            mcap = info.get("market_cap", 0) or 0
+            _fcf_yield = (fcf / mcap) if mcap else 0.0
 
             out[sym] = {
                 "symbol": sym,
@@ -88,60 +87,21 @@ def _bulk_fundamentals(tickers: List[str]) -> Dict[str, dict]:
                 "roe": sanitize_metric(info.get("roe"), 0) * 100,
                 "margin": sanitize_metric(margin, 0),
                 "rev_growth": sanitize_metric(info.get("revenue_growth"), 0) * 100,
-                "peg": 999,  # not in persistent DB
+                "peg": 999,
                 "div_yield": sanitize_metric(info.get("dividend_yield"), 2.5) * 100,
                 "pb": sanitize_metric(info.get("price_to_book"), 999),
                 "debt_equity": sanitize_metric(info.get("debt_to_equity"), 999),
                 "inst_ownership": 50.0,
-                "market_cap": sanitize_metric(info.get("market_cap"), 0),
+                "market_cap": mcap,
                 "sector": info.get("sector", ""),
+                "gross_margin": info.get("gross_margin"),
+                "roic": info.get("roic"),
+                "fcf_yield": _fcf_yield,
             }
             cached_count += 1
-        else:
-            needs_fetch.append(sym)
 
     if cached_count:
         print(f"[Screener] {cached_count}/{len(tickers)} symbols from persistent DB (instant)")
-
-    # 3. Fetch remaining symbols from network
-    if needs_fetch:
-        print(f"[Screener] Fetching {len(needs_fetch)} symbols from network...")
-
-        def fetch_fund(sym):
-            try:
-                info = get_fundamentals(sym)
-                live = get_price_live(sym)
-                if not info: return sym, None
-
-                rev = info.get("revenue", 0)
-                ni = info.get("netIncome", 0)
-                margin = (ni / rev) * 100 if rev else 0.0
-
-                return sym, {
-                    "symbol": sym,
-                    "name": info.get('shortName', sym),
-                    "price": sanitize_metric(live.get('price'), 0),
-                    "pe": sanitize_metric(info.get('trailingPE'), 999),
-                    "roe": sanitize_metric(info.get("returnOnEquity"), 0) * 100,
-                    "margin": sanitize_metric(margin, 0),
-                    "rev_growth": sanitize_metric(info.get("revenueGrowth"), 0) * 100,
-                    "peg": sanitize_metric(info.get('pegRatio'), 999),
-                    "div_yield": 2.5,
-                    "pb": sanitize_metric(info.get('priceToBook'), 999),
-                    "debt_equity": sanitize_metric(info.get('debtToEquity'), 999),
-                    "inst_ownership": 50.0,
-                    "market_cap": sanitize_metric(info.get("marketCap"), 0),
-                    "sector": info.get("sector", ""),
-                }
-            except Exception as e:
-                return sym, None
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = {executor.submit(fetch_fund, sym): sym for sym in needs_fetch}
-            for future in concurrent.futures.as_completed(futures):
-                sym, data = future.result()
-                if data:
-                    out[sym] = data
 
     return out
 
@@ -218,6 +178,9 @@ class ScreenerEngine:
             w52_return = metrics.get('52w_return', 0)
             inst_ownership = metrics.get('inst_ownership', 0)
             market_cap = metrics.get('market_cap', 0)
+            gross_margin = metrics.get('gross_margin', 0)
+            roic = metrics.get('roic', 0)
+            fcf_yield = metrics.get('fcf_yield', 0)
             
             # Safety check: Force metrics to be JSON-serializable if anything leaked
             for k, v in metrics.items():
@@ -228,7 +191,29 @@ class ScreenerEngine:
                 except:
                     pass
             
-            if strategy_id == 'magic_formula':
+            if strategy_id == 'inflation_busters':
+                _roe = roe
+                _de = debt_equity
+                _fcf = fcf_yield * 100
+
+                roe_score = min(35, max(0, (_roe - 5) / (20 - 5) * 35))
+                de_score = min(35, max(0, (1.5 - min(_de, 1.5)) / (1.5 - 0.3) * 35))
+                fcf_score = min(30, max(0, _fcf / 3 * 30))
+
+                tailwind_sectors = {"Energy", "Materials", "Financials", "Consumer Defensive", "Basic Materials"}
+                sector_bonus = 5 if metrics.get("sector", "") in tailwind_sectors else 0
+
+                inflation_score = min(100, round(roe_score + de_score + fcf_score + sector_bonus))
+
+                if inflation_score >= 50:
+                    match = True
+                    if inflation_score >= 80:
+                        reason = f"Inflation Proof 🛡️ Score {inflation_score}/100"
+                    elif inflation_score >= 65:
+                        reason = f"Well Shielded Score {inflation_score}/100"
+                    else:
+                        reason = f"Adequate Score {inflation_score}/100"
+            elif strategy_id == 'magic_formula':
                 if roe > 20 and 0 < pe < 25 and debt_equity < 100:
                     match = True
                     reason = f"High Quality (ROE {round(roe)}%) + Cheap (PE {round(pe)})"
@@ -254,17 +239,26 @@ class ScreenerEngine:
                     reason = f"Burry Orphan (PE {round(pe)}, {round(inst_ownership)}% Inst.)"
 
             if match:
-                results.append({
+                entry = {
                     "symbol": symbol,
                     "name": metrics.get('name', symbol),
                     "price": round(metrics.get('price', 0), 2),
                     "strategy": strategy_id,
                     "reason": reason,
                     "metrics": metrics
-                })
+                }
+                if strategy_id == 'inflation_busters':
+                    entry["inflation_score"] = inflation_score
+                    entry["roe_pct"] = round(roe, 1)
+                    entry["debt_to_equity"] = round(_de, 2)
+                    entry["fcf_yield"] = round(_fcf, 1)
+                    entry["sector"] = metrics.get("sector", "")
+                results.append(entry)
                 
         # Sorting
-        if strategy_id == 'magic_formula':
+        if strategy_id == 'inflation_busters':
+            results.sort(key=lambda x: x.get('inflation_score', 0), reverse=True)
+        elif strategy_id == 'magic_formula':
             results.sort(key=lambda x: x['metrics'].get('pe', 999))
         elif strategy_id == 'deep_value':
             results.sort(key=lambda x: x['metrics'].get('pe', 999))

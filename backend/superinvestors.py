@@ -234,5 +234,107 @@ def get_superinvestors():
                     }
                 }
             ]
+        },
+        {
+            "id": "gates",
+            "name": "Bill & Melinda Gates Foundation",
+            "firm": "Bill & Melinda Gates Foundation Trust",
+            "style": "Long Term / Foundation",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Diversified global health and development portfolio. Top holdings in MSFT, WM, BRK.B.",
+                    "top_buys": [
+                        {"symbol": "MSFT", "name": "Microsoft", "change": "CORE"},
+                        {"symbol": "WM", "name": "Waste Management", "change": "STEADY"},
+                        {"symbol": "BRK.B", "name": "Berkshire Hathaway B", "change": "CORE"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "CVS", "name": "CVS Health", "change": "REDUCED"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "WM",
+                        "type": "DEFENSIVE",
+                        "description": "Waste Management is an unusual tech-billionaire pick — signals a very defensive, income-oriented posture."
+                    }
+                }
+            ]
+        },
+        {
+            "id": "einhorn",
+            "name": "David Einhorn",
+            "firm": "Greenlight Capital",
+            "style": "Value / Short Bias",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Deep value positioning with activist tilt. Large Greenhill/Intrepid exposure.",
+                    "top_buys": [
+                        {"symbol": "BRK.B", "name": "Berkshire Hathaway B", "change": "NEW"},
+                        {"symbol": "CPNG", "name": "Coupang", "change": "ADDED"},
+                        {"symbol": "TEVA", "name": "Teva Pharma", "change": "ADDED"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "GOOGL", "name": "Alphabet", "change": "EXIT"},
+                        {"symbol": "CNHI", "name": "CNH Industrial", "change": "REDUCED"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "BRK.B",
+                        "type": "CONTRARIAN",
+                        "description": "Einhorn buying Berkshire? He's criticized Buffett for years — admits defensive/value rotation."
+                    }
+                }
+            ]
+        },
+        {
+            "id": "jensen",
+            "name": "Jensen Investment Management",
+            "firm": "Jensen Investment Management Inc",
+            "style": "Quality Growth / Long Term",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Focused on high-quality growth companies with sustainable competitive advantages. Concentrated portfolio of ~25 stocks.",
+                    "top_buys": [
+                        {"symbol": "MSFT", "name": "Microsoft", "change": "CORE"},
+                        {"symbol": "GOOGL", "name": "Alphabet", "change": "CORE"},
+                        {"symbol": "AAPL", "name": "Apple", "change": "CORE"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "PEP", "name": "PepsiCo", "change": "REDUCED"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "JPM",
+                        "type": "QUALITY",
+                        "description": "Jensen bought JPMorgan — a rare financials pick for this quality-growth focused manager."
+                    }
+                }
+            ]
+        },
+        {
+            "id": "aschenbrenner",
+            "name": "Leopold Aschenbrenner",
+            "firm": "Situational Awareness LP",
+            "style": "AGI-Focused / Long/Short Equity",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Massive scale-up to $5.5B AUM. Pivoted from chip shorts into energy infrastructure and bitcoin miners.",
+                    "top_buys": [
+                        {"symbol": "BE", "name": "Bloom Energy", "change": "NEW"},
+                        {"symbol": "LITE", "name": "Lumentum Holdings", "change": "NEW"},
+                        {"symbol": "SNDK", "name": "SanDisk", "change": "ADDED"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "VST", "name": "Vistra Corp", "change": "EXIT"},
+                        {"symbol": "NVDA", "name": "Nvidia (PUTS)", "change": "EXIT"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "BE",
+                        "type": "ENERGY",
+                        "description": "Bloom Energy as largest holding — betting fuel cells power AI data centers. A $876M conviction."
+                    }
+                }
+            ]
         }
     ]

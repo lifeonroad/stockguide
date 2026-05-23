@@ -1,39 +1,5 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Environment Variables (Secrets)
+backend/data/stockguide.db
 .env
-.env.local
-
-# IDEs
-.idea/
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Virtual Environments
+__pycache__/
+*.pyc
 venv/
-.venv/
-env/
-
-# Logs
-*.log
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Deployment (local only)
-.requirements.md5
-
-# Artifacts
-.gemini/
-
-# SQLite DBs (application data - always track these)
-# Exception: backup files
-**/stockguide_backup.db

@@ -11,3 +11,5 @@ requests
 pdfplumber
 python-multipart
 gunicorn
+beautifulsoup4
+lxml

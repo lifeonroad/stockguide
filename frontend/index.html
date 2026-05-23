@@ -297,6 +297,90 @@
         </div>
     </header>
 
+    <!-- Superinvestor Detail Modal -->
+    <div id="superinvestor-detail-modal" class="fixed inset-0 z-[60] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 py-8">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-90" onclick="closeSuperinvestorDetail()"></div>
+            <div class="glass-panel rounded-2xl overflow-hidden shadow-xl relative z-10 w-full max-w-5xl max-h-[90vh] flex flex-col border border-gray-700">
+                <!-- Header -->
+                <div class="p-6 border-b border-gray-700 flex items-start justify-between bg-gray-800/50 shrink-0">
+                    <div class="flex items-center gap-4">
+                        <div id="si-detail-avatar" class="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center text-2xl font-bold text-white shadow-inner">WB</div>
+                        <div>
+                            <h3 id="si-detail-name" class="text-2xl font-bold text-white">Loading...</h3>
+                            <div id="si-detail-firm" class="text-sm text-gray-400"></div>
+                            <div id="si-detail-style" class="mt-1 text-xs text-warren-accent font-medium uppercase tracking-wider"></div>
+                            <div id="si-detail-dataroma" class="mt-1.5"></div>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-xs text-gray-500 uppercase">Quarter</div>
+                        <div id="si-detail-quarter" class="text-lg font-bold text-white">--</div>
+                    </div>
+                </div>
+                <!-- Stats Bar -->
+                <div class="grid grid-cols-4 gap-px bg-gray-700/50 shrink-0">
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Portfolio Value</div>
+                        <div id="si-stat-value" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Holdings</div>
+                        <div id="si-stat-holdings" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Top 3 Concentration</div>
+                        <div id="si-stat-concentration" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Changes</div>
+                        <div id="si-stat-changes" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                </div>
+                <!-- Body -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                    <!-- Sector Breakdown -->
+                    <div id="si-sector-section">
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Sector Allocation</h4>
+                        <div id="si-sector-bars" class="space-y-2"></div>
+                    </div>
+                    <!-- Changes Breakdown -->
+                    <div id="si-changes-section">
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Changes this Quarter</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="si-changes-grid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <!-- Holdings Table -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Holdings</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg">Ticker</th>
+                                        <th class="px-4 py-3">Name</th>
+                                        <th class="px-4 py-3 text-right">Value ($M)</th>
+                                        <th class="px-4 py-3 text-right">Weight</th>
+                                        <th class="px-4 py-3 rounded-r-lg">Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="si-holdings-body" class="divide-y divide-gray-800">
+                                    <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading holdings...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div class="p-4 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center shrink-0">
+                    <span id="si-detail-source" class="text-[10px] text-gray-600"></span>
+                    <button onclick="closeSuperinvestorDetail()" class="px-4 py-2 bg-warren-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Forecast Modal (Hidden by default) -->
     <div id="forecast-modal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title"
         role="dialog" aria-modal="true">
@@ -482,6 +566,10 @@
                     class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all">
                     Superinvestor Radar 📡
                 </button>
+                <button onclick="switchTab('guru-flow')" id="tab-guru-flow"
+                    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all">
+                    Guru Flow 📈
+                </button>
                 <button id="tab-copycat" onclick="switchTab('copycat')"
                     class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                     Copycat Portfolio <span class="ml-1 text-xs">👯‍♂️</span>
@@ -501,6 +589,14 @@
                 <button id="tab-diphunter" onclick="switchTab('diphunter')"
                     class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                     Dip Hunter <span class="ml-1 text-xs">🎯</span>
+                </button>
+                <button id="tab-technical-zones" onclick="switchTab('technical-zones')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Technical Zones <span class="ml-1 text-xs">📐</span>
+                </button>
+                <button id="tab-momentum" onclick="switchTab('momentum')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Momentum <span class="ml-1 text-xs">⚡</span>
                 </button>
                 <button id="tab-contrarian" onclick="switchTab('contrarian')"
                     class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -738,6 +834,188 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="superinvestor-container">
                     <!-- Investor Cards injected here -->
                 </div>
+
+                <!-- Guru Consensus Panel -->
+                <div class="glass-panel p-6 rounded-2xl mt-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-xl font-semibold text-white flex items-center gap-3">
+                            Guru Consensus
+                            <span class="text-xs text-gray-500 font-normal">Top superinvestor holdings aggregated from all tracked managers</span>
+                        </h2>
+                        <span id="guru-consensus-badge" class="text-xs text-gray-400"></span>
+                    </div>
+
+                    <!-- View Switcher -->
+                    <div class="flex flex-wrap gap-2 mb-6" id="guru-consensus-filters">
+                        <button onclick="loadGuruConsensus('grand_portfolio')" data-view="grand_portfolio"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-warren-accent text-white">Holdings</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_qtr_buys')" data-view="grand_portfolio_qtr_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Qtr Buys</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_qtr_sells')" data-view="grand_portfolio_qtr_sells"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Qtr Sells</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_6mo_buys')" data-view="grand_portfolio_6mo_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">6mo Buys</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_6mo_sells')" data-view="grand_portfolio_6mo_sells"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">6mo Sells</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_sector')" data-view="grand_portfolio_sector"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Sector</button>
+                        <button onclick="loadGuruConsensus('consensus_picks')" data-view="consensus_picks"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Consensus</button>
+                    </div>
+
+                    <!-- Consensus Content -->
+                    <div id="guru-consensus-content">
+                        <div class="text-center py-8 text-gray-500 text-sm">Select a view to load guru consensus data.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Guru Flow -->
+            <div id="guru-flow-view" class="hidden animate-fade-in space-y-8">
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Guru Flow 📈</h2>
+                    <p class="text-gray-400 max-w-3xl mx-auto">Aggregate buy/sell activity across all tracked superinvestors. See where the smart money is flowing.</p>
+                </div>
+
+                <!-- Stats row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="guru-flow-stats">
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-white" id="gf-stat-holdings">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Total Holdings</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-green-400" id="gf-stat-buys">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Qtr Buys</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-red-400" id="gf-stat-sells">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Qtr Sells</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-purple-400" id="gf-stat-new">--</div>
+                        <div class="text-xs text-gray-400 mt-1">New Positions</div>
+                    </div>
+                </div>
+
+                <!-- Section 1: Most Widely Held -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-white mb-4">Most Widely Held <span class="text-xs text-gray-500 font-normal">— Stocks owned by the most gurus</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-widely-held-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="#">#</th>
+                                    <th class="px-4 py-3" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right" data-sort="max">Max %</th>
+                                    <th class="px-4 py-3 text-right" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-widely-held-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 2: Top Buys & Sells -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold text-green-400 mb-4">🔥 Most Bought <span class="text-xs text-gray-500 font-normal">— By manager count</span></h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="gf-buys-table">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                        <th class="px-4 py-3" data-sort="name">Name</th>
+                                        <th class="px-4 py-3 text-center" data-sort="buying">Buying</th>
+                                        <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                        <th class="px-4 py-3 text-right" data-sort="change">Avg % Chg</th>
+                                        <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gf-buys-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold text-red-400 mb-4">⚠️ Most Sold <span class="text-xs text-gray-500 font-normal">— By manager count</span></h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="gf-sells-table">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                        <th class="px-4 py-3" data-sort="name">Name</th>
+                                        <th class="px-4 py-3 text-center" data-sort="selling">Selling</th>
+                                        <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                        <th class="px-4 py-3 text-right" data-sort="change">Avg % Chg</th>
+                                        <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gf-sells-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: New Positions -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-purple-400 mb-4">🆕 New Positions <span class="text-xs text-gray-500 font-normal">— Being bought by gurus but not in grand portfolio</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-new-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="gurus">Buying Gurus</th>
+                                    <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="change">Avg % Chg</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-new-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 4: Single-Manager Heavy Bets -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-white mb-4">🎲 Single-Manager Heavy Bets <span class="text-xs text-gray-500 font-normal">— >30% of one manager's portfolio</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-heavy-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="max">Max %</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-heavy-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 5: Near 52w Low (Opportunities) -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-yellow-400 mb-4">📉 Near 52w Low <span class="text-xs text-gray-500 font-normal">— Guru holdings within 10% of 52w low</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-near-low-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-right" data-sort="above">Above 52w Low</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-near-low-body"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- Copycat View -->
@@ -749,12 +1027,25 @@
                             Portfolio <span id="copycat-universe-badge"></span></h2>
                         <span class="text-xs text-gray-400">High Conviction "Clone" Picks</span>
                     </div>
+                    <div class="flex flex-wrap gap-2 mb-4" id="copycat-filters">
+                        <button onclick="loadCopycatPortfolio('all')" data-filter="all"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-warren-accent text-white">All</button>
+                        <button onclick="loadCopycatPortfolio('overlap')" data-filter="overlap"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Multi-Manager</button>
+                        <button onclick="loadCopycatPortfolio('new_buys')" data-filter="new_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">New Buys</button>
+                        <button onclick="loadCopycatPortfolio('increased')" data-filter="increased"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Conviction Up</button>
+                        <button onclick="loadCopycatPortfolio('exits')" data-filter="exits"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Exits</button>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left">
                             <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
                                 <tr>
                                     <th class="px-6 py-3 rounded-l-lg">Stock</th>
                                     <th class="px-6 py-3">Held By</th>
+                                    <th class="px-6 py-3">Signal</th>
                                     <th class="px-6 py-3 text-right">Price</th>
                                     <th class="px-6 py-3 text-right">Daily %</th>
                                     <th class="px-6 py-3 text-right">Yearly %</th>
@@ -766,6 +1057,7 @@
                             </tbody>
                         </table>
                     </div>
+                    <div id="copycat-source-note" class="text-[10px] text-gray-600 mt-3 text-center"></div>
                 </div>
             </div>
 
@@ -896,6 +1188,15 @@
                                 <h3 class="font-bold text-white text-sm">Burry's Orphans</h3>
                                 <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Wall St
                                     Neglected</p>
+                            </div>
+
+                            <!-- Row 3: Inflation Busters -->
+                            <div onclick="runScreen('inflation_busters')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-amber-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-amber-400 text-xl mb-2">🛡️</div>
+                                <h3 class="font-bold text-white text-sm">Inflation Busters</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Pricing
+                                    Power + Low Debt + High ROIC</p>
                             </div>
                         </div>
 
@@ -1444,6 +1745,26 @@
                             </svg>
                             Import PDF
                         </button>
+                        <input type="file" id="csv-upload" accept=".csv" class="hidden"
+                            onchange="importCSV(this)">
+                        <button onclick="document.getElementById('csv-upload').click()"
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
+                                </path>
+                            </svg>
+                            Import CSV
+                        </button>
+                        <button onclick="importFromServerFiles()"
+                            class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-emerald-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
+                                </path>
+                            </svg>
+                            Import from Server
+                        </button>
                         <button onclick="openCreatePortfolioModal()"
                             class="px-4 py-2 bg-warren-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1482,6 +1803,7 @@
                                     <div class="text-xs text-gray-500 uppercase">Total Account Value</div>
                                     <div class="text-3xl font-bold text-white" id="portfolio-total-value">$0.00</div>
                                     <div class="text-sm" id="portfolio-total-gain">+$0.00 (0%)</div>
+                                    <div class="mt-1 text-[11px]" id="signal-summary"></div>
 
                                     <div class="mt-4 pt-4 border-t border-gray-800/50">
                                         <div class="flex justify-end gap-6">
@@ -1535,8 +1857,9 @@
                             <table class="w-full text-sm text-left">
                                 <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
                                     <tr>
+                                        <th class="px-3 py-3 rounded-l-lg text-center">Signal</th>
                                         <th onclick="sortPortfolio('ticker')"
-                                            class="px-6 py-3 rounded-l-lg cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            class="px-6 py-3 cursor-pointer hover:bg-gray-800 transition-colors select-none">
                                             Ticker <span class="sort-icon ml-1 opacity-50">↕</span>
                                         </th>
                                         <th onclick="sortPortfolio('quantity')"
@@ -1565,7 +1888,7 @@
                                 </thead>
                                 <tbody id="holdings-table-body" class="divide-y divide-gray-800">
                                     <tr>
-                                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">No
+                                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">No
                                             positions yet. Add your first position!</td>
                                     </tr>
                                 </tbody>
@@ -1662,6 +1985,22 @@
                 </div>
             </div>
 
+            <!-- Technical Zones View -->
+            <div id="technical-zones-view" class="hidden space-y-8 animate-fade-in">
+                <div class="text-center py-8" id="technical-zones-header">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="technical-zones-container">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Momentum View -->
+            <div id="momentum-view" class="hidden space-y-8 animate-fade-in">
+                <div class="text-center py-2" id="momentum-header"></div>
+                <div id="momentum-container"></div>
+            </div>
+
             <!-- Research Hub View -->
             <div id="research-view" class="hidden animate-fade-in space-y-6 pb-20">
                 <!-- Search Bar -->
@@ -1701,6 +2040,8 @@
                 <p class="opacity-60">Built with ❤️ by Antigravity | Data for educational purposes
                     only. Not financial
                     advice.</p>
+                <a href="/admin/db-viewer" target="_blank"
+                    class="hover:text-gray-400 transition-colors underline underline-offset-2">DB Viewer</a>
                 <div class="flex items-center gap-2 opacity-80">
                     <span class="text-gray-500">Data Source:</span>
                     <button id="datasource-toggle"
@@ -1782,8 +2123,8 @@
         </div>
 
         <!-- App Logic -->
-        <script type="module" src="/static/portfolio.js?v=17"></script>
-        <script type="module" src="/static/app.js?v=17"></script>
+        <script type="module" src="/static/portfolio.js?v=20"></script>
+        <script type="module" src="/static/app.js?v=24"></script>
 </body>
 
 </html>

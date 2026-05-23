@@ -2,14 +2,17 @@
 
 import { API_BASE } from './js/api.js';
 import { loadMarketStatus, loadMacroTrends } from './js/components/marketStatus.js';
-import { loadIndustries, loadStocks, searchStock, startResearch, loadResearch, loadTrends } from './js/components/researchUi.js';
-import { loadSuperinvestors, loadCopycatPortfolio, loadMoonshots } from './js/components/thematic.js';
+import { loadIndustries, loadStocks, searchStock, startResearch, loadResearch, loadTrends, loadPriceChart } from './js/components/researchUi.js';
+import { loadTechnicalZones } from './js/components/technicalZones.js';
+import { loadSuperinvestors, loadCopycatPortfolio, loadMoonshots, loadGuruConsensus, openSuperinvestorDetail, closeSuperinvestorDetail } from './js/components/thematic.js';
+import { loadGuruFlow } from './js/components/guruFlow.js';
 import { runScreen } from './js/components/screenerUi.js';
 import { loadEconomicIndicators, loadMoneyFlow, loadMarketNews, loadContrarianOpportunities, filterContrarian } from './js/components/economics.js';
 import { loadDipHunterData, sortDipStocks } from './js/components/dipHunter.js';
 import { loadAlphaIntelligence } from './js/components/alpha.js';
 import { loadSmallCaps } from './js/components/smallCaps.js';
 import { initInternational } from './js/components/international.js';
+import { loadMomentumData } from './js/components/momentum.js';
 
 // --- Theme Management ---
 function toggleThemeMenu() {
@@ -97,11 +100,18 @@ window.toggleThemeMenu = toggleThemeMenu;
 window.setTheme = setTheme;
 window.renderUniverseBadge = renderUniverseBadge;
 window.loadTrends = loadTrends;
+window.loadPriceChart = loadPriceChart;
+window.loadTechnicalZones = loadTechnicalZones;
+window.loadCopycatPortfolio = loadCopycatPortfolio;
+window.loadGuruConsensus = loadGuruConsensus;
+window.loadGuruFlow = loadGuruFlow;
+window.openSuperinvestorDetail = openSuperinvestorDetail;
+window.closeSuperinvestorDetail = closeSuperinvestorDetail;
 window.closeModal = () => document.getElementById('forecast-modal').classList.add('hidden');
 
 // --- Tab Navigation Orchestrator ---
 function switchTab(tabName) {
-    const tabs = ['dashboard', 'superinvestors', 'copycat', 'moonshots', 'screeners', 'economics', 'contrarian', 'diphunter', 'alpha', 'small-caps', 'international', 'portfolio', 'research'];
+    const tabs = ['dashboard', 'superinvestors', 'copycat', 'moonshots', 'screeners', 'economics', 'diphunter', 'contrarian', 'momentum', 'alpha', 'small-caps', 'international', 'portfolio', 'technical-zones', 'research', 'guru-flow'];
 
     tabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
@@ -123,8 +133,11 @@ function switchTab(tabName) {
     }
     if (activeView) activeView.classList.remove('hidden');
 
-    if (tabName === 'superinvestors') loadSuperinvestors();
-    else if (tabName === 'copycat') loadCopycatPortfolio();
+    if (tabName === 'superinvestors') {
+        loadSuperinvestors();
+        loadGuruConsensus('grand_portfolio');
+    } else if (tabName === 'guru-flow') loadGuruFlow();
+    else if (tabName === 'copycat') loadCopycatPortfolio('all');
     else if (tabName === 'moonshots') loadMoonshots();
     else if (tabName === 'economics') {
         loadEconomicIndicators();
@@ -132,9 +145,11 @@ function switchTab(tabName) {
         loadMarketNews();
     }
     else if (tabName === 'contrarian') loadContrarianOpportunities();
+    else if (tabName === 'momentum') loadMomentumData();
     else if (tabName === 'diphunter') loadDipHunterData();
     else if (tabName === 'alpha') loadAlphaIntelligence();
     else if (tabName === 'small-caps') loadSmallCaps();
+    else if (tabName === 'technical-zones') loadTechnicalZones();
     else if (tabName === 'international') initInternational();
     else if (tabName === 'portfolio' && typeof window.initPortfolioView === 'function') {
         window.initPortfolioView();
