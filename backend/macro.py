@@ -2,7 +2,10 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from cache_utils import timed_cache
+from cache_utils import timed_cache, fetch_with_retry
+
+# Import rate limiting
+from rate_limiter import get_rate_limiter
 
 # Sector Map for Macro Impacts
 SECTOR_MAP = {
@@ -20,20 +23,38 @@ SECTOR_MAP = {
     "Defense": "ITA" # Special mention, though not in our main ETF list yet, mapped to Industrials usually.
 }
 
-@timed_cache(ttl_seconds=3600)  # Cache for 1 hour
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_macro_trends():
     """
     Fetches macro indicators and returns a 'Weather Report' for sectors.
+    Uses DB-first with rate limiting.
     """
     # Tickers:
     # ^TNX: 10-Year Treasury Yield
     # CL=F: Crude Oil Futures
     # GC=F: Gold Futures
     # ^VIX: CBOE Volatility Index
-    tickers = ["^TNX", "CL=F", "GC=F", "^VIX"]
+    tickers = ["^TNX", "CL=F", "GLD", "^VIX"]
     
-    # Download data - returns multi-index DataFrame
-    raw_data = yf.download(tickers, period="5d", progress=False)
+    # Check rate limiter before network call
+    limiter = get_rate_limiter()
+    can_fetch, reason = limiter.can_fetch(tickers[0], "macro")
+    
+    if not can_fetch:
+        # Try to return cached/stale data with warning
+        print(f"[Macro] Rate limited: {reason}. Using stale data.")
+        # The timed_cache decorator will handle returning stale data
+    
+    # Download data with retry - threads=False avoids extra connections from shared cloud IP
+    raw_data = fetch_with_retry(
+        lambda: yf.download(tickers, period="5d", progress=False, threads=False),
+        max_attempts=3,
+        base_delay=2.0,
+    )
+    
+    # Record successful fetch
+    for ticker in tickers:
+        limiter.record_fetch(ticker, "macro")
     
     # Extract Close prices - handle multi-index structure
     if isinstance(raw_data.columns, pd.MultiIndex):
@@ -169,7 +190,7 @@ def get_macro_trends():
         "indicators": {
             "rates": trends["^TNX"],
             "oil": trends["CL=F"],
-            "gold": trends["GC=F"],
+            "gold": trends["GLD"],
             "vix": trends["^VIX"]
         },
         "sector_impacts": sector_impacts

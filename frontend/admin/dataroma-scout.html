@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dataroma Scout — Stock Guide</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { font-family: 'Inter', sans-serif; }
+body { background: #0f172a; color: #e2e8f0; }
+.card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
+.card-header { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 0.5rem; }
+.badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+.badge-green { background: #064e3b; color: #6ee7b7; }
+.badge-yellow { background: #451a03; color: #fcd34d; }
+.badge-red { background: #450a0a; color: #fca5a5; }
+.badge-blue { background: #1e3a5f; color: #93c5fd; }
+.badge-gray { background: #334155; color: #94a3b8; }
+.badge-purple { background: #3b0764; color: #d8b4fe; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid #334155; color: #94a3b8; font-weight: 600; white-space: nowrap; user-select: none; }
+td { padding: 0.4rem 0.75rem; border-bottom: 1px solid #1e293b; white-space: nowrap; font-size: 0.8rem; }
+tr:hover { background: #1e293b; }
+tr:nth-child(even) { background: #0f172a; }
+tr:nth-child(even):hover { background: #1e293b; }
+.tab-btn { padding: 0.5rem 1rem; border-radius: 8px 8px 0 0; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: none; background: transparent; color: #64748b; }
+.tab-btn.active { background: #1e293b; color: #e2e8f0; }
+.tab-btn:hover { color: #e2e8f0; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+select, input { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 0.5rem 1rem; color: #e2e8f0; font-size: 0.875rem; outline: none; }
+select:focus, input:focus { border-color: #3b82f6; }
+pre { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; overflow: auto; font-size: 0.75rem; line-height: 1.5; max-height: 70vh; }
+.buy { color: #6ee7b7; }
+.sell { color: #fca5a5; }
+.neutral { color: #94a3b8; }
+.fade-in { animation: fadeIn 0.2s ease-in; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.loading { opacity: 0.5; pointer-events: none; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+.warn { color: #fcd34d; }
+.error-text { color: #fca5a5; }
+</style>
+</head>
+<body class="p-6">
+<div class="max-w-7xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <h1 class="text-2xl font-bold">Dataroma Scout</h1>
+      <p class="text-sm text-slate-400 mt-1">Exploratory data validation — manually inspect Dataroma pages</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/admin/db-viewer" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">DB Viewer</a>
+      <a href="/" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition">Back to App</a>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="card mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4 items-end">
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Manager Code</label>
+        <select id="managerCode" onchange="onManagerChange()">
+          <option value="BRK">BRK — Buffett</option>
+          <option value="SAM">SAM — Burry</option>
+          <option value="PI">PI — Pabrai</option>
+          <option value="GFT">GFT — Gates</option>
+          <option value="GLRE">GLRE — Einhorn</option>
+          <option value="JIM">JIM — Jensen</option>
+          <option value="CST">CST — Carl Icahn (extra)</option>
+          <option value="LCH">LCH — Loeb</option>
+          <option value="TPB">TPB — Tepper</option>
+          <option value="DAL">DAL — Dalio</option>
+          <option value="GOD">GOD — Gottesman</option>
+          <option value="GRR">GRR — Greenblatt</option>
+          <option value="KCL">KCL — Klarman</option>
+          <option value="PMM">PMM — Paulson</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">Page Type</label>
+        <select id="pageType" onchange="onPageTypeChange()">
+          <option value="holdings">Holdings (current portfolio)</option>
+          <option value="activity">Activity — All</option>
+          <option value="activity_buys">Activity — Buys only</option>
+          <option value="activity_sells">Activity — Sells only</option>
+          <option value="history">History (quarter-by-quarter)</option>
+          <option value="stock_hist">Single stock history</option>
+          <option value="grand_portfolio">Grand Portfolio — Holdings</option>
+          <option value="grand_portfolio_qtr_buys">Grand Portfolio — Qtr Buys</option>
+          <option value="grand_portfolio_qtr_sells">Grand Portfolio — Qtr Sells</option>
+          <option value="grand_portfolio_6mo_buys">Grand Portfolio — 6mo Buys</option>
+          <option value="grand_portfolio_6mo_sells">Grand Portfolio — 6mo Sells</option>
+          <option value="grand_portfolio_sector">Grand Portfolio — Sector Stats</option>
+          <option value="all_managers">All Managers (~82)</option>
+          <option value="all_activity">All Activity (aggregate)</option>
+        </select>
+      </div>
+      <div id="pageNumContainer" style="display:none">
+        <label class="text-xs text-slate-400 mb-1 block">Page #</label>
+        <input type="number" id="pageNum" value="1" min="1" max="50" onchange="onFetch()">
+      </div>
+      <div id="symbolContainer" style="display:none">
+        <label class="text-xs text-slate-400 mb-1 block">Symbol</label>
+        <input type="text" id="symbolInput" placeholder="e.g. AAPL" onchange="onFetch()">
+      </div>
+      <div id="alphaContainer" style="display:none">
+        <label class="text-xs text-slate-400 mb-1 block">Alpha Page</label>
+        <input type="text" id="alphaPage" placeholder="A-Z" maxlength="1" onchange="onFetch()">
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 mb-1 block">&nbsp;</label>
+        <button onclick="onFetch()" id="fetchBtn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition w-full">Fetch</button>
+      </div>
+    </div>
+    <div class="flex items-center gap-4 mt-4 text-xs text-slate-500">
+      <span>⏱ <span id="fetchTime">—</span></span>
+      <span>📦 <span id="responseSize">—</span></span>
+      <span id="blockedBadge"></span>
+    </div>
+  </div>
+
+  <!-- Tabs: Parsed / Raw -->
+  <div class="flex border-b border-slate-700 mb-4">
+    <button class="tab-btn active" onclick="switchTab('parsed', this)">Parsed Data</button>
+    <button class="tab-btn" onclick="switchTab('raw', this)">Raw HTML</button>
+    <button class="tab-btn" onclick="switchTab('headers', this)">URL & Headers</button>
+  </div>
+
+  <!-- Tab: Parsed -->
+  <div id="tab-parsed" class="tab-content active fade-in">
+    <div id="parsedContent">
+      <p class="text-slate-500 text-sm">Select a manager and page type, then click Fetch.</p>
+    </div>
+  </div>
+
+  <!-- Tab: Raw HTML -->
+  <div id="tab-raw" class="tab-content fade-in">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="text-xs text-slate-400"><span id="rawLineCount">0</span> lines</span>
+      <button onclick="copyRaw()" class="text-xs text-blue-400 hover:text-blue-300">Copy</button>
+      <button onclick="toggleRawWrap()" class="text-xs text-blue-400 hover:text-blue-300">Toggle Wrap</button>
+    </div>
+    <pre id="rawContent" class="text-xs">No data yet.</pre>
+  </div>
+
+  <!-- Tab: Headers -->
+  <div id="tab-headers" class="tab-content fade-in">
+    <div id="headersContent">
+      <p class="text-slate-500 text-sm">Fetch data to see request details.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const MANAGER_META = {
+  BRK: { name: "Warren Buffett", firm: "Berkshire Hathaway" },
+  SAM: { name: "Michael Burry", firm: "Scion Asset Management" },
+  PI: { name: "Mohnish Pabrai", firm: "Pabrai Investments" },
+  GFT: { name: "Bill & Melinda Gates", firm: "Gates Foundation" },
+  GLRE: { name: "David Einhorn", firm: "Greenlight Capital" },
+  JIM: { name: "Jensen Investment", firm: "Jensen Investment Management" },
+  CST: { name: "Carl Icahn", firm: "Icahn Enterprises" },
+  LCH: { name: "Daniel Loeb", firm: "Third Point" },
+  TPB: { name: "David Tepper", firm: "Appaloosa Management" },
+  DAL: { name: "Ray Dalio", firm: "Bridgewater Associates" },
+  GOD: { name: "David Gottesman", firm: "First Manhattan" },
+  GRR: { name: "Joel Greenblatt", firm: "Gotham Asset Management" },
+  KCL: { name: "Seth Klarman", firm: "Baupost Group" },
+  PMM: { name: "John Paulson", firm: "Paulson & Co." },
+};
+
+function onManagerChange() {
+  onFetch();
+}
+
+function onPageTypeChange() {
+  const pt = document.getElementById("pageType").value;
+  const isPerManager = ["holdings","activity","activity_buys","activity_sells","history","stock_hist"].includes(pt);
+  document.getElementById("managerCode").closest("div").style.display = isPerManager ? "block" : "none";
+  document.getElementById("pageNumContainer").style.display = (pt.startsWith("activity") && !pt.startsWith("all_act")) ? "block" : "none";
+  document.getElementById("symbolContainer").style.display = pt === "stock_hist" ? "block" : "none";
+  document.getElementById("alphaContainer").style.display = pt === "all_activity" ? "block" : "none";
+  onFetch();
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  document.getElementById("tab-" + tab).classList.add("active");
+}
+
+let lastResult = null;
+
+async function onFetch() {
+  const m = document.getElementById("managerCode").value;
+  const p = document.getElementById("pageType").value;
+  const L = parseInt(document.getElementById("pageNum").value) || 1;
+  const sym = document.getElementById("symbolInput").value.trim().toUpperCase();
+  const alpha = document.getElementById("alphaPage").value.trim().toUpperCase();
+  const btn = document.getElementById("fetchBtn");
+  const t0 = performance.now();
+
+  btn.classList.add("loading");
+  btn.textContent = "Fetching...";
+  document.getElementById("blockedBadge").innerHTML = "";
+
+  try {
+    const params = new URLSearchParams({ p });
+    if (!["all_managers","grand_portfolio","grand_portfolio_qtr_buys","grand_portfolio_qtr_sells","grand_portfolio_6mo_buys","grand_portfolio_6mo_sells","grand_portfolio_sector","all_activity"].includes(p)) {
+      params.set("m", m);
+    }
+    params.set("L", String(L));
+    if (sym && p === "stock_hist") params.set("sym", sym);
+    if (alpha && p === "all_activity") params.set("page", alpha);
+    if (["activity","activity_buys","activity_sells","all_activity"].includes(p)) {
+      if (p === "all_activity") params.set("typ", "a");
+    }
+
+    const parsedUrl = "/api/admin/dataroma/parsed?" + params.toString();
+    const rawUrl = "/api/admin/dataroma/raw?" + params.toString();
+
+    const [parsedResp, rawResp] = await Promise.all([
+      fetch(parsedUrl).then(r => r.json()),
+      fetch(rawUrl).then(r => r.json()),
+    ]);
+
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    document.getElementById("fetchTime").textContent = elapsed + "s";
+    document.getElementById("responseSize").textContent = formatSize(rawResp.size || 0);
+
+    if (rawResp.blocked) {
+      document.getElementById("blockedBadge").innerHTML =
+        '<span class="badge badge-red">BLOCKED by WAF</span>';
+    }
+
+    lastResult = { parsed: parsedResp, raw: rawResp, params: { m, p, L, sym } };
+    renderParsed(parsedResp);
+    renderRaw(rawResp);
+    renderHeaders(rawResp);
+  } catch (err) {
+    document.getElementById("parsedContent").innerHTML =
+      `<p class="error-text">Fetch error: ${err.message}</p>`;
+    document.getElementById("rawContent").textContent = "Error: " + err.message;
+  } finally {
+    btn.classList.remove("loading");
+    btn.textContent = "Fetch";
+  }
+}
+
+function renderParsed(data) {
+  const el = document.getElementById("parsedContent");
+
+  if (data.error) {
+    el.innerHTML = `<div class="p-4 rounded-lg bg-red-900/30 border border-red-800">
+      <p class="error-text font-medium">Error</p>
+      <p class="text-sm text-slate-300 mt-1">${data.error}</p>
+    </div>`;
+    return;
+  }
+
+  const pt = data.page_type || "";
+  let html = "";
+
+  if (pt === "holdings") {
+    html = renderHoldings(data);
+  } else if (pt.startsWith("activity") && pt !== "all_activity") {
+    html = renderActivity(data);
+  } else if (pt === "history") {
+    html = renderHistory(data);
+  } else if (pt === "stock_hist") {
+    html = renderStockHist(data);
+  } else if (pt.startsWith("grand_portfolio")) {
+    html = renderGrandPortfolio(data);
+  } else if (pt === "all_managers") {
+    html = renderAllManagers(data);
+  } else if (pt === "all_activity") {
+    html = renderAllActivity(data);
+  } else {
+    html = `<pre class="text-xs">${JSON.stringify(data, null, 2)}</pre>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function renderHoldings(data) {
+  let html = "";
+
+  if (data.header && data.header.name) {
+    html += `<div class="card mb-4">
+      <div class="text-lg font-semibold">${data.header.name}</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-sm">
+        ${data.header.period ? `<div><span class="text-slate-400">Period:</span> ${data.header.period}</div>` : ""}
+        ${data.header.no_of_stocks ? `<div><span class="text-slate-400">Stocks:</span> ${data.header.no_of_stocks}</div>` : ""}
+        ${data.header.portfolio_value ? `<div><span class="text-slate-400">Value:</span> ${data.header.portfolio_value}</div>` : ""}
+        ${data.header.portfolio_date ? `<div><span class="text-slate-400">Date:</span> ${data.header.portfolio_date}</div>` : ""}
+      </div>
+    </div>`;
+  }
+
+  if (!data.holdings || data.holdings.length === 0) {
+    html += `<p class="text-slate-500">No holdings data found.</p>`;
+    return html;
+  }
+
+  html += `<div class="overflow-x-auto rounded-lg border border-slate-700">
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>Symbol</th>
+        <th>Name</th>
+        <th>% Portfolio</th>
+        <th>Activity</th>
+        <th>Shares</th>
+        <th>Reported Price</th>
+        <th>Value</th>
+        <th>Current Price</th>
+        <th>Change</th>
+      </tr></thead>
+      <tbody>`;
+
+  data.holdings.forEach((h, i) => {
+    const actClass = h.activity && h.activity.toLowerCase().includes("add") ? "buy" :
+                     h.activity && (h.activity.toLowerCase().includes("red") || h.activity.toLowerCase().includes("sold")) ? "sell" : "";
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td class="font-medium text-blue-300">${h.symbol || "?"}</td>
+      <td>${h.name || ""}</td>
+      <td>${h.portfolio_pct || ""}</td>
+      <td class="${actClass}">${h.activity || ""}</td>
+      <td>${h.shares || ""}</td>
+      <td>${h.reported_price || ""}</td>
+      <td>${h.value || ""}</td>
+      <td>${h.current_price || ""}</td>
+      <td class="${h.price_change_pct && h.price_change_pct.startsWith("+") ? "buy" : h.price_change_pct && h.price_change_pct.startsWith("-") ? "sell" : ""}">${h.price_change_pct || ""}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderActivity(data) {
+  let html = `<div class="flex items-center gap-3 mb-3">
+    <span class="badge badge-blue">${data.activities_count || 0} activities</span>`;
+
+  if (data.pagination) {
+    html += `<span class="text-xs text-slate-400">Page ${data.pagination.current_page || data.page || 1} of ${data.pagination.total_pages || "?"}</span>`;
+    if (data.pagination.pages && data.pagination.pages.length > 1) {
+      html += `<div class="flex gap-1">`;
+      data.pagination.pages.forEach(pg => {
+        const active = pg === (data.page || 1) ? "bg-blue-600" : "bg-slate-700 hover:bg-slate-600";
+        html += `<button onclick="goToPage(${pg})" class="px-2 py-1 ${active} rounded text-xs transition">${pg}</button>`;
+      });
+      html += `</div>`;
+    }
+  }
+
+  html += `</div>`;
+
+  if (!data.activities || data.activities.length === 0) {
+    html += `<p class="text-slate-500">No activity data found on this page.</p>`;
+    return html;
+  }
+
+  html += `<div class="overflow-x-auto rounded-lg border border-slate-700">
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>Symbol</th>
+        <th>Name</th>
+        <th>Activity</th>
+        <th>Type</th>
+        <th>Shares</th>
+        <th>% Portfolio Δ</th>
+        <th>Period</th>
+      </tr></thead>
+      <tbody>`;
+
+  data.activities.forEach((a, i) => {
+    const typeClass = a.activity_type === "buy" ? "buy" : a.activity_type === "sell" ? "sell" : "neutral";
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td class="font-medium text-blue-300">${a.symbol || "?"}</td>
+      <td>${a.name || ""}</td>
+      <td>${a.activity || ""}</td>
+      <td class="${typeClass} font-medium">${a.activity_type}</td>
+      <td>${a.shares || ""}</td>
+      <td>${a.portfolio_pct_change || ""}</td>
+      <td>${a.period || ""}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderHistory(data) {
+  let html = "";
+
+  if (!data.periods || data.periods.length === 0) {
+    html += `<p class="text-slate-500">No history data found.</p>`;
+    return html;
+  }
+
+  html += `<div class="flex items-center gap-3 mb-3">
+    <span class="badge badge-purple">${data.period_count} quarters</span>
+    <span class="badge badge-blue">${data.stock_names ? data.stock_names.length : "?"} tracked stocks</span>
+  </div>`;
+
+  if (data.stock_names && data.stock_names.length > 0) {
+    html += `<div class="mb-4">
+      <span class="text-xs text-slate-400">Tracked stocks across all quarters:</span>
+      <div class="flex flex-wrap gap-1 mt-1">`;
+    const seenSymbols = new Set();
+    data.stock_names.forEach(s => {
+      const sym = s.split(" ")[0];
+      if (sym && !seenSymbols.has(sym)) {
+        seenSymbols.add(sym);
+        html += `<span class="badge badge-gray">${sym}</span>`;
+      }
+    });
+    html += `</div></div>`;
+  }
+
+  const maxStocks = Math.max(...data.periods.map(p => (p.holdings || []).filter(h => h).length));
+
+  html += `<div class="overflow-x-auto rounded-lg border border-slate-700">
+    <table>
+      <thead><tr>
+        <th>Period</th>
+        <th>Portfolio Value</th>`;
+
+  for (let i = 0; i < Math.min(maxStocks, 10); i++) {
+    html += `<th>Stock ${i + 1}</th>`;
+  }
+  if (maxStocks > 10) html += `<th>+${maxStocks - 10} more</th>`;
+
+  html += `</tr></thead><tbody>`;
+
+  data.periods.forEach(p => {
+    html += `<tr>
+      <td class="font-medium">${p.period}</td>
+      <td>${p.portfolio_value}</td>`;
+    const holdings = (p.holdings || []).filter(h => h);
+    for (let i = 0; i < Math.min(holdings.length, 10); i++) {
+      html += `<td>${holdings[i]}</td>`;
+    }
+    for (let i = holdings.length; i < Math.min(maxStocks, 10); i++) {
+      html += `<td class="text-slate-600">—</td>`;
+    }
+    if (maxStocks > 10 && holdings.length > 10) {
+      html += `<td>+${holdings.length - 10}</td>`;
+    } else if (maxStocks > 10) {
+      html += `<td class="text-slate-600">—</td>`;
+    }
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+
+  return html;
+}
+
+function renderStockHist(data) {
+  let html = `<div class="flex items-center gap-3 mb-3">
+    <span class="badge badge-blue">${data.symbol || ""}</span>
+    <span class="text-xs text-slate-400">${data.entries_count || 0} entries</span>
+  </div>`;
+
+  if (!data.entries || data.entries.length === 0) {
+    html += `<p class="text-slate-500">No history entries found.</p>`;
+    return html;
+  }
+
+  html += `<div class="overflow-x-auto rounded-lg border border-slate-700">
+    <table>
+      <thead><tr>
+        <th>Period</th>
+        <th>Shares</th>
+        <th>Value</th>
+        <th>Price</th>
+      </tr></thead>
+      <tbody>`;
+
+  data.entries.forEach(e => {
+    html += `<tr>
+      <td class="font-medium">${e.period || ""}</td>
+      <td>${e.shares || ""}</td>
+      <td>${e.value || ""}</td>
+      <td>${e.price || ""}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderRaw(data) {
+  const el = document.getElementById("rawContent");
+  const raw = data.raw_html || "No raw HTML returned.";
+
+  if (data.blocked) {
+    el.innerHTML = `<span class="warn">PAGE BLOCKED BY WAF — Dataroma's ModSecurity rejected the request.
+Try different headers or a slower fetch rate.</span>`;
+    document.getElementById("rawLineCount").textContent = "BLOCKED";
+    return;
+  }
+
+  el.textContent = raw;
+  document.getElementById("rawLineCount").textContent = raw.split("\n").length;
+}
+
+function renderHeaders(data) {
+  const el = document.getElementById("headersContent");
+  el.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="card">
+      <div class="card-header">Request</div>
+      <div class="text-sm space-y-1">
+        <div><span class="text-slate-400">URL:</span> <span class="text-blue-300 text-xs break-all">${data.url || "—"}</span></div>
+        <div><span class="text-slate-400">Method:</span> GET</div>
+        <div><span class="text-slate-400">Manager:</span> ${data.manager || "—"}</div>
+        <div><span class="text-slate-400">Page Type:</span> ${data.page_type || "—"}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Response</div>
+      <div class="text-sm space-y-1">
+        <div><span class="text-slate-400">Status:</span> ${data.status || "—"}</div>
+        <div><span class="text-slate-400">Size:</span> ${formatSize(data.size || 0)}</div>
+        <div><span class="text-slate-400">Blocked:</span> ${data.blocked ? '<span class="error-text">YES (WAF)</span>' : '<span class="text-green-400">No</span>'}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function goToPage(page) {
+  document.getElementById("pageNum").value = page;
+  onFetch();
+}
+
+function copyRaw() {
+  const el = document.getElementById("rawContent");
+  const text = el.textContent || el.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = "Copied!";
+    setTimeout(() => btn.textContent = "Copy", 1500);
+  });
+}
+
+function toggleRawWrap() {
+  const el = document.getElementById("rawContent");
+  el.style.whiteSpace = el.style.whiteSpace === "pre-wrap" ? "pre" : "pre-wrap";
+}
+
+function renderGrandPortfolio(data) {
+  let html = "";
+
+  if (data.header && data.header.name) {
+    html += `<div class="card mb-4">
+      <div class="text-lg font-semibold">${data.header.name}</div>
+      <div class="text-xs text-slate-500 mt-1">${data.page_type.replace(/_/g," ")}</div>
+    </div>`;
+  }
+
+  if (data.sector_data && data.sector_data.length > 0) {
+    html += `<div class="overflow-x-auto rounded-lg border border-slate-700 mb-4">
+      <table><thead><tr><th>Sector</th><th>Value</th></tr></thead><tbody>`;
+    data.sector_data.forEach(s => {
+      html += `<tr><td>${s.sector || ""}</td><td>${s.value || ""}</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+    return html;
+  }
+
+  if (!data.holdings || data.holdings.length === 0) {
+    html += `<p class="text-slate-500">No holdings data.</p>`;
+    return html;
+  }
+
+  html += `<div class="flex items-center gap-3 mb-3">
+    <span class="badge badge-purple">${data.holdings_count} stocks</span>
+    ${data.summary && data.summary.portfolio_value ? `<span class="text-xs text-slate-400">Total: ${data.summary.portfolio_value}</span>` : ""}
+  </div>`;
+
+  html += `<div class="overflow-x-auto rounded-lg border border-slate-700">
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>Symbol</th>
+        <th>Name</th>
+        <th>% Grand Port</th>
+        <th>Owners</th>
+        <th>Reported Price</th>
+        <th>Max %</th>
+        <th>Current Price</th>
+        <th>52w Low</th>
+        <th>% Above Low</th>
+        <th>52w High</th>
+      </tr></thead>
+      <tbody>`;
+
+  data.holdings.forEach((h, i) => {
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td class="font-medium text-blue-300">${h.symbol || "?"}</td>
+      <td>${h.name || ""}</td>
+      <td class="font-medium">${h.portfolio_pct || ""}</td>
+      <td><span class="badge badge-blue">${h.ownership_count || ""}</span></td>
+      <td>${h.reported_price || ""}</td>
+      <td>${h.max_pct || ""}</td>
+      <td>${h.current_price || ""}</td>
+      <td>${h.week_52_low || ""}</td>
+      <td>${h.above_52w_low_pct || ""}</td>
+      <td>${h.week_52_high || ""}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderAllManagers(data) {
+  if (!data.managers || data.managers.length === 0) {
+    return `<p class="text-slate-500">No managers found.</p>`;
+  }
+
+  let html = `<div class="flex items-center gap-3 mb-3">
+    <span class="badge badge-purple">${data.manager_count} managers</span>
+  </div>
+  <div class="overflow-x-auto rounded-lg border border-slate-700">
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>Code</th>
+        <th>Name / Firm</th>
+        <th>Portfolio Value</th>
+        <th>Stocks</th>
+        <th>Top Holdings</th>
+      </tr></thead>
+      <tbody>`;
+
+  data.managers.forEach((m, i) => {
+    const firm = m.firm ? `<span class="text-xs text-slate-400">${m.firm}</span>` : "";
+    const tops = (m.top_holdings || []).slice(0, 5).join(", ");
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td><span class="badge badge-blue">${m.code || "?"}</span></td>
+      <td>${m.name || ""}<br>${firm}</td>
+      <td>${m.portfolio_value || ""}</td>
+      <td>${m.stock_count || ""}</td>
+      <td class="text-xs">${tops}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  return html;
+}
+
+function renderAllActivity(data) {
+  if (!data.managers || data.managers.length === 0) {
+    return `<p class="text-slate-500">No activity data found.</p>`;
+  }
+
+  let html = `<div class="flex items-center gap-3 mb-3">
+    <span class="badge badge-purple">${data.manager_count} managers with activity</span>
+    ${data.alpha_pages && data.alpha_pages.length > 0 ? `<span class="text-xs text-slate-400">Pages: ${data.alpha_pages.join(", ")}</span>` : ""}
+  </div>`;
+
+  data.managers.forEach((mgr, mi) => {
+    html += `<div class="card mb-4 ${mi > 0 ? 'mt-4' : ''}">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <span class="font-semibold">${mgr.manager}</span>
+          <span class="text-xs text-slate-400 ml-2">${mgr.period || ""}</span>
+        </div>
+        <span class="badge badge-blue">${mgr.activities.length} actions</span>
+      </div>`;
+
+    if (mgr.activities.length > 0) {
+      html += `<div class="overflow-x-auto rounded-lg border border-slate-700">
+        <table>
+          <thead><tr><th>Symbol</th><th>Name</th><th>Activity</th><th>Type</th><th>Portfolio Δ</th></tr></thead>
+          <tbody>`;
+      mgr.activities.forEach(a => {
+        const tc = a.activity_type === "buy" ? "buy" : a.activity_type === "sell" ? "sell" : "neutral";
+        html += `<tr>
+          <td class="font-medium text-blue-300">${a.symbol || ""}</td>
+          <td>${a.name || ""}</td>
+          <td>${a.activity || ""}</td>
+          <td class="${tc} font-medium">${a.activity_type}</td>
+          <td>${a.portfolio_pct_change || ""}</td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    }
+    html += `</div>`;
+  });
+
+  return html;
+}
+
+function formatSize(bytes) {
+  if (!bytes) return "0 B";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1048576).toFixed(1) + " MB";
+}
+
+onPageTypeChange();
+</script>
+</body>
+</html>

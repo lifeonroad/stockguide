@@ -14,10 +14,10 @@ The application follows a **Monolithic Client-Server** architecture, designed fo
        |
        +--- [ Service Layer (analyst.py, screener.py) ]
        |
-       +--- [ Data Access Layer (portfolio.py) ]
+       +--- [ Data Access Layer (data_client.py, portfolio.py) ]
        |
        v
-[ SQLite Database ] / [ External APIs (yfinance, FRED) ]
+[ SQLite Database ] / [ External APIs (yfinance, defeatbeta, FRED) ]
 ```
 
 ## 2. Backend Design Patterns
@@ -26,7 +26,7 @@ The application follows a **Monolithic Client-Server** architecture, designed fo
 Usage: The application strictly separates concerns.
 *   **API/Controller**: `main.py` handles input validation (Pydantic), HTTP routing, and response formatting.
 *   **Business Logic**: `analyst.py` and `screeners.py` contain the core intelligence. They do not know about the HTTP layer.
-*   **Data Access**: `portfolio.py` encapsulates all SQL queries.
+*   **Data Access**: `portfolio.py` encapsulates all SQL queries. `data_client.py` abstracts external data sources.
 
 ### 2.2. Strategy Pattern
 **Usage**: `analyst.py`
@@ -46,8 +46,15 @@ The `PortfolioManager` class acts as a Repository.
 *   It handles data mapping (SQL Row -> Python Dict).
 
 ### 2.4. Facade Pattern
-**Usage**: `market_data.py`
-This module acts as a Facade over the complex and potentially unstable external data sources (yfinance, FRED). It provides a simplified interface (`get_batch_quotes`, `get_buffett_indicator`) to the application, handling error catching, data normalization, and fallback logic internally.
+**Usage**: `data_client.py`
+This module acts as a Facade over external data sources (yfinance, defeatbeta). It provides a simplified interface (`get_fundamentals`, `get_price_history`, `get_news`, `get_dcf`) to the application, handling error catching, data normalization, fallback logic, and caching internally.
+
+### 2.5. Toggleable Data Sources
+**Usage**: `data_client.py`
+The `DEFEATBETA_ENABLED` environment variable (default: `1`) controls whether defeatbeta or yfinance/yahooquery is used for fundamental data, price history, news, and DCF calculations.
+*   **Enabled (`1`)**: Uses defeatbeta for fundamentals/history/news/DCF (weekly cached snapshots, no rate limits), yfinance for live price only.
+*   **Disabled (`0`)**: Falls back entirely to yfinance/yahooquery for all data.
+*   Each function checks the flag at entry and branches accordingly — no duplicate code paths.
 
 ## 3. Frontend Architecture
 
@@ -58,11 +65,14 @@ The frontend acts as a lightweight SPA.
 *   **Event Delegation**: Modal handlers and chart toggles are attached to the global scope or delegated.
 *   **State Management**: `currentPortfolioId`, `portfolios` array, and `DATA_CACHE` (frontend side implied) manage local state.
 
+### 3.2. Cache-Busting Strategy
+The `index.html` response includes `Cache-Control: no-cache` headers. Script tags include `?v=N` version query parameters that must be bumped when JS files change. Current version: `v=17`.
+
 ## 4. Data Flow
 1.  **User Request**: User clicks "Analyze AAPL".
 2.  **Controller**: `main.py` receives GET `/api/analyze/AAPL?strategy=buffett`.
 3.  **Service**: `analyze_stock` instantiates `BuffettStrategy`.
-4.  **Facade**: Strategy calls `yfinance` to get raw data.
+4.  **Facade**: Strategy calls `data_client.py` which routes to defeatbeta or yfinance based on `DEFEATBETA_ENABLED`.
 5.  **Logic**: Strategy applies rules (e.g., `if roe > 15: score += 1`).
 6.  **Response**: JSON verdict returned to Frontend.
 7.  **Render**: `app.js` updates the DOM with the "Scorecard" and "Reasons".
@@ -73,3 +83,9 @@ The frontend acts as a lightweight SPA.
     *   `static/` - Frontend assets (served directly).
     *   `data/` - SQLite database location.
     *   `docs/` - Documentation.
+*   `frontend/` - Client-side code.
+    *   `app.js` - Main orchestrator, tab navigation.
+    *   `portfolio.js` - Portfolio CRUD and trade modal.
+    *   `js/api.js` - API base config.
+    *   `js/utils.js` - Shared utilities (formatting, tooltips, TradingView links).
+    *   `js/components/` - Feature-specific modules (marketStatus, researchUi, thematic, etc.).

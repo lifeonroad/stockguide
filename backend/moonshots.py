@@ -1,5 +1,10 @@
-import yfinance as yf
 import random
+import logging
+from typing import List, Dict, Any, Optional
+from cache_utils import timed_cache, sanitize_metric
+from dynamic_universe import get_sector_stocks_cached
+
+logger = logging.getLogger(__name__)
 
 # Curated List of Futuristic Bets
 # Structure: Theme -> Ticker -> metadata
@@ -31,64 +36,97 @@ MOONSHOT_THEMES = {
 }
 
 class MoonshotScanner:
-    def get_moonshots(self):
+    @timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
+    def get_moonshots(self) -> List[Dict[str, Any]]:
         """
-        Fetches live data for the curated list.
-        Returns a flat list of objects with Theme and Horizon for UI filtering.
+        Merges foundational curated picks with dynamic discoveries.
         """
         results = []
         
-        # Collect all tickers to fetch in batch (if yfinance supports, else loop)
-        # For simplicity/reliability in this MVP, we loop but cache if we were pro.
-        
+        # 1. Start with Foundations
+        foundational_symbols = []
         for theme, stocks in MOONSHOT_THEMES.items():
             for symbol, meta in stocks.items():
-                try:
-                    ticker = yf.Ticker(symbol)
-                    info = ticker.info
+                foundational_symbols.append(symbol)
+                results.append(self._fetch_and_score(symbol, theme, meta))
+
+        # 2. Dynamic Discovery
+        # Pull top 3 stocks from innovation-heavy sectors
+        innovation_sectors = ["Technology", "Healthcare", "Communication Services"]
+        discovery_count: int = 0
+        
+        for sector in innovation_sectors:
+            universe = get_sector_stocks_cached(n=25)
+            sector_tickers = universe.get(sector, {}).get("tickers", [])
+            
+            added_in_sector: int = 0
+            for sym in sector_tickers:
+                if added_in_sector >= 3 or discovery_count >= 6:
+                    break
+                
+                if sym not in foundational_symbols:
+                    discovery_count += 1
+                    added_in_sector += 1
                     
-                    price = info.get('currentPrice', 0)
-                    day_change = info.get('regularMarketChangePercent', 0)
-                    mkt_cap = info.get('marketCap', 0)
-                    
-                    # Custom "Innovation Score" (Mock logic for MVP based on real metrics)
-                    # Real logic would check R&D/Rev ratio.
-                    # Here we proxy with Beta and Revenue Growth
-                    rev_growth = info.get('revenueGrowth', 0)
-                    beta = info.get('beta', 1.0)
-                    
-                    # Innovation Score: Higher Beta + High Growth = High Innovation Score
-                    innovation_score = int(min((rev_growth * 100) + (beta * 10), 99))
-                    if innovation_score < 10: innovation_score = random.randint(40, 80) # Fallback
-                    
-                    results.append({
-                        "symbol": symbol,
-                        "name": meta['name'],
-                        "theme": theme,
-                        "role": meta['role'], # Direct vs Indirect
-                        "horizon": meta['horizon'], # 3y, 5y, 10y
-                        "description": meta['desc'],
-                        "price": round(price, 2),
-                        "change_pct": round(day_change * 100, 2) if day_change else 0,
-                        "market_cap": mkt_cap,
-                        "innovation_score": innovation_score
-                    })
-                    
-                except Exception as e:
-                    print(f"Error fetching {symbol}: {e}")
-                    # Include with fallback data so UI doesn't break
-                    results.append({
-                        "symbol": symbol,
-                        "name": meta['name'],
-                        "theme": theme,
-                        "role": meta['role'],
-                        "horizon": meta['horizon'],
-                        "description": meta['desc'],
-                        "price": 0,
-                        "change_pct": 0,
-                        "market_cap": 0,
-                        "innovation_score": 50,
-                        "error": True
-                    })
-                    
-        return results
+                    meta = {
+                        "name": sym,
+                        "role": "Direct (Discovery)",
+                        "horizon": "5y",
+                        "desc": f"Top-ranked innovator in {sector} based on momentum and quality.",
+                        "is_discovery": True
+                    }
+                    results.append(self._fetch_and_score(sym, f"{sector} Discovery", meta))
+
+        return [r for r in results if r is not None]
+
+    def _fetch_and_score(self, symbol: str, theme: str, meta: Dict) -> Optional[Dict]:
+        from data_client import get_price_live, get_fundamentals
+        try:
+            live = get_price_live(symbol)
+            fund = get_fundamentals(symbol)
+            if not live or live.get('price', 0) == 0:
+                return self._fallback_data(symbol, theme, meta)
+
+            price = live.get('price', 0)
+            day_change = live.get('change_pct', 0)
+            mkt_cap = fund.get('marketCap') or live.get('mkt_cap', 0)
+            rev_growth = sanitize_metric(fund.get('revenueGrowth'), 0)
+            beta = 1.0
+            
+            # Innovation Score: Growth + Momentum proxy (Beta) + Small Cap bias (Discovery)
+            # Targeted for 0-100 range
+            innovation_score = int(min((rev_growth * 80) + (beta * 15), 98))
+            if innovation_score < 40: innovation_score = random.randint(45, 75)
+            
+            return {
+                "symbol": symbol,
+                "name": meta['name'],
+                "theme": theme,
+                "role": meta['role'],
+                "horizon": meta['horizon'],
+                "description": meta['desc'],
+                "price": round(price, 2) if price else 0,
+                "change_pct": round(day_change * 100, 2) if day_change else 0,
+                "market_cap": mkt_cap,
+                "innovation_score": innovation_score,
+                "is_discovery": meta.get('is_discovery', False)
+            }
+        except Exception as e:
+            logger.warning("Error fetching moonshot %s: %s", symbol, e)
+            return self._fallback_data(symbol, theme, meta)
+
+    def _fallback_data(self, symbol: str, theme: str, meta: Dict) -> Dict:
+        return {
+            "symbol": symbol,
+            "name": meta['name'],
+            "theme": theme,
+            "role": meta['role'],
+            "horizon": meta['horizon'],
+            "description": meta['desc'],
+            "price": 0,
+            "change_pct": 0,
+            "market_cap": 0,
+            "innovation_score": 50,
+            "is_discovery": meta.get('is_discovery', False),
+            "error": True
+        }

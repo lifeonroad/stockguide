@@ -1,14 +1,17 @@
 
-import yfinance as yf
+from data_client import get_ticker_info, get_price_history
 from macro import get_macro_trends, SECTOR_MAP
-
+from cache_utils import fetch_with_retry
 import math
 
 class BaseStrategy:
     def __init__(self, symbol):
         self.symbol = symbol.upper()
-        self.ticker = yf.Ticker(symbol)
-        self.info = self.ticker.info
+        try:
+            self.info = get_ticker_info(symbol)
+        except Exception:
+            self.info = {}
+        self._has_data = 'trailingPE' in self.info or 'currentPrice' in self.info
         self.reasons = []
         self.score = 0
         self.rating = "HOLD"
@@ -63,7 +66,9 @@ class BaseStrategy:
         Note: Sells are less meaningful (liquidity), but Cluster Sales are bad.
         """
         try:
-            tx = self.ticker.insider_transactions
+            import yfinance as yf
+            ticker = yf.Ticker(self.symbol)
+            tx = ticker.insider_transactions
             if tx is None or tx.empty:
                 return "Neutral (No Data)"
             
@@ -134,7 +139,7 @@ class BuffettStrategy(BaseStrategy):
     Long Only focus.
     """
     def run(self):
-        if 'symbol' not in self.info: return {"error": "Symbol not found"}
+        if not self._has_data: return {"error": "Symbol not found", "symbol": self.symbol}
         
         # Metrics
         price = self.get_metric('currentPrice')
@@ -222,7 +227,7 @@ class BurryStrategy(BaseStrategy):
     Looks for hidden disasters (Shorts) or hidden gems (Deep Value).
     """
     def run(self):
-        if 'symbol' not in self.info: return {"error": "Symbol not found"}
+        if not self._has_data: return {"error": "Symbol not found", "symbol": self.symbol}
         
         price = self.get_metric('currentPrice')
         ev_ebitda = self.get_metric('enterpriseToEbitda', 0)
@@ -294,7 +299,7 @@ class LynchStrategy(BaseStrategy):
     PEG Ratio, Inventory Check.
     """
     def run(self):
-        if 'symbol' not in self.info: return {"error": "Symbol not found"}
+        if not self._has_data: return {"error": "Symbol not found", "symbol": self.symbol}
         
         price = self.get_metric('currentPrice')
         peg = self.get_metric('pegRatio', 0)
@@ -350,4 +355,17 @@ def analyze_stock(symbol, strategy_name='buffett'):
     }
     
     cls = strategies.get(strategy_name.lower(), BuffettStrategy)
-    return cls(symbol).run()
+    result = cls(symbol).run()
+    
+    if isinstance(result, dict) and "error" not in result:
+        try:
+            from indicators import calculate_rsi, get_price_history_for_indicators
+            df = get_price_history_for_indicators(symbol, min_days=30)
+            if df is not None and not df.empty and 'close' in df.columns:
+                result["rsi_14"] = round(calculate_rsi(df['close'], 14), 1)
+            else:
+                result["rsi_14"] = None
+        except Exception:
+            result["rsi_14"] = None
+    
+    return result

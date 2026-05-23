@@ -1,105 +1,109 @@
-# Rational Equity 📈
+# Rational Equity Dashboard 📊
 
-**Holistic Market Intelligence & Portfolio Dashboard.**
-> "Price is what you pay. Value is what you get." — Warren Buffett
+A self-hosted stock analysis SPA — FastAPI backend + vanilla JS frontend — aggregating data from Yahoo Finance, SEC EDGAR 13F filings, and Dataroma superinvestor portfolios.
 
-## 🚀 Overview
-**Rational Equity** is a comprehensive market dashboard that helps retail investors analyze the market using proven strategies from superinvestors like **Warren Buffett**, **Michael Burry**, and **Peter Lynch**.
-
-It features:
-*   **Rational Compass**: Is the market Overvalued or Undervalued? (Buffett Indicator).
-*   **Economic Indicators**: Live macro data (unemployment, inflation, Fed rates, GDP) from FRED API.
-*   **Market News**: Aggregated financial headlines from Yahoo Finance, Reuters, MarketWatch.
-*   **Macro Impact Analysis**: Real-time sector tailwinds/headwinds based on rates, oil, VIX.
-*   **Holistic Verification**: Automated "Buy/Hold/Sell" verdicts based on fundamental data (ROE, Debt, Margins).
-*   **Multi-Currency Portfolios**: Track USD and CAD assets with automatic currency handling.
-*   **Superinvestor Radar**: Track 13F filings of top hedge funds.
-
-## 🛠 Project Structure
-The project is set up as a monolithic repo with separated concerns:
-
-```text
-repo/
-├── backend/          # Python API (FastAPI) & Logic
-│   ├── main.py       # Entry point
-│   ├── analyst.py    # Strategy Logic
-│   ├── economic.py   # FRED API integration
-│   ├── news.py       # RSS feed aggregator
-│   ├── macro.py      # Macro indicators & sector impacts
-│   └── data/         # SQLite Database (Local only)
-├── frontend/         # Static Assets (HTML/JS/CSS)
-│   ├── index.html
-│   └── app.js
-├── .env              # Environment variables (API keys)
-└── README.md
-```
-
-## ⚡ Quick Start
-
-### 1. Prerequisites
-*   Python 3.9+
-*   `pip`
-
-### 2. Installation
-```bash
-pip install fastapi "uvicorn[standard]" yfinance pandas requests feedparser python-dotenv
-```
-
-### 3. Environment Setup (Optional but Recommended)
-Create a `.env` file in the project root to enable live economic data:
+## Quick Start
 
 ```bash
-# .env
-FRED_API_KEY=your_fred_api_key_here
+./start.sh
 ```
 
-**Get a free FRED API key**: https://fred.stlouisfed.org/docs/api/api_key.html
+Or manually:
 
-> **Note**: Without a FRED API key, the Economics tab will display demo data.
-
-### 4. Running the Server
-
-**Option A: Simplified launcher (recommended)**
 ```bash
-python3 run.py
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cd stockguide && python3 run.py
 ```
-This automatically:
-- Loads environment variables from `.env`
-- Starts the backend server
-- Opens your browser to the dashboard
 
-**Option B: Manual**
+Open **http://localhost:8000**
+
+## Features
+
+### 📈 Market Dashboard
+- Real-time market status, Buffett indicator, macro trends
+- Economic indicators (FRED), money flow analysis, news
+- Market cycle analytics and technical support/resistance zones
+
+### 🎯 Dip Hunter & Opportunities
+- Multi-factor dip detection across 250+ ticker universe
+- Market regime context-aware dip classification
+- Per-sector dynamic universe scoring (18.5s scan)
+
+### 🔭 Superinvestor Tracking
+- **Superinvestors Tab** — Live 13F data from SEC EDGAR (free API)
+- Detail modal with sector breakdown, QoQ changes, top moves
+- Dataroma.com integration for ~82 tracked managers
+
+### 👥 Guru Consensus
+- Grand Portfolio aggregating all tracked superinvestors' holdings
+- Views: Holdings, Qtr Buys/Sells, 6mo Buys/Sells, Sector allocation
+- 6-month comparison column on quarter views
+- **Consensus Picks** — Composite scoring (0-100) ranking stocks by sustained buying, ownership breadth, net manager activity, 52w low proximity, and portfolio weight
+
+### 📊 Guru Flow Analytics
+- Most Widely Held, Most Bought/Sold by manager count
+- New Positions, Single-Manager Heavy Bets (>30% portfolio)
+- Near 52w Low opportunities, Sector Rotation (net buying vs selling)
+- Sustained Buying signals (quarter + 6-month confirmation)
+- Sortable columns on all tables
+
+### 📋 Copycat Portfolio
+- Multi-manager overlap detection
+- Filter by signal type (new buys, conviction up, exits, trims)
+- Live from SEC EDGAR 13F filings
+
+### 📊 Pro Screeners & Strategies
+- Deep value, growth at reasonable price, Buffet/Burry/Lynch analysis
+- Momentum investing (8-factor scoring engine)
+- Moonshots (3/5/10 year horizon), Small Caps, International picks
+- Contrarian opportunities, Inflation busters
+
+### 💼 Portfolio Management
+- CRUD portfolios with positions
+- PDF/CSV import (WealthSimple format)
+- Performance tracking
+
+## Data Sources
+
+| Source | Data | Cache TTL |
+|---|---|---|
+| Yahoo Finance / yahooquery | Price, fundamentals, analysis | Per-ticker rate limited (48/day) |
+| SEC EDGAR | 13F filings (free, no API key) | Quarterly |
+| Dataroma.com | Superinvestor portfolios, grand portfolio, activity | 720h (quarterly) |
+| FRED | Economic indicators | Per-endpoint |
+
+## Architecture
+
+```
+5-tier caching: Business Logic → DataOrchestrator → SQLite → RateLimiter → NetworkClient
+```
+
+- **timed_cache** — In-memory SWR with circuit breaker
+- **SQLite persistent cache** — WAL mode, 3 tables, per-type staleness
+- **RateLimiter** — 30min between fetches, 48/day per ticker
+- **IntelligentTTL** — Adaptive by beta, earnings, market hours
+
+## Deploy
+
+Render.com free tier (1 worker, 4 threads, 120s timeout):
 ```bash
-cd backend
-python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+git push origin deploy
 ```
 
-### 5. Access the Dashboard
-Open your browser to:
-[http://localhost:8000](http://localhost:8000)
+See `DEPLOYMENT.md` for details.
 
-## 📊 Features
+## Configuration
 
-### Economics Tab
-- **Live Macro Indicators**: Unemployment, CPI inflation, Fed funds rate, GDP growth
-- **Data Source**: Federal Reserve Economic Data (FRED) API
-- **Update Frequency**: Daily (24-hour cache)
+```bash
+DEFEATBETA_ENABLED=0 python3 run.py   # yfinance/yahooquery only
+DEFEATBETA_ENABLED=1 python3 run.py   # defeatbeta proxy (default)
+```
 
-### News Tab
-- **Aggregated Headlines**: Yahoo Finance, Reuters, MarketWatch
-- **Update Frequency**: Hourly (1-hour cache)
-- **Filter**: Market-relevant news only
+## Troubleshooting
 
-### Macro Impact Column
-Analyzes current macro conditions to determine sector tailwinds/headwinds:
-- **Rising Rates** → Headwind for Tech/Real Estate, Tailwind for Financials
-- **Rising Oil** → Tailwind for Energy, Headwind for Consumers
-- **High VIX** → Tailwind for Defensive sectors (Healthcare, Staples)
+**Stale frontend?** Hard refresh `Ctrl+Shift+R`. JS version in `index.html` (`?v=N`).
 
-## 🔒 Privacy & Data
-*   **Local Storage**: All your portfolio data is stored in `backend/data/portfolios.db`.
-*   **No Cloud Sync**: Your financial data never leaves your machine.
-*   **Git Safe**: Database files and `.env` are `.gitignored`, so your secrets are safe from GitHub uploads.
+**Port in use?** `lsof -ti:8000 | xargs kill -9`
 
-## 🤖 Architecture
-See [backend/docs/ARCHITECTURE.md](backend/docs/ARCHITECTURE.md) for deep technical details.
+**Yahoo rate limits after restart?** Wait 60s — background warming runs staggered.

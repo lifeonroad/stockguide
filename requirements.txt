@@ -1,0 +1,15 @@
+fastapi==0.111.0
+starlette==0.37.2
+uvicorn[standard]>=0.31.1
+python-dotenv==1.0.0
+yfinance
+yahooquery
+pandas
+numpy
+feedparser
+requests
+pdfplumber
+python-multipart
+gunicorn
+beautifulsoup4
+lxml

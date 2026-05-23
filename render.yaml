@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: rational-equity
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: |
+      cd backend && gunicorn --bind :$PORT --workers 1 --threads 4 --timeout 120 --worker-class uvicorn.workers.UvicornWorker main:app
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: PORT
+        value: 10000

@@ -1,7 +1,16 @@
 
+import time
 import yfinance as yf
+import concurrent.futures
+from typing import Optional
 import pandas as pd
 import random
+from cache_utils import timed_cache, fetch_with_retry
+from data_client import get_ticker_info
+
+# Import rate limiting
+from rate_limiter import get_rate_limiter, MIN_REFRESH_INTERVAL
+from intelligent_ttl import get_cached_ttl
 
 # Mapping Sectors to ETFs (Proxies)
 SECTOR_ETFS = {
@@ -19,106 +28,291 @@ SECTOR_ETFS = {
 }
 
 # Pre-defined list of top stocks per sector for MVP scanning
-# Fetching all stocks is too slow for yfinance without caching/batching
+# Expanded to ~20-25 per sector for deeper dip hunting
 SECTOR_STOCKS = {
-    "Technology": ["AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "ADBE", "CSCO", "CRM"],
-    "Financials": ["JPM", "BAC", "WFC", "GS", "MS", "AXP", "BLK", "C"],
-    "Healthcare": ["LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO", "PFE", "AMGN"],
-    "Energy": ["XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO"],
-    "Consumer Discretionary": ["AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "LOW", "BKNG"],
-    "Industrials": ["CAT", "UNP", "GE", "HON", "DE", "UPS", "LMT", "BA"],
-    "Consumer Staples": ["PG", "COST", "PEP", "KO", "WMT", "PM", "MO", "CL"],
-    "Materials": ["LIN", "SHW", "FCX", "APD", "ECL", "NEM", "DOW", "DD"],
-    "Utilities": ["NEE", "DUK", "SO", "AEP", "SRE", "D", "EXC", "PEG"],
-    "Real Estate": ["PLD", "AMT", "EQIX", "CCI", "PSA", "O", "VICI", "DLR"],
-    "Communication Services": ["GOOGL", "META", "NFLX", "DIS", "TMUS", "CMCSA", "VZ", "T"]
+    "Technology": [
+        "AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "ADBE", "CSCO", "CRM",
+        "AMD", "TXN", "QCOM", "INTU", "AMAT", "IBM", "MU", "NOW",
+        "PANW", "SNPS", "CDNS", "KLAC", "APH", "MSI", "TEL", "LRCX"
+    ],
+    "Financials": [
+        "JPM", "BAC", "WFC", "GS", "MS", "AXP", "BLK", "C",
+        "V", "MA", "SPGI", "PYPL", "FIS", "ICE", "CB", "PGR",
+        "MET", "AIG", "TRV", "PNC", "USB", "TFC", "SCHW", "BRK-B"
+    ],
+    "Healthcare": [
+        "LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO", "PFE", "AMGN",
+        "DHR", "ISRG", "SYK", "VRTX", "REGN", "BMY", "GILD", "ZTS",
+        "MDT", "BDX", "BSX", "HUM", "CI", "ELV", "MCK", "ABT"
+    ],
+    "Energy": [
+        "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO",
+        "OXY", "HAL", "BKR", "HES", "KMI", "WMB", "TRGP", "FANG",
+        "DVN", "CTRA", "OKE", "APA"
+    ],
+    "Consumer Discretionary": [
+        "AMZN", "TSLA", "HD", "MCD", "NKE", "SBUX", "LOW", "BKNG",
+        "TJX", "LULU", "CMG", "F", "GM", "MAR", "HLT", "RCL",
+        "CCL", "AZO", "ORLY", "EBAY", "ETSY", "PHM", "LEN", "DHI"
+    ],
+    "Industrials": [
+        "CAT", "UNP", "GE", "HON", "DE", "UPS", "LMT", "BA",
+        "RTX", "MMM", "L3H", "NSC", "CSX", "FDX", "WM", "RSG",
+        "PH", "ITW", "ETN", "EMR", "ROP", "TDG", "GD", "NOC"
+    ],
+    "Consumer Staples": [
+        "PG", "COST", "PEP", "KO", "WMT", "PM", "MO", "CL",
+        "EL", "TGT", "KHC", "MDLZ", "GIS", "SYY", "ADM", "MNST",
+        "HSY", "KR", "STZ", "K", "MKC", "CHD"
+    ],
+    "Materials": [
+        "LIN", "SHW", "FCX", "APD", "ECL", "NEM", "DOW", "DD",
+        "ALB", "PPG", "VMC", "MLM", "CTVA", "CF", "MOS", "NUE",
+        "STLD", "FREE", "FMC", "CE"
+    ],
+    "Utilities": [
+        "NEE", "DUK", "SO", "AEP", "SRE", "D", "EXC", "PEG",
+        "XEL", "ED", "WEC", "ES", "PCG", "FE", "VST", "CEG",
+        "CNP", "CMS", "ATO", "NI"
+    ],
+    "Real Estate": [
+        "PLD", "AMT", "EQIX", "CCI", "PSA", "O", "VICI", "DLR",
+        "SPG", "WELL", "CBRE", "AVB", "EQR", "ARE", "WY", "IRM",
+        "VTR", "BXP", "HST", "MAA"
+    ],
+    "Communication Services": [
+        "GOOGL", "META", "NFLX", "DIS", "TMUS", "CMCSA", "VZ", "T",
+        "CHTR", "WBD", "FOXA", "PARA", "TTWO", "EA", "MTCH", "OMC",
+        "IPG", "LYV", "NFLX", "GOOG"
+    ]
 }
 
+# Specialized Lists
+GROWTH_STOCKS = [
+    "NVDA", "PLTR", "SNOW", "TSLA", "AMD", "ARM", "MSTR", "SQ", 
+    "SHOP", "MDB", "DDOG", "NET", "CRWD", "ZS", "OKTA", "PANW", 
+    "SMCI", "ANET", "U", "MELI", "COIN", "DKNG", "HOOD", "RBLX"
+]
+
+DIVIDEND_KINGS = [
+    "KO", "PEP", "PG", "JNJ", "MMM", "ABBV", "LOW", "TGT", 
+    "CVX", "XOM", "MCD", "SYY", "ADM", "CL", "GPC", "SPGI", 
+    "ITW", "EMR", "DOV", " Genuine Parts (GPC)", "SPG", "K", "MO", "PM"
+]
+
+
+def get_sector_stocks(sector: Optional[str] = None, n: int = 25) -> dict:
+    """
+    Single source of truth for sector ticker lists.
+    Returns INSTANTLY — never blocks on network calls.
+    Triggers background scoring on first call so future requests get live data.
+
+    Returns
+    -------
+    If *sector* is given:
+        { "tickers": [...], "is_dynamic": bool, "scored_at": str }
+    If *sector* is None:
+        Full dict keyed by sector name.
+    """
+    try:
+        from dynamic_universe import (  # noqa: PLC0415
+            get_sector_stocks_cached,
+            trigger_background_score,
+        )
+        # Kick off background scoring (no-op if already running or cache fresh)
+        trigger_background_score(n=n)
+        universe = get_sector_stocks_cached(n=n)
+    except Exception:
+        from datetime import datetime, timezone  # noqa: PLC0415
+        now = datetime.now(timezone.utc).isoformat()
+        universe = {
+            s: {"tickers": t, "is_dynamic": False, "scored_at": now}
+            for s, t in SECTOR_STOCKS.items()
+        }
+
+    if sector is not None:
+        return universe.get(sector, {
+            "tickers": SECTOR_STOCKS.get(sector, []),
+            "is_dynamic": False,
+            "scored_at": None,
+        })
+    return universe
+
+
+def get_sector_meta(sector: Optional[str] = None) -> dict:
+    """
+    Return universe metadata (is_dynamic, scored_at, ttl_hours, partially_dynamic).
+    Instant — reads from cache only, never triggers network calls.
+    """
+    try:
+        from dynamic_universe import get_sector_meta as _get_meta  # noqa: PLC0415
+        return _get_meta(sector=sector)
+    except Exception:
+        return {
+            "is_dynamic": False,
+            "partially_dynamic": False,
+            "scored_at": None,
+            "ttl_hours": 24,
+        }
+
+
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
+def get_sector_metrics_from_constituents(sector_name):
+    """
+    Calculate sector average ROE and Debt/Equity from top constituent stocks.
+    Uses DB-first, then falls back to yahooquery.
+    Returns tuple: (avg_roe, avg_debt_equity)
+    """
+    stocks = get_sector_stocks(sector_name).get("tickers", [])
+    if not stocks:
+        return 0, 0
+    
+    sample = stocks[:5]
+    roe_values = []
+    debt_values = []
+    
+    try:
+        from persistent_cache import get_bulk_ticker_info
+        cached = get_bulk_ticker_info(sample)
+        for sym in sample:
+            data = cached.get(sym.upper(), {})
+            roe = data.get("roe")
+            debt = data.get("debt_to_equity")
+            if roe is not None and roe > 0:
+                roe_values.append(float(roe) * 100)
+            if debt is not None and debt >= 0:
+                debt_values.append(float(debt))
+        
+        if not roe_values and not debt_values:
+            # Check rate limiter before network call
+            limiter = get_rate_limiter()
+            if limiter.can_fetch(sample[0], "fundamentals")[0]:
+                from yahooquery import Ticker
+                tq = Ticker(sample)
+                fd = tq.financial_data
+                if isinstance(fd, dict):
+                    for sym in sample:
+                        data = fd.get(sym, {})
+                        roe = data.get("returnOnEquity")
+                        debt = data.get("debtToEquity")
+                        if roe and roe > 0:
+                            roe_values.append(roe * 100)
+                        if debt is not None and debt >= 0:
+                            debt_values.append(debt)
+                        limiter.record_fetch(sym, "fundamentals")
+    except Exception:
+        pass
+    
+    avg_roe = sum(roe_values) / len(roe_values) if roe_values else 0
+    avg_debt = sum(debt_values) / len(debt_values) if debt_values else 0
+    return round(avg_roe, 2), round(avg_debt, 2)
+
+
+@timed_cache(ttl_seconds=3600, soft_ttl_seconds=2700)  # 1h hard, 45m soft (SWR)
 def get_industry_rankings():
     """
-    Analyzes Sector ETFs to find the most 'Undervalued' and 'High Quality'.
-    Note: ETF 'info' in yfinance often contains aggregate PE, Yield, etc.
+    Analyzes Sector ETFs with real constituent-based metrics.
+    Calculates ROE and Debt/Equity from top holdings in each sector.
+    All fetches are parallelized — typically completes in ~5-8s first run.
     """
     results = []
     
-    for sector, ticker_symbol in SECTOR_ETFS.items():
-        ticker = yf.Ticker(ticker_symbol)
-        info = ticker.info
+    def fetch_sector_data(sector, ticker_symbol):
+        # Fetch ETF info
+        try:
+            ticker = yf.Ticker(ticker_symbol)
+            info = fetch_with_retry(lambda t=ticker: t.info, max_attempts=3, base_delay=1.5)
+            pe = info.get('trailingPE') or info.get('forwardPE') or 20
+            div_yield = info.get('yield', 0) or info.get('trailingAnnualDividendYield', 0)
+        except Exception:
+            pe, div_yield = 20, 0
         
-        # Extract metrics (fallback to 0 or estimates if missing)
-        # Note: ETF fields can be different from Stock fields
-        pe = info.get('trailingPE') or info.get('forwardPE') or 20
-        # PriceToSales is not always directly on ETF info, sometimes yield is better proxy for 'value' in sectors? 
-        # We will iterate through a few stocks to get a better sector average if ETF data is sparse.
+        # Fetch constituent metrics (cached 1h per sector)
+        avg_roe, avg_debt = get_sector_metrics_from_constituents(sector)
         
-        # Let's try to be simple for MVP:
-        # Use whatever ETF info we have.
-        
-        # Mocking or Approximate Logic if explicit aggregate fields missing:
-        # We prioritize: PE, Yield.
-        div_yield = info.get('yield', 0) or info.get('trailingAnnualDividendYield', 0)
-        
-        # Quality Proxy: ROE is hard to get for an ETF directly.
-        # We will simulate "Screener" logic by picking top 3 stocks and averaging.
-        
-        results.append({
+        return {
             "industry": sector,
             "etf": ticker_symbol,
             "pe": round(pe, 2),
             "dividend_yield": round(div_yield * 100, 2) if div_yield else 0,
-            # Placeholder for calculated aggregate metrics
-            "roe": 0, 
-            "debt_to_equity": 0
-        })
-
-    # Sort by 'Value' (Low PE) for now
+            "roe": avg_roe,
+            "debt_to_equity": avg_debt,
+        }
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=11) as executor:
+        futures = {
+            executor.submit(fetch_sector_data, sector, ticker): sector
+            for sector, ticker in SECTOR_ETFS.items()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            results.append(future.result())
+    
     sorted_results = sorted(results, key=lambda x: x['pe'])
     return sorted_results
 
+
+@timed_cache(ttl_seconds=1800, soft_ttl_seconds=1200)  # 30m hard, 20m soft (SWR)
 def analyze_sector_fundamentals(sector_name):
     """
     Deep dive into a sector:
     Fetches top stocks, calculates avg ROE, Debt/Eq, P/E.
     Returns: Sector Stats + Top Pick Stocks
+    Cached for 30 minutes to prevent repeated API calls.
+    Uses DB-first approach with rate limiting.
     """
-    stocks = SECTOR_STOCKS.get(sector_name, [])
+    stocks = get_sector_stocks(sector_name).get("tickers", [])
     if not stocks:
-        # Fallback for sectors not in our short list
         return {"error": "Sector data not fully mapped for MVP"}
-        
+    
     stock_data = []
+    limiter = get_rate_limiter()
     
     for symbol in stocks:
-        t = yf.Ticker(symbol)
-        i = t.info
+        i = get_ticker_info(symbol)
+        if not i or 'symbol' not in i:
+            continue
         
-        # Fundamental checks
-        roe = i.get('returnOnEquity', 0)
-        de = i.get('debtToEquity', 0)
-        pe = i.get('trailingPE', 99)
-        profit_margin = i.get('profitMargins', 0)
+        # Check rate limiter before any network call (throttle)
+        can_fetch, _ = limiter.can_fetch(symbol, "fundamentals")
+        if not can_fetch:
+            time.sleep(2)  # Extra throttle when rate limited
+        else:
+            time.sleep(0.3)  # Normal throttle
+        
+        # Fundamental checks — only use keys that actually exist in the data
+        # (missing key means fetch genuinely failed for this ticker)
+        roe = i.get('returnOnEquity') or i.get('roe')
+        de = i.get('debtToEquity') or i.get('debt_to_equity')
+        pe = i.get('trailingPE') or i.get('trailing_pe')
+        profit_margin = i.get('profitMargins') or i.get('profit_margin')
+        price = i.get('currentPrice') or i.get('price')
         
         stock_data.append({
             "symbol": symbol,
-            "name": i.get('shortName', symbol),
-            "price": i.get('currentPrice', 0),
-            "pe": round(pe, 2) if pe else 0,
-            "roe": round(roe * 100, 2) if roe else 0,
-            "debt_to_equity": round(de, 2) if de else 0,
-            "profit_margin": round(profit_margin * 100, 2) if profit_margin else 0
+            "name": i.get('shortName', symbol) or i.get('name', symbol),
+            "price": round(float(price), 2) if price else 0,
+            "pe": round(float(pe), 2) if pe is not None else None,
+            "roe": round(float(roe) * 100, 2) if roe is not None else None,
+            "debt_to_equity": round(float(de), 2) if de is not None else None,
+            "profit_margin": round(float(profit_margin) * 100, 2) if profit_margin is not None else None
         })
         
-    # Calculate Sector Averages
-    avg_roe = sum(s['roe'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_pe = sum(s['pe'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_de = sum(s['debt_to_equity'] for s in stock_data) / len(stock_data) if stock_data else 0
-    avg_margin = sum(s['profit_margin'] for s in stock_data) / len(stock_data) if stock_data else 0
+    # Calculate Sector Averages (filter out None values)
+    roe_vals = [s['roe'] for s in stock_data if s['roe'] is not None]
+    pe_vals = [s['pe'] for s in stock_data if s['pe'] is not None]
+    de_vals = [s['debt_to_equity'] for s in stock_data if s['debt_to_equity'] is not None]
+    margin_vals = [s['profit_margin'] for s in stock_data if s['profit_margin'] is not None]
+    avg_roe = sum(roe_vals) / len(roe_vals) if roe_vals else 0
+    avg_pe = sum(pe_vals) / len(pe_vals) if pe_vals else 0
+    avg_de = sum(de_vals) / len(de_vals) if de_vals else 0
+    avg_margin = sum(margin_vals) / len(margin_vals) if margin_vals else 0
     
     # Filter for "Warren's Picks"
     # Logic: High ROE (>15), Healthy Debt (<100 approx), Fair PE
     top_picks = [
         s for s in stock_data 
-        if s['roe'] > 15 and s['debt_to_equity'] < 200 # Relaxed for MVP (Banks have high D/E)
+        if s.get('roe') is not None and s['roe'] > 15 
+        and s.get('debt_to_equity') is not None and s['debt_to_equity'] < 200
     ]
     
     # Tie-breaker: PE (Lower is better)

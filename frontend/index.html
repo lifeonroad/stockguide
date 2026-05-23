@@ -5,6 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rational Equity | Holistic Market Intelligence</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="shortcut icon" type="image/png" href="/static/favicon.png">
+    <meta name="description"
+        content="Rational Equity — institutional-grade stock analysis, superinvestor radar, deep research hub, and portfolio tracking.">
+    <meta property="og:title" content="Rational Equity | Holistic Market Intelligence">
+    <meta property="og:description"
+        content="Multi-analyst consensus, moat scoring, and growth reality checks for serious investors.">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Fonts -->
@@ -33,17 +40,83 @@
         }
     </script>
     <style>
+        :root {
+            /* Dark Theme (Default) */
+            --bg-main: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-color: #38bdf8;
+            --glass-bg: rgba(30, 41, 59, 0.8);
+            --panel-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        [data-theme="light"] {
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --border-color: rgba(0, 0, 0, 0.08);
+            --accent-color: #0284c7;
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --panel-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        [data-theme="solaris"] {
+            --bg-main: #fdf6e3;
+            --bg-card: #eee8d5;
+            --text-main: #073642;
+            --text-muted: #586e75;
+            --border-color: rgba(101, 123, 131, 0.2);
+            --accent-color: #b58900;
+            --glass-bg: rgba(238, 232, 213, 0.95);
+            --panel-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="contrast"] {
+            --bg-main: #000000;
+            --bg-card: #000000;
+            --text-main: #ffffff;
+            --text-muted: #e2e8f0;
+            --border-color: #ffffff;
+            --accent-color: #ffff00;
+            --glass-bg: #000000;
+            --panel-shadow: none;
+        }
+
         body {
-            background-color: #0f172a;
-            color: #f8fafc;
+            background-color: var(--bg-main);
+            color: var(--text-main);
             margin: 0;
             padding: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
         .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
+            background: var(--glass-bg);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--panel-shadow);
+            transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* Override specific classes for themes */
+        [data-theme="light"] .text-white,
+        [data-theme="solaris"] .text-white {
+            color: var(--text-main) !important;
+        }
+
+        [data-theme="contrast"] .text-warren-accent {
+            color: var(--accent-color) !important;
+        }
+
+        [data-theme="contrast"] border-gray-800 {
+            border-color: var(--border-color) !important;
+        }
+
+        [data-theme="contrast"] .bg-gray-900 {
+            background-color: #111 !important;
         }
 
         .animate-fade-in {
@@ -188,11 +261,125 @@
                 </select>
             </div>
 
-            <div class="text-sm text-gray-400 whitespace-nowrap hidden sm:block">
-                Live Analysis
+            <div class="flex items-center gap-4">
+                <div class="relative inline-block text-left" id="theme-switcher-container">
+                    <button onclick="toggleThemeMenu()"
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-full glass-panel text-[10px] font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-widest border border-gray-700 hover:border-warren-accent">
+                        <span id="current-theme-icon">🌙</span>
+                        <span class="hidden md:inline">Theme</span>
+                    </button>
+                    <div id="theme-menu"
+                        class="hidden absolute right-0 mt-2 w-40 rounded-xl glass-panel shadow-2xl border border-gray-700 py-1 z-[60]">
+                        <button onclick="setTheme('dark')"
+                            class="w-full text-left px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-white hover:bg-gray-800/50 flex items-center gap-3 uppercase tracking-tighter">
+                            <span>🌙</span> Dark Mode
+                        </button>
+                        <button onclick="setTheme('light')"
+                            class="w-full text-left px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-white hover:bg-gray-800/50 flex items-center gap-3 uppercase tracking-tighter">
+                            <span>☀️</span> Light Mode
+                        </button>
+                        <button onclick="setTheme('solaris')"
+                            class="w-full text-left px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-white hover:bg-gray-800/50 flex items-center gap-3 uppercase tracking-tighter">
+                            <span>🌅</span> Solaris
+                        </button>
+                        <button onclick="setTheme('contrast')"
+                            class="w-full text-left px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-white hover:bg-gray-800/50 flex items-center gap-3 uppercase tracking-tighter">
+                            <span>👁️</span> Contrast
+                        </button>
+                    </div>
+                </div>
+                <div
+                    class="text-[10px] text-gray-400 whitespace-nowrap hidden sm:flex items-center gap-2 uppercase font-black tracking-widest opacity-60">
+                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    Live Analysis
+                </div>
             </div>
         </div>
     </header>
+
+    <!-- Superinvestor Detail Modal -->
+    <div id="superinvestor-detail-modal" class="fixed inset-0 z-[60] hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 py-8">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-90" onclick="closeSuperinvestorDetail()"></div>
+            <div class="glass-panel rounded-2xl overflow-hidden shadow-xl relative z-10 w-full max-w-5xl max-h-[90vh] flex flex-col border border-gray-700">
+                <!-- Header -->
+                <div class="p-6 border-b border-gray-700 flex items-start justify-between bg-gray-800/50 shrink-0">
+                    <div class="flex items-center gap-4">
+                        <div id="si-detail-avatar" class="w-14 h-14 rounded-full bg-gray-700 flex items-center justify-center text-2xl font-bold text-white shadow-inner">WB</div>
+                        <div>
+                            <h3 id="si-detail-name" class="text-2xl font-bold text-white">Loading...</h3>
+                            <div id="si-detail-firm" class="text-sm text-gray-400"></div>
+                            <div id="si-detail-style" class="mt-1 text-xs text-warren-accent font-medium uppercase tracking-wider"></div>
+                            <div id="si-detail-dataroma" class="mt-1.5"></div>
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-xs text-gray-500 uppercase">Quarter</div>
+                        <div id="si-detail-quarter" class="text-lg font-bold text-white">--</div>
+                    </div>
+                </div>
+                <!-- Stats Bar -->
+                <div class="grid grid-cols-4 gap-px bg-gray-700/50 shrink-0">
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Portfolio Value</div>
+                        <div id="si-stat-value" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Holdings</div>
+                        <div id="si-stat-holdings" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Top 3 Concentration</div>
+                        <div id="si-stat-concentration" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                    <div class="bg-gray-800/80 p-4 text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-wider">Changes</div>
+                        <div id="si-stat-changes" class="text-lg font-bold text-white mt-1">--</div>
+                    </div>
+                </div>
+                <!-- Body -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                    <!-- Sector Breakdown -->
+                    <div id="si-sector-section">
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Sector Allocation</h4>
+                        <div id="si-sector-bars" class="space-y-2"></div>
+                    </div>
+                    <!-- Changes Breakdown -->
+                    <div id="si-changes-section">
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Changes this Quarter</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="si-changes-grid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <!-- Holdings Table -->
+                    <div>
+                        <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Holdings</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg">Ticker</th>
+                                        <th class="px-4 py-3">Name</th>
+                                        <th class="px-4 py-3 text-right">Value ($M)</th>
+                                        <th class="px-4 py-3 text-right">Weight</th>
+                                        <th class="px-4 py-3 rounded-r-lg">Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="si-holdings-body" class="divide-y divide-gray-800">
+                                    <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading holdings...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- Footer -->
+                <div class="p-4 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center shrink-0">
+                    <span id="si-detail-source" class="text-[10px] text-gray-600"></span>
+                    <button onclick="closeSuperinvestorDetail()" class="px-4 py-2 bg-warren-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Forecast Modal (Hidden by default) -->
     <div id="forecast-modal" class="fixed inset-0 z-[60] hidden overflow-y-auto" aria-labelledby="modal-title"
@@ -367,804 +554,1577 @@
 
     <!-- Section 1: The Buffett Indicator (Macro) -->
     <section class="animate-fade-in">
-        <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
-            <svg class="w-6 h-6 text-warren-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
-                </path>
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-                    <!-- Navigation Tabs -->
-                    <div class="flex space-x-1 bg-gray-800/50 p-1 rounded-xl w-fit mb-8 border border-gray-700">
-                        <button onclick="switchTab('dashboard')" id="tab-dashboard"
-                            class="px-5 py-2 rounded-lg text-sm font-medium transition-all bg-warren-accent text-white shadow-lg">
-                            Market Dashboard
-                        </button>
-                        <button onclick="switchTab('superinvestors')" id="tab-superinvestors"
-                            class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all">
-                            Superinvestor Radar 📡
-                        </button>
-                        <button id="tab-copycat" onclick="switchTab('copycat')"
-                            class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Copycat Portfolio <span class="ml-1 text-xs">👯‍♂️</span>
-                        </button>
-                        <button id="tab-moonshots" onclick="switchTab('moonshots')"
-                            class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Futuristic Bets <span class="ml-1 text-xs">🚀</span>
-                        </button>
-                        <button id="tab-screeners" onclick="switchTab('screeners')"
-                            class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Pro Screeners <span class="ml-1 text-xs">📡</span>
-                        </button>
-                        <button id="tab-economics" onclick="switchTab('economics')"
-                            class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Economics <span class="ml-1 text-xs">📊</span>
-                        </button>
-                        <button id="tab-contrarian" onclick="switchTab('contrarian')"
-                            class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                            Contrarian Edge <span class="ml-1 text-xs">🎯</span>
-                        </button>
-                        <button id="tab-portfolio" onclick="switchTab('portfolio')"
-                            class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                            My Portfolios <span class="ml-1 text-xs">💼</span>
-                        </button>
+            <!-- Navigation Tabs -->
+            <div class="flex flex-wrap gap-2 bg-gray-800/50 p-2 rounded-xl mb-8 border border-gray-700">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard"
+                    class="px-5 py-2 rounded-lg text-sm font-medium transition-all bg-warren-accent text-white shadow-lg">
+                    Market Dashboard
+                </button>
+                <button onclick="switchTab('superinvestors')" id="tab-superinvestors"
+                    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all">
+                    Superinvestor Radar 📡
+                </button>
+                <button onclick="switchTab('guru-flow')" id="tab-guru-flow"
+                    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all">
+                    Guru Flow 📈
+                </button>
+                <button id="tab-copycat" onclick="switchTab('copycat')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Copycat Portfolio <span class="ml-1 text-xs">👯‍♂️</span>
+                </button>
+                <button id="tab-moonshots" onclick="switchTab('moonshots')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Futuristic Bets <span class="ml-1 text-xs">🚀</span>
+                </button>
+                <button id="tab-screeners" onclick="switchTab('screeners')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Pro Screeners <span class="ml-1 text-xs">📡</span>
+                </button>
+                <button id="tab-economics" onclick="switchTab('economics')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Economics <span class="ml-1 text-xs">📊</span>
+                </button>
+                <button id="tab-diphunter" onclick="switchTab('diphunter')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Dip Hunter <span class="ml-1 text-xs">🎯</span>
+                </button>
+                <button id="tab-technical-zones" onclick="switchTab('technical-zones')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Technical Zones <span class="ml-1 text-xs">📐</span>
+                </button>
+                <button id="tab-momentum" onclick="switchTab('momentum')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Momentum <span class="ml-1 text-xs">⚡</span>
+                </button>
+                <button id="tab-contrarian" onclick="switchTab('contrarian')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Contrarian Edge <span class="ml-1 text-xs">🔥</span>
+                </button>
+                <button id="tab-alpha" onclick="switchTab('alpha')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Alpha Intelligence <span class="ml-1 text-xs">🧠</span>
+                </button>
+                <button id="tab-small-caps" onclick="switchTab('small-caps')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    Small-Cap Gems <span class="ml-1 text-xs">💎</span>
+                </button>
+                <button id="tab-portfolio" onclick="switchTab('portfolio')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    My Portfolios <span class="ml-1 text-xs">💼</span>
+                </button>
+                <button id="tab-international" onclick="switchTab('international')"
+                    class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                    International <span class="ml-1 text-xs">🌍</span>
+                </button>
+                <button id="tab-research" onclick="switchTab('research')"
+                    class="text-warren-accent hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-warren-accent/30 bg-warren-accent/5">
+                    Research Hub <span class="ml-1 text-xs">🔍</span>
+                </button>
+            </div>
+
+            <!-- VIEW 1: Dashboard -->
+            <div id="dashboard-view" class="space-y-8 transition-opacity duration-300">
+                <!-- Market Status Gauge -->
+                <div class="glass-panel p-8 rounded-2xl relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10">
+                        <svg class="w-64 h-64 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path
+                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                        </svg>
                     </div>
 
-                    <!-- VIEW 1: Dashboard -->
-                    <div id="dashboard-view" class="space-y-8 transition-opacity duration-300">
-                        <!-- Market Status Gauge -->
-                        <div class="glass-panel p-8 rounded-2xl relative overflow-hidden">
-                            <div class="absolute top-0 right-0 p-4 opacity-10">
-                                <svg class="w-64 h-64 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                                </svg>
-                            </div>
+                    <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                        <div class="text-center md:text-left">
+                            <h2 class="text-3xl font-bold text-white mb-2">Buffett Indicator</h2>
+                            <div class="text-sm text-gray-400 mb-6">Market Cap to GDP Ratio</div>
 
-                            <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-                                <div class="text-center md:text-left">
-                                    <h2 class="text-3xl font-bold text-white mb-2">Buffett Indicator</h2>
-                                    <div class="text-sm text-gray-400 mb-6">Market Cap to GDP Ratio</div>
-
-                                    <div class="flex items-baseline gap-2 justify-center md:justify-start">
-                                        <span class="text-6xl font-black text-white tracking-tighter"
-                                            id="buffett-ratio">--%</span>
-                                        <span
-                                            class="text-xl font-semibold px-4 py-1 rounded-full bg-gray-700 text-gray-300"
-                                            id="buffett-status-badge">Loading...</span>
-                                    </div>
-                                </div>
-
-                                <!-- Gauge Visual -->
-                                <div class="w-full md:w-1/2 max-w-lg">
-                                    <div class="h-4 bg-gray-800 rounded-full overflow-hidden mb-2 relative">
-                                        <!-- Gradient Background for Zones -->
-                                        <div
-                                            class="absolute inset-0 bg-gradient-to-r from-green-500/20 via-yellow-500/20 to-red-500/20 opacity-50">
-                                        </div>
-                                        <!-- Fill Bar -->
-                                        <div id="gauge-fill"
-                                            class="h-full bg-warren-accent w-0 transition-all duration-1000 ease-out relative z-10 shadow-[0_0_10px_rgba(56,189,248,0.5)]">
-                                        </div>
-                                    </div>
-
-                                    <!-- Improved Legend -->
-                                    <div
-                                        class="flex justify-between items-center text-xs font-medium mt-3 bg-gray-800/50 p-2 rounded-lg border border-gray-700/50">
-                                        <div class="flex items-center gap-2 group cursor-help"
-                                            title="Market Cap is significantly lower than GDP">
-                                            <span
-                                                class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
-                                            <span
-                                                class="text-gray-400 group-hover:text-green-400 transition-colors">Undervalued
-                                                (&lt;80%)</span>
-                                        </div>
-                                        <div class="flex items-center gap-2 group cursor-help"
-                                            title="Market Cap is roughly equal to GDP">
-                                            <span
-                                                class="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></span>
-                                            <span
-                                                class="text-gray-400 group-hover:text-yellow-400 transition-colors">Fair
-                                                (100%)</span>
-                                        </div>
-                                        <div class="flex items-center gap-2 group cursor-help"
-                                            title="Market Cap is significantly higher than GDP">
-                                            <span
-                                                class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span>
-                                            <span
-                                                class="text-gray-400 group-hover:text-red-400 transition-colors">Bubble
-                                                (&gt;135%)</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-4 mt-8 max-w-sm">
-                                <div>
-                                    <div class="text-xs text-gray-500 uppercase">US Market Cap</div>
-                                    <div class="text-lg font-mono text-gray-300" id="market-cap-val">--</div>
-                                </div>
-                                <div>
-                                    <div class="text-xs text-gray-500 uppercase">US GDP</div>
-                                    <div class="text-lg font-mono text-gray-300" id="gdp-val">--</div>
-                                </div>
+                            <div class="flex items-baseline gap-2 justify-center md:justify-start">
+                                <span class="text-6xl font-black text-white tracking-tighter"
+                                    id="buffett-ratio">--%</span>
+                                <span class="text-xl font-semibold px-4 py-1 rounded-full bg-gray-700 text-gray-300"
+                                    id="buffett-status-badge">Loading...</span>
                             </div>
                         </div>
 
-                        <!-- Macro Trends Ticker -->
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="macro-container">
-                            <!-- Populated by JS -->
-                        </div>
-
-
-                        <!-- Industry Rankings Table -->
-                        <div class="glass-panel rounded-2xl overflow-hidden">
-                            <div class="p-6 border-b border-gray-700/50 flex justify-between items-center">
-                                <h3 class="text-xl font-bold text-white">Industry Valuation Rankings</h3>
-                                <div class="text-xs text-gray-500 flex gap-4">
-                                    <span class="flex items-center gap-1"><span
-                                            class="w-2 h-2 rounded-full bg-green-500"></span> Cheap</span>
-                                    <span class="flex items-center gap-1"><span
-                                            class="w-2 h-2 rounded-full bg-red-500"></span> Expensive</span>
+                        <!-- Gauge Visual -->
+                        <div class="w-full md:w-1/2 max-w-lg">
+                            <div class="h-4 bg-gray-800 rounded-full overflow-hidden mb-2 relative">
+                                <!-- Gradient Background for Zones -->
+                                <div
+                                    class="absolute inset-0 bg-gradient-to-r from-green-500/20 via-yellow-500/20 to-red-500/20 opacity-50">
+                                </div>
+                                <!-- Fill Bar -->
+                                <div id="gauge-fill"
+                                    class="h-full bg-warren-accent w-0 transition-all duration-1000 ease-out relative z-10 shadow-[0_0_10px_rgba(56,189,248,0.5)]">
                                 </div>
                             </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-sm text-left">
-                                    <thead class="text-xs text-gray-400 uppercase bg-gray-800/50">
-                                        <tr>
-                                            <th class="px-6 py-4">Industry</th>
-                                            <th class="px-6 py-4">Top ETF</th>
-                                            <th class="px-6 py-4">Macro Impact</th>
-                                            <th class="px-6 py-4">
-                                                <span class="group relative inline-flex items-center gap-1 cursor-help">
-                                                    <span
-                                                        class="border-b border-dotted border-gray-500 group-hover:border-warren-accent transition-colors">Avg
-                                                        P/E</span>
-                                                    <div
-                                                        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-gray-900 text-xs text-gray-300 rounded-lg shadow-xl border border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center font-normal lowercase tracking-normal">
-                                                        Price-to-Earnings Ratio. Measures valuation.
-                                                    </div>
-                                                </span>
-                                            </th>
-                                            <th class="px-6 py-4">
-                                                <span class="group relative inline-flex items-center gap-1 cursor-help">
-                                                    <span
-                                                        class="border-b border-dotted border-gray-500 group-hover:border-warren-accent transition-colors">Div
-                                                        Yield</span>
-                                                    <div
-                                                        class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-gray-900 text-xs text-gray-300 rounded-lg shadow-xl border border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center font-normal lowercase tracking-normal">
-                                                        Annual dividend percentage return.
-                                                    </div>
-                                                </span>
-                                            </th>
-                                            <th class="px-6 py-4 text-right">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="industry-table-body" class="divide-y divide-gray-700/50">
-                                        <!-- Populated by JS -->
-                                        <tr>
-                                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading
-                                                Industries...</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
 
-                        <!-- Section 3: Stock Picks -->
-                        <section id="stock-picks-section" class="animate-fade-in hidden" style="animation-delay: 0.2s;">
-                            <div class="flex justify-between items-end mb-4">
-                                <h2 class="text-2xl font-semibold flex items-center gap-2">
-                                    Top Picks in <span id="selected-industry-name"
-                                        class="text-warren-accent ml-2">--</span>
-                                </h2>
-                                <button onclick="document.getElementById('stock-picks-section').classList.add('hidden')"
-                                    class="text-sm text-gray-400 hover:text-white">Close</button>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"
-                                id="stock-cards-container">
-                                <!-- Cards injected by JS -->
-                            </div>
-
-                            <!-- Moat Matrix Chart -->
-                            <div class="glass-panel p-6 rounded-2xl mb-6">
-                                <h3 class="text-lg font-medium mb-4 flex items-center justify-between">
-                                    <span>Moat Matrix: Quality vs. Profitability</span>
-                                    <div class="text-xs text-gray-400 font-normal">
-                                        <span class="mr-3">Vertical: Return on Equity (ROE)</span>
-                                        <span>Horizontal: Profit Margin</span>
-                                    </div>
-                                </h3>
-                                <div class="h-64 w-full">
-                                    <canvas id="moat-matrix-chart"></canvas>
+                            <!-- Improved Legend -->
+                            <div
+                                class="flex justify-between items-center text-xs font-medium mt-3 bg-gray-800/50 p-2 rounded-lg border border-gray-700/50">
+                                <div class="flex items-center gap-2 group cursor-help"
+                                    title="Market Cap is significantly lower than GDP">
+                                    <span
+                                        class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
+                                    <span class="text-gray-400 group-hover:text-green-400 transition-colors">Undervalued
+                                        (&lt;80%)</span>
                                 </div>
-                                <p class="text-xs text-center text-gray-500 mt-2 italic">
-                                    target: Top Right Quadrant (High Quality Compounding)
-                                </p>
-                            </div>
-
-                            <!-- Deep Dive Table -->
-                            <div class="mt-6 glass-panel rounded-2xl p-6">
-                                <h3 class="text-lg font-medium mb-4">Sector Deep Dive</h3>
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-left text-sm text-gray-300">
-                                        <thead>
-                                            <tr class="border-b border-gray-700 text-gray-500">
-                                                <th class="py-2">Stock</th>
-                                                <th class="py-2">Price</th>
-                                                <th class="py-2">P/E</th>
-                                                <th class="py-2">ROE %</th>
-                                                <th class="py-2">Debt/Eq</th>
-                                                <th class="py-2">Margin %</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="stock-detail-body">
-                                            <!-- Detail rows -->
-                                        </tbody>
-                                    </table>
+                                <div class="flex items-center gap-2 group cursor-help"
+                                    title="Market Cap is roughly equal to GDP">
+                                    <span
+                                        class="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></span>
+                                    <span class="text-gray-400 group-hover:text-yellow-400 transition-colors">Fair
+                                        (100%)</span>
+                                </div>
+                                <div class="flex items-center gap-2 group cursor-help"
+                                    title="Market Cap is significantly higher than GDP">
+                                    <span
+                                        class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span>
+                                    <span class="text-gray-400 group-hover:text-red-400 transition-colors">Bubble
+                                        (&gt;135%)</span>
                                 </div>
                             </div>
-                        </section>
-                    </div> <!-- End Dashboard View -->
-
-                    <!-- VIEW 2: Superinvestor Radar -->
-                    <div id="superinvestor-view" class="hidden space-y-8 animate-fade-in">
-                        <div class="text-center py-8">
-                            <h2 class="text-3xl font-bold text-white mb-2">Superinvestor Radar 📡</h2>
-                            <p class="text-gray-400 max-w-2xl mx-auto">Tracking the latest 13F filings (Q4 2024 / Q1
-                                2025) to see what the smart money is doing. Note: Institutional data has a 45-day
-                                reporting lag.</p>
-                        </div>
-
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="superinvestor-container">
-                            <!-- Investor Cards injected here -->
                         </div>
                     </div>
 
-                    <!-- Copycat View -->
-                    <div id="copycat-view" class="hidden animate-fade-in">
-                        <!-- ... Copycat Content ... -->
-                        <div class="glass-panel p-6 rounded-2xl mb-8">
-                            <div class="flex items-center justify-between mb-4">
-                                <h2 class="text-xl font-semibold text-white">Superinvestor Copycat Portfolio</h2>
-                                <span class="text-xs text-gray-400">High Conviction "Clone" Picks</span>
+                    <div class="grid grid-cols-2 gap-4 mt-8 max-w-sm">
+                        <div>
+                            <div class="text-xs text-gray-500 uppercase">US Market Cap</div>
+                            <div class="text-lg font-mono text-gray-300" id="market-cap-val">--</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-500 uppercase">US GDP</div>
+                            <div class="text-lg font-mono text-gray-300" id="gdp-val">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Macro Trends Ticker -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="macro-container">
+                    <!-- Populated by JS -->
+                </div>
+
+
+                <!-- Industry Rankings Table -->
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <div class="p-6 border-b border-gray-700/50 flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-3">Industry Valuation Rankings
+                            <span id="industry-universe-badge"></span>
+                        </h3>
+                        <div class="text-xs text-gray-500 flex gap-4">
+                            <span class="flex items-center gap-1"><span
+                                    class="w-2 h-2 rounded-full bg-green-500"></span> Cheap</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                Expensive</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-800/50">
+                                <tr>
+                                    <th class="px-6 py-4">Industry</th>
+                                    <th class="px-6 py-4">Top ETF</th>
+                                    <th class="px-6 py-4">Macro Impact</th>
+                                    <th class="px-6 py-4">
+                                        <span class="group relative inline-flex items-center gap-1 cursor-help">
+                                            <span
+                                                class="border-b border-dotted border-gray-500 group-hover:border-warren-accent transition-colors">Avg
+                                                P/E</span>
+                                            <div
+                                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-gray-900 text-xs text-gray-300 rounded-lg shadow-xl border border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center font-normal lowercase tracking-normal">
+                                                Price-to-Earnings Ratio. Measures valuation.
+                                            </div>
+                                        </span>
+                                    </th>
+                                    <th class="px-6 py-4">
+                                        <span class="group relative inline-flex items-center gap-1 cursor-help">
+                                            <span
+                                                class="border-b border-dotted border-gray-500 group-hover:border-warren-accent transition-colors">Div
+                                                Yield</span>
+                                            <div
+                                                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-gray-900 text-xs text-gray-300 rounded-lg shadow-xl border border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 text-center font-normal lowercase tracking-normal">
+                                                Annual dividend percentage return.
+                                            </div>
+                                        </span>
+                                    </th>
+                                    <th class="px-6 py-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="industry-table-body" class="divide-y divide-gray-700/50">
+                                <!-- Populated by JS -->
+                                <tr>
+                                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">Loading
+                                        Industries...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 3: Stock Picks -->
+                <section id="stock-picks-section" class="animate-fade-in hidden" style="animation-delay: 0.2s;">
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-2xl font-semibold flex items-center gap-2">
+                            Top Picks in <span id="selected-industry-name" class="text-warren-accent ml-2">--</span>
+                        </h2>
+                        <button onclick="document.getElementById('stock-picks-section').classList.add('hidden')"
+                            class="text-sm text-gray-400 hover:text-white">Close</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"
+                        id="stock-cards-container">
+                        <!-- Cards injected by JS -->
+                    </div>
+
+                    <!-- Moat Matrix Chart -->
+                    <div class="glass-panel p-6 rounded-2xl mb-6">
+                        <h3 class="text-lg font-medium mb-4 flex items-center justify-between">
+                            <span>Moat Matrix: Quality vs. Profitability</span>
+                            <div class="text-xs text-gray-400 font-normal">
+                                <span class="mr-3">Vertical: Return on Equity (ROE)</span>
+                                <span>Horizontal: Profit Margin</span>
                             </div>
+                        </h3>
+                        <div class="h-64 w-full">
+                            <canvas id="moat-matrix-chart"></canvas>
+                        </div>
+                        <p class="text-xs text-center text-gray-500 mt-2 italic">
+                            target: Top Right Quadrant (High Quality Compounding)
+                        </p>
+                    </div>
+
+                    <!-- Deep Dive Table -->
+                    <div class="mt-6 glass-panel rounded-2xl p-6">
+                        <h3 class="text-lg font-medium mb-4">Sector Deep Dive</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-300">
+                                <thead>
+                                    <tr class="border-b border-gray-700 text-gray-500">
+                                        <th class="py-2">Stock</th>
+                                        <th class="py-2">Price</th>
+                                        <th class="py-2">P/E</th>
+                                        <th class="py-2">ROE %</th>
+                                        <th class="py-2">Debt/Eq</th>
+                                        <th class="py-2">Margin %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stock-detail-body">
+                                    <!-- Detail rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div> <!-- End Dashboard View -->
+
+            <!-- VIEW 2: Superinvestor Radar -->
+            <div id="superinvestors-view" class="hidden space-y-8 animate-fade-in">
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Superinvestor Radar 📡</h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto mb-4">Tracking the latest 13F filings to see what the
+                        smart money is doing. Note: Institutional data has a 45-day reporting lag.</p>
+                    <div id="next-filing-info"
+                        class="inline-block bg-warren-accent/10 border border-warren-accent/20 px-4 py-2 rounded-full text-warren-accent text-sm font-medium animate-pulse hidden">
+                        <!-- Injected: "Next major update: May 15, 2026" -->
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="superinvestor-container">
+                    <!-- Investor Cards injected here -->
+                </div>
+
+                <!-- Guru Consensus Panel -->
+                <div class="glass-panel p-6 rounded-2xl mt-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-xl font-semibold text-white flex items-center gap-3">
+                            Guru Consensus
+                            <span class="text-xs text-gray-500 font-normal">Top superinvestor holdings aggregated from all tracked managers</span>
+                        </h2>
+                        <span id="guru-consensus-badge" class="text-xs text-gray-400"></span>
+                    </div>
+
+                    <!-- View Switcher -->
+                    <div class="flex flex-wrap gap-2 mb-6" id="guru-consensus-filters">
+                        <button onclick="loadGuruConsensus('grand_portfolio')" data-view="grand_portfolio"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-warren-accent text-white">Holdings</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_qtr_buys')" data-view="grand_portfolio_qtr_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Qtr Buys</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_qtr_sells')" data-view="grand_portfolio_qtr_sells"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Qtr Sells</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_6mo_buys')" data-view="grand_portfolio_6mo_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">6mo Buys</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_6mo_sells')" data-view="grand_portfolio_6mo_sells"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">6mo Sells</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_sector')" data-view="grand_portfolio_sector"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Sector</button>
+                        <button onclick="loadGuruConsensus('consensus_picks')" data-view="consensus_picks"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Consensus</button>
+                    </div>
+
+                    <!-- Consensus Content -->
+                    <div id="guru-consensus-content">
+                        <div class="text-center py-8 text-gray-500 text-sm">Select a view to load guru consensus data.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Guru Flow -->
+            <div id="guru-flow-view" class="hidden animate-fade-in space-y-8">
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Guru Flow 📈</h2>
+                    <p class="text-gray-400 max-w-3xl mx-auto">Aggregate buy/sell activity across all tracked superinvestors. See where the smart money is flowing.</p>
+                </div>
+
+                <!-- Stats row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="guru-flow-stats">
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-white" id="gf-stat-holdings">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Total Holdings</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-green-400" id="gf-stat-buys">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Qtr Buys</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-red-400" id="gf-stat-sells">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Qtr Sells</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-purple-400" id="gf-stat-new">--</div>
+                        <div class="text-xs text-gray-400 mt-1">New Positions</div>
+                    </div>
+                </div>
+
+                <!-- Section 1: Most Widely Held -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-white mb-4">Most Widely Held <span class="text-xs text-gray-500 font-normal">— Stocks owned by the most gurus</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-widely-held-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="#">#</th>
+                                    <th class="px-4 py-3" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right" data-sort="max">Max %</th>
+                                    <th class="px-4 py-3 text-right" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-widely-held-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 2: Top Buys & Sells -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold text-green-400 mb-4">🔥 Most Bought <span class="text-xs text-gray-500 font-normal">— By manager count</span></h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="gf-buys-table">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                        <th class="px-4 py-3" data-sort="name">Name</th>
+                                        <th class="px-4 py-3 text-center" data-sort="buying">Buying</th>
+                                        <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                        <th class="px-4 py-3 text-right" data-sort="change">Avg % Chg</th>
+                                        <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gf-buys-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold text-red-400 mb-4">⚠️ Most Sold <span class="text-xs text-gray-500 font-normal">— By manager count</span></h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="gf-sells-table">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                        <th class="px-4 py-3" data-sort="name">Name</th>
+                                        <th class="px-4 py-3 text-center" data-sort="selling">Selling</th>
+                                        <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                        <th class="px-4 py-3 text-right" data-sort="change">Avg % Chg</th>
+                                        <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gf-sells-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: New Positions -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-purple-400 mb-4">🆕 New Positions <span class="text-xs text-gray-500 font-normal">— Being bought by gurus but not in grand portfolio</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-new-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="gurus">Buying Gurus</th>
+                                    <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="change">Avg % Chg</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-new-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 4: Single-Manager Heavy Bets -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-white mb-4">🎲 Single-Manager Heavy Bets <span class="text-xs text-gray-500 font-normal">— >30% of one manager's portfolio</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-heavy-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="max">Max %</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-heavy-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 5: Near 52w Low (Opportunities) -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-yellow-400 mb-4">📉 Near 52w Low <span class="text-xs text-gray-500 font-normal">— Guru holdings within 10% of 52w low</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-near-low-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-right" data-sort="above">Above 52w Low</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-near-low-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Copycat View -->
+            <div id="copycat-view" class="hidden animate-fade-in">
+                <!-- ... Copycat Content ... -->
+                <div class="glass-panel p-6 rounded-2xl mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-white flex items-center gap-3">Superinvestor Copycat
+                            Portfolio <span id="copycat-universe-badge"></span></h2>
+                        <span class="text-xs text-gray-400">High Conviction "Clone" Picks</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-4" id="copycat-filters">
+                        <button onclick="loadCopycatPortfolio('all')" data-filter="all"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-warren-accent text-white">All</button>
+                        <button onclick="loadCopycatPortfolio('overlap')" data-filter="overlap"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Multi-Manager</button>
+                        <button onclick="loadCopycatPortfolio('new_buys')" data-filter="new_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">New Buys</button>
+                        <button onclick="loadCopycatPortfolio('increased')" data-filter="increased"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Conviction Up</button>
+                        <button onclick="loadCopycatPortfolio('exits')" data-filter="exits"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Exits</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-6 py-3 rounded-l-lg">Stock</th>
+                                    <th class="px-6 py-3">Held By</th>
+                                    <th class="px-6 py-3">Signal</th>
+                                    <th class="px-6 py-3 text-right">Price</th>
+                                    <th class="px-6 py-3 text-right">Daily %</th>
+                                    <th class="px-6 py-3 text-right">Yearly %</th>
+                                    <th class="px-6 py-3 rounded-r-lg text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="copycat-table-body" class="divide-y divide-gray-800">
+                                <!-- Rows injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="copycat-source-note" class="text-[10px] text-gray-600 mt-3 text-center"></div>
+                </div>
+            </div>
+
+            <!-- Moonshot View -->
+            <div id="moonshots-view" class="hidden animate-fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2
+                            class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+                            The Future Frontier 🌌</h2>
+                        <p class="text-sm text-gray-400 flex items-center gap-2">The technology of tomorrow, investable
+                            today. <span id="moonshot-universe-badge"></span></p>
+                    </div>
+                    <!-- Theme Filters -->
+                    <div class="flex gap-2" id="moonshot-filters">
+                        <button
+                            class="bg-purple-500/20 text-purple-300 border border-purple-500/50 px-3 py-1 rounded-full text-xs font-bold"
+                            data-theme="all">ALL</button>
+                        <button
+                            class="bg-gray-800 text-gray-400 hover:text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
+                            data-theme="Robotics">Robotics</button>
+                        <button
+                            class="bg-gray-800 text-gray-400 hover:text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
+                            data-theme="Energy">Energy</button>
+                        <button
+                            class="bg-gray-800 text-gray-400 hover:text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
+                            data-theme="Cities">Cities</button>
+                    </div>
+                </div>
+
+                <!-- Timeline Grid (3 Columns) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                    <!-- 3 Year Horizon -->
+                    <div class="glass-panel p-4 rounded-xl border-t-4 border-blue-400">
+                        <h3 class="text-lg font-bold text-white mb-1">Scale-Up <span
+                                class="text-xs font-normal text-gray-400 ml-1">(~3 Years)</span></h3>
+                        <p class="text-xs text-gray-500 mb-4 h-8">High growth, proven product, nearing
+                            profitability.</p>
+                        <div id="moonshot-col-3y" class="space-y-4">
+                            <!-- Cards injected here -->
+                        </div>
+                    </div>
+
+                    <!-- 5 Year Horizon -->
+                    <div class="glass-panel p-4 rounded-xl border-t-4 border-purple-400">
+                        <h3 class="text-lg font-bold text-white mb-1">Disruptor <span
+                                class="text-xs font-normal text-gray-400 ml-1">(~5 Years)</span></h3>
+                        <p class="text-xs text-gray-500 mb-4 h-8">Massive R&D, market expansion, cash burn.
+                        </p>
+                        <div id="moonshot-col-5y" class="space-y-4">
+                            <!-- Cards injected here -->
+                        </div>
+                    </div>
+
+                    <!-- 10 Year Horizon -->
+                    <div class="glass-panel p-4 rounded-xl border-t-4 border-pink-500">
+                        <h3 class="text-lg font-bold text-white mb-1">Moonshot <span
+                                class="text-xs font-normal text-gray-400 ml-1">(~10 Years)</span></h3>
+                        <p class="text-xs text-gray-500 mb-4 h-8">Experimental technology. Binary outcome.
+                        </p>
+                        <div id="moonshot-col-10y" class="space-y-4">
+                            <!-- Cards injected here -->
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Screeners View -->
+            <div id="screeners-view" class="hidden animate-fade-in">
+                <div class="flex gap-6 items-start">
+
+                    <!-- Left: Strategy Console -->
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                            Strategy Command Center <span class="text-base text-gray-500 font-normal">Select
+                                a protocol to scan the market.</span>
+                        </h2>
+
+                        <!-- Strategy Selection Grid -->
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                            <!-- Row 1: Classic Value -->
+                            <div onclick="runScreen('magic_formula')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-green-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-green-400 text-xl mb-2">🪄</div>
+                                <h3 class="font-bold text-white text-sm">Magic Formula</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">High Quality
+                                    + Cheap Price</p>
+                            </div>
+
+                            <div onclick="runScreen('deep_value')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-red-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-red-400 text-xl mb-2">💎</div>
+                                <h3 class="font-bold text-white text-sm">Deep Value</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Low P/E +
+                                    High Dividends</p>
+                            </div>
+
+                            <div onclick="runScreen('quality_compounders')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-yellow-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-yellow-400 text-xl mb-2">👑</div>
+                                <h3 class="font-bold text-white text-sm">Quality Compounders</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Buffett's
+                                    Sweet Spot</p>
+                            </div>
+
+                            <!-- Row 2: Moats & Contrarian -->
+                            <div onclick="runScreen('moat_masters')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-purple-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-purple-400 text-xl mb-2">🏰</div>
+                                <h3 class="font-bold text-white text-sm">Moat Masters</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Competitive
+                                    Advantages</p>
+                            </div>
+
+                            <div onclick="runScreen('fallen_angels')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-orange-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-orange-400 text-xl mb-2">🔥</div>
+                                <h3 class="font-bold text-white text-sm">Fallen Angels</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Beaten Down
+                                    Quality</p>
+                            </div>
+
+                            <div onclick="runScreen('burry_orphans')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-teal-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-teal-400 text-xl mb-2">🦉</div>
+                                <h3 class="font-bold text-white text-sm">Burry's Orphans</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Wall St
+                                    Neglected</p>
+                            </div>
+
+                            <!-- Row 3: Inflation Busters -->
+                            <div onclick="runScreen('inflation_busters')"
+                                class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-amber-500/50 p-4 rounded-xl cursor-pointer transition-all group">
+                                <div class="text-amber-400 text-xl mb-2">🛡️</div>
+                                <h3 class="font-bold text-white text-sm">Inflation Busters</h3>
+                                <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Pricing
+                                    Power + Low Debt + High ROIC</p>
+                            </div>
+                        </div>
+
+                        <!-- Results Area -->
+                        <div class="glass-panel p-6 rounded-2xl min-h-[300px]">
+                            <h3 id="screener-results-title" class="text-lg font-bold text-white mb-4">
+                                Results</h3>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-sm text-left">
                                     <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
                                         <tr>
-                                            <th class="px-6 py-3 rounded-l-lg">Stock</th>
-                                            <th class="px-6 py-3">Held By</th>
+                                            <th class="px-6 py-3 rounded-l-lg">Ticker</th>
+                                            <th class="px-6 py-3">Signal / Reason</th>
                                             <th class="px-6 py-3 text-right">Price</th>
-                                            <th class="px-6 py-3 text-right">Daily %</th>
-                                            <th class="px-6 py-3 text-right">Yearly %</th>
-                                            <th class="px-6 py-3 rounded-r-lg text-right">Action</th>
+                                            <th class="px-6 py-3 text-right rounded-r-lg">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="copycat-table-body" class="divide-y divide-gray-800">
-                                        <!-- Rows injected by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Moonshot View -->
-                    <div id="moonshot-view" class="hidden animate-fade-in">
-                        <div class="flex justify-between items-center mb-6">
-                            <div>
-                                <h2
-                                    class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
-                                    The Future Frontier 🌌</h2>
-                                <p class="text-sm text-gray-400">The technology of tomorrow, investable today.</p>
-                            </div>
-                            <!-- Theme Filters -->
-                            <div class="flex gap-2" id="moonshot-filters">
-                                <button
-                                    class="bg-purple-500/20 text-purple-300 border border-purple-500/50 px-3 py-1 rounded-full text-xs font-bold"
-                                    data-theme="all">ALL</button>
-                                <button
-                                    class="bg-gray-800 text-gray-400 hover:text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                                    data-theme="Robotics">Robotics</button>
-                                <button
-                                    class="bg-gray-800 text-gray-400 hover:text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                                    data-theme="Energy">Energy</button>
-                                <button
-                                    class="bg-gray-800 text-gray-400 hover:text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
-                                    data-theme="Cities">Cities</button>
-                            </div>
-                        </div>
-
-                        <!-- Timeline Grid (3 Columns) -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                            <!-- 3 Year Horizon -->
-                            <div class="glass-panel p-4 rounded-xl border-t-4 border-blue-400">
-                                <h3 class="text-lg font-bold text-white mb-1">Scale-Up <span
-                                        class="text-xs font-normal text-gray-400 ml-1">(~3 Years)</span></h3>
-                                <p class="text-xs text-gray-500 mb-4 h-8">High growth, proven product, nearing
-                                    profitability.</p>
-                                <div id="moonshot-col-3y" class="space-y-4">
-                                    <!-- Cards injected here -->
-                                </div>
-                            </div>
-
-                            <!-- 5 Year Horizon -->
-                            <div class="glass-panel p-4 rounded-xl border-t-4 border-purple-400">
-                                <h3 class="text-lg font-bold text-white mb-1">Disruptor <span
-                                        class="text-xs font-normal text-gray-400 ml-1">(~5 Years)</span></h3>
-                                <p class="text-xs text-gray-500 mb-4 h-8">Massive R&D, market expansion, cash burn.
-                                </p>
-                                <div id="moonshot-col-5y" class="space-y-4">
-                                    <!-- Cards injected here -->
-                                </div>
-                            </div>
-
-                            <!-- 10 Year Horizon -->
-                            <div class="glass-panel p-4 rounded-xl border-t-4 border-pink-500">
-                                <h3 class="text-lg font-bold text-white mb-1">Moonshot <span
-                                        class="text-xs font-normal text-gray-400 ml-1">(~10 Years)</span></h3>
-                                <p class="text-xs text-gray-500 mb-4 h-8">Experimental technology. Binary outcome.
-                                </p>
-                                <div id="moonshot-col-10y" class="space-y-4">
-                                    <!-- Cards injected here -->
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <!-- Screeners View -->
-                    <div id="screeners-view" class="hidden animate-fade-in">
-                        <div class="flex gap-6 items-start">
-
-                            <!-- Left: Strategy Console -->
-                            <div class="flex-1">
-                                <h2 class="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                                    Strategy Command Center <span class="text-base text-gray-500 font-normal">Select
-                                        a protocol to scan the market.</span>
-                                </h2>
-
-                                <!-- Strategy Selection Grid -->
-                                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-                                    <!-- Row 1: Classic Value -->
-                                    <div onclick="runScreen('magic_formula')"
-                                        class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-green-500/50 p-4 rounded-xl cursor-pointer transition-all group">
-                                        <div class="text-green-400 text-xl mb-2">🪄</div>
-                                        <h3 class="font-bold text-white text-sm">Magic Formula</h3>
-                                        <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">High Quality
-                                            + Cheap Price</p>
-                                    </div>
-
-                                    <div onclick="runScreen('deep_value')"
-                                        class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-red-500/50 p-4 rounded-xl cursor-pointer transition-all group">
-                                        <div class="text-red-400 text-xl mb-2">💎</div>
-                                        <h3 class="font-bold text-white text-sm">Deep Value</h3>
-                                        <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Low P/E +
-                                            High Dividends</p>
-                                    </div>
-
-                                    <div onclick="runScreen('quality_compounders')"
-                                        class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-yellow-500/50 p-4 rounded-xl cursor-pointer transition-all group">
-                                        <div class="text-yellow-400 text-xl mb-2">👑</div>
-                                        <h3 class="font-bold text-white text-sm">Quality Compounders</h3>
-                                        <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Buffett's
-                                            Sweet Spot</p>
-                                    </div>
-
-                                    <!-- Row 2: Moats & Contrarian -->
-                                    <div onclick="runScreen('moat_masters')"
-                                        class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-purple-500/50 p-4 rounded-xl cursor-pointer transition-all group">
-                                        <div class="text-purple-400 text-xl mb-2">🏰</div>
-                                        <h3 class="font-bold text-white text-sm">Moat Masters</h3>
-                                        <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Competitive
-                                            Advantages</p>
-                                    </div>
-
-                                    <div onclick="runScreen('fallen_angels')"
-                                        class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-orange-500/50 p-4 rounded-xl cursor-pointer transition-all group">
-                                        <div class="text-orange-400 text-xl mb-2">🔥</div>
-                                        <h3 class="font-bold text-white text-sm">Fallen Angels</h3>
-                                        <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Beaten Down
-                                            Quality</p>
-                                    </div>
-
-                                    <div onclick="runScreen('burry_orphans')"
-                                        class="bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 hover:border-teal-500/50 p-4 rounded-xl cursor-pointer transition-all group">
-                                        <div class="text-teal-400 text-xl mb-2">🦉</div>
-                                        <h3 class="font-bold text-white text-sm">Burry's Orphans</h3>
-                                        <p class="text-xs text-gray-500 mt-1 group-hover:text-gray-300">Wall St
-                                            Neglected</p>
-                                    </div>
-                                </div>
-
-                                <!-- Results Area -->
-                                <div class="glass-panel p-6 rounded-2xl min-h-[300px]">
-                                    <h3 id="screener-results-title" class="text-lg font-bold text-white mb-4">
-                                        Results</h3>
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full text-sm text-left">
-                                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
-                                                <tr>
-                                                    <th class="px-6 py-3 rounded-l-lg">Ticker</th>
-                                                    <th class="px-6 py-3">Signal / Reason</th>
-                                                    <th class="px-6 py-3 text-right">Price</th>
-                                                    <th class="px-6 py-3 text-right rounded-r-lg">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="screener-table-body" class="divide-y divide-gray-800">
-                                                <tr>
-                                                    <td colspan="4" class="px-6 py-8 text-center text-gray-500 italic">
-                                                        Select a
-                                                        strategy above to begin scan.</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Right: Toolbox Sidebar -->
-                            <div class="w-64 space-y-4">
-                                <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">The Toolbox
-                                </h3>
-                                <!-- External Links -->
-                                <a href="https://finviz.com/screener.ashx" target="_blank"
-                                    class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-green-500 transition-colors">
-                                    <div class="text-sm font-bold text-white">Finviz</div>
-                                    <div class="text-xs text-gray-500">Visual Screeners</div>
-                                </a>
-                                <a href="http://openinsider.com/" target="_blank"
-                                    class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-blue-500 transition-colors">
-                                    <div class="text-sm font-bold text-white">OpenInsider</div>
-                                    <div class="text-xs text-gray-500">Insider Buying</div>
-                                </a>
-                                <a href="https://whalewisdom.com/" target="_blank"
-                                    class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-purple-500 transition-colors">
-                                    <div class="text-sm font-bold text-white">WhaleWisdom</div>
-                                    <div class="text-xs text-gray-500">Hedge Fund 13Fs</div>
-                                </a>
-                                <a href="https://tikr.com/" target="_blank"
-                                    class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-orange-500 transition-colors">
-                                    <div class="text-sm font-bold text-white">Tikr Terminal</div>
-                                    <div class="text-xs text-gray-500">Pro Data (Freemium)</div>
-                                </a>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <!-- Economics View -->
-                    <div id="economics-view" class="hidden animate-fade-in">
-                        <h2 class="text-2xl font-bold text-white mb-6">📊 Economic Indicators</h2>
-                        <div id="economics-source" class="text-xs text-gray-500 mb-4">Loading...</div>
-
-                        <div id="indicators-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <!-- Indicators will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- News View -->
-                    <!-- Contrarian Edge View -->
-                    <div id="contrarian-view" class="hidden animate-fade-in">
-                        <div class="mb-8">
-                            <h2 class="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                                <span class="text-4xl">🎯</span>
-                                Contrarian Edge
-                            </h2>
-                            <p class="text-gray-400">Data-driven contrarian opportunities where fear creates value</p>
-                        </div>
-
-                        <!-- Market Fear Index Card -->
-                        <div class="glass-panel p-6 rounded-2xl mb-8 border-l-4 border-orange-500">
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <h3 class="text-lg font-bold text-white mb-2">Market Fear Index</h3>
-                                    <p class="text-sm text-gray-400">VIX-based opportunity signal</p>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-4xl font-black text-orange-400" id="contrarian-vix">--</div>
-                                    <div class="text-xs text-gray-500 mt-1" id="contrarian-signal">Loading...</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Opportunity Scorecard (3 Cards) -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                            <div class="glass-panel p-5 rounded-xl">
-                                <div class="flex justify-between items-start mb-2">
-                                    <span class="text-gray-400 text-sm">Active Opportunities</span>
-                                    <span class="text-2xl">🔥</span>
-                                </div>
-                                <div class="text-3xl font-bold text-white" id="total-opportunities">--</div>
-                                <div class="text-xs text-green-400 mt-1" id="new-this-week">-- new this week</div>
-                            </div>
-
-                            <div class="glass-panel p-5 rounded-xl">
-                                <div class="flex justify-between items-start mb-2">
-                                    <span class="text-gray-400 text-sm">High Conviction</span>
-                                    <span class="text-2xl">⭐</span>
-                                </div>
-                                <div class="text-3xl font-bold text-yellow-400" id="high-conviction">--</div>
-                                <div class="text-xs text-gray-400 mt-1">Score &gt;70</div>
-                            </div>
-
-                            <div class="glass-panel p-5 rounded-xl">
-                                <div class="flex justify-between items-start mb-2">
-                                    <span class="text-gray-400 text-sm">Avg Score</span>
-                                    <span class="text-2xl">📊</span>
-                                </div>
-                                <div class="text-3xl font-bold text-blue-400" id="avg-score">--</div>
-                                <div class="text-xs text-gray-400 mt-1">Out of 100</div>
-                            </div>
-                        </div>
-
-                        <!-- Signal Category Tabs -->
-                        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
-                            <button onclick="filterContrarian('all')" id="contrarian-filter-all"
-                                class="px-4 py-2 rounded-lg text-sm font-medium bg-warren-accent text-white whitespace-nowrap">
-                                All Opportunities
-                            </button>
-                            <button onclick="filterContrarian('fallen_angels')" id="contrarian-filter-fallen_angels"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap">
-                                🔥 Fallen Angels
-                            </button>
-                            <button onclick="filterContrarian('burry_orphans')" id="contrarian-filter-burry_orphans"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap">
-                                🦉 Burry's Orphans
-                            </button>
-                            <button onclick="filterContrarian('insider_confidence')"
-                                id="contrarian-filter-insider_confidence"
-                                class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap">
-                                📈 Insider Buying
-                            </button>
-                        </div>
-
-                        <!-- Top Contrarian Picks Table -->
-                        <div class="glass-panel p-6 rounded-2xl mb-8">
-                            <h3 class="text-xl font-bold text-white mb-4">Top Picks</h3>
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead>
-                                        <tr class="border-b border-gray-700">
-                                            <th
-                                                class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
-                                                Rank</th>
-                                            <th
-                                                class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
-                                                Stock</th>
-                                            <th
-                                                class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
-                                                Score</th>
-                                            <th
-                                                class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
-                                                52W Change</th>
-                                            <th
-                                                class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
-                                                Why Contrarian</th>
-                                            <th
-                                                class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
-                                                Signal</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="contrarian-table-body">
+                                    <tbody id="screener-table-body" class="divide-y divide-gray-800">
                                         <tr>
-                                            <td colspan="6" class="text-center py-8 text-gray-500">
-                                                Loading contrarian opportunities...
-                                            </td>
+                                            <td colspan="4" class="px-6 py-8 text-center text-gray-500 italic">
+                                                Select a
+                                                strategy above to begin scan.</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-
-                        <!-- Contrarian Principles (Educational Panel) -->
-                        <div class="glass-panel p-6 rounded-2xl border-l-4 border-purple-500">
-                            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                                <span>💡</span> Contrarian Investing Principles
-                            </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div class="flex gap-3">
-                                    <span class="text-green-400 font-bold">✓</span>
-                                    <div>
-                                        <div class="text-white font-medium">Buy When VIX &gt;25</div>
-                                        <div class="text-gray-400 text-xs">Fear spikes create opportunities</div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-3">
-                                    <span class="text-green-400 font-bold">✓</span>
-                                    <div>
-                                        <div class="text-white font-medium">Follow Insider Buying</div>
-                                        <div class="text-gray-400 text-xs">CEOs know their business best</div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-3">
-                                    <span class="text-green-400 font-bold">✓</span>
-                                    <div>
-                                        <div class="text-white font-medium">Check Fundamentals</div>
-                                        <div class="text-gray-400 text-xs">Avoid value traps, verify quality</div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-3">
-                                    <span class="text-green-400 font-bold">✓</span>
-                                    <div>
-                                        <div class="text-white font-medium">Size Positions Small</div>
-                                        <div class="text-gray-400 text-xs">2-3% max per contrarian bet</div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-3">
-                                    <span class="text-green-400 font-bold">✓</span>
-                                    <div>
-                                        <div class="text-white font-medium">Be Patient (6-12 months)</div>
-                                        <div class="text-gray-400 text-xs">Markets stay irrational longer than expected
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex gap-3">
-                                    <span class="text-orange-400 font-bold">⚠</span>
-                                    <div>
-                                        <div class="text-white font-medium">Use Stop Losses (-25%)</div>
-                                        <div class="text-gray-400 text-xs">Exit if thesis breaks</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                                <p class="text-sm italic text-gray-300">
-                                    "Be fearful when others are greedy, and greedy when others are fearful."
-                                </p>
-                                <p class="text-xs text-gray-500 mt-2">— Warren Buffett</p>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- Portfolio View -->
-                    <div id="portfolio-view" class="hidden animate-fade-in">
-                        <!-- Portfolio Selector -->
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-2xl font-bold text-white flex items-center gap-2">
-                                My Portfolios 💼
-                            </h2>
-                            <div class="flex gap-2">
-                                <input type="file" id="pdf-upload" accept=".pdf" class="hidden"
-                                    onchange="importWealthSimple(this)">
-                                <button onclick="document.getElementById('pdf-upload').click()"
-                                    class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
-                                        </path>
-                                    </svg>
-                                    Import PDF
-                                </button>
-                                <button onclick="openCreatePortfolioModal()"
-                                    class="px-4 py-2 bg-warren-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M12 4v16m8-8H4"></path>
-                                    </svg>
-                                    New Portfolio
-                                </button>
-                            </div>
+                    <!-- Right: Toolbox Sidebar -->
+                    <div class="w-64 space-y-4">
+                        <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">The Toolbox
+                        </h3>
+                        <!-- External Links -->
+                        <a href="https://finviz.com/screener.ashx" target="_blank"
+                            class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-green-500 transition-colors">
+                            <div class="text-sm font-bold text-white">Finviz</div>
+                            <div class="text-xs text-gray-500">Visual Screeners</div>
+                        </a>
+                        <a href="http://openinsider.com/" target="_blank"
+                            class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-blue-500 transition-colors">
+                            <div class="text-sm font-bold text-white">OpenInsider</div>
+                            <div class="text-xs text-gray-500">Insider Buying</div>
+                        </a>
+                        <a href="https://whalewisdom.com/" target="_blank"
+                            class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-purple-500 transition-colors">
+                            <div class="text-sm font-bold text-white">WhaleWisdom</div>
+                            <div class="text-xs text-gray-500">Hedge Fund 13Fs</div>
+                        </a>
+                        <a href="https://tikr.com/" target="_blank"
+                            class="block bg-gray-800/50 hover:bg-gray-800 p-3 rounded-lg border-l-2 border-orange-500 transition-colors">
+                            <div class="text-sm font-bold text-white">Tikr Terminal</div>
+                            <div class="text-xs text-gray-500">Pro Data (Freemium)</div>
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Dip Hunter View -->
+            <div id="diphunter-view" class="hidden space-y-8 animate-fade-in">
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Dip Hunter 🎯</h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto">Identifying quality buying opportunities during market
+                        drops using RSI and fundamental quality metrics.</p>
+                    <div id="dip-last-updated" class="text-[10px] text-gray-500 mt-2 uppercase tracking-widest"></div>
+                </div>
+
+                <!-- Market ETFs Panel -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="market-etf-container">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Sector ETFs Panel -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-xl font-bold text-white mb-4">Sector Opportunities</h3>
+                    <div class="flex gap-4 overflow-x-auto pb-4" id="sector-etf-container">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Top Quality Stocks in Dip -->
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <div class="p-6 border-b border-gray-700/50 flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-3">Investment Opportunities <span
+                                id="dip-universe-badge"></span></h3>
+                        <div class="flex gap-2">
+                            <button onclick="loadOpportunities(0)"
+                                class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded-lg border border-gray-700">All</button>
+                            <button onclick="loadOpportunities(70)"
+                                class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded-lg border border-gray-700">High
+                                Quality</button>
                         </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-800/50">
+                                <tr>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('ticker')">
+                                        Stock <span id="sort-ticker" class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('drop_pct')">
+                                        Drop % <span id="sort-drop_pct" class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('rsi')">
+                                        RSI <span id="sort-rsi" class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('roe')">
+                                        ROE % <span id="sort-roe" class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('debt_equity')">
+                                        Debt/Eq <span id="sort-debt_equity" class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors"
+                                        onclick="sortDipStocks('classification')">
+                                        Quality <span id="sort-classification"
+                                            class="ml-1 text-[8px] opacity-50">↕</span>
+                                    </th>
+                                    <th class="px-6 py-4">
+                                        Opportunity
+                                    </th>
+                                    <th class="px-6 py-4">
+                                        Thesis
+                                    </th>
+                                    <th class="px-6 py-4 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dip-stocks-body" class="divide-y divide-gray-700/50">
+                                <tr>
+                                    <td colspan="10" class="px-6 py-8 text-center text-gray-500">Scanning for
+                                        opportunities...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-                        <!-- Portfolio Cards -->
-                        <div id="portfolio-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                            <!-- Populated by JS -->
-                            <div class="glass-panel p-6 rounded-xl text-center">
-                                <div class="text-gray-500 text-sm">Loading portfolios...</div>
-                            </div>
+                <!-- Strategy Advice -->
+                <div class="glass-panel p-6 rounded-2xl border-l-4 border-warren-accent">
+                    <h3 class="text-lg font-bold text-white mb-2">💡 Dip Strategy Guide</h3>
+                    <p class="text-sm text-gray-300 mb-4">Markets often overreact to short-term news. Use these tiers to
+                        manage your entry:</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <span
+                                class="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-400 mb-2 inline-block">GOOD
+                                DIP</span>
+                            <p class="text-xs text-gray-400">Initial entry zone. Consider 25-33% of your intended
+                                position size.</p>
                         </div>
-
-                        <!-- Selected Portfolio Details -->
-                        <div id="portfolio-details" class="hidden">
-                            <!-- Portfolio Header & Charts -->
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                                <!-- Header Info -->
-                                <div class="glass-panel p-6 rounded-2xl col-span-2 flex flex-col justify-between">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <h3 class="text-xl font-bold text-white" id="selected-portfolio-name">
-                                                Portfolio Name</h3>
-                                            <p class="text-sm text-gray-400 mb-1" id="selected-portfolio-desc">
-                                                Description</p>
-                                            <p class="text-xs text-gray-500">Last updated: <span
-                                                    id="portfolio-updated-at">--</span></p>
-                                        </div>
-                                        <div class="text-right">
-                                            <div class="text-xs text-gray-500 uppercase">Total Value</div>
-                                            <div class="text-3xl font-bold text-white" id="portfolio-total-value">
-                                                $0.00</div>
-                                            <div class="text-sm" id="portfolio-total-gain">+$0.00 (0%)</div>
-                                        </div>
-                                    </div>
-                                    <div class="mt-4 flex gap-2">
-                                        <button onclick="document.getElementById('pdf-upload').click()"
-                                            class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded transition-colors text-white">Import
-                                            More Positions</button>
-                                    </div>
-                                </div>
-
-                                <!-- Allocation Chart -->
-                                <div class="glass-panel p-4 rounded-2xl relative flex flex-col">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                            Allocation</h4>
-                                        <button id="allocation-toggle-btn" onclick="toggleAllocationMode()"
-                                            class="text-[10px] bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition-colors border border-gray-600">
-                                            View by Strategy
-                                        </button>
-                                    </div>
-                                    <div class="flex-grow flex items-center justify-center min-h-[160px]">
-                                        <canvas id="allocation-chart"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Holdings Table -->
-                            <div class="glass-panel rounded-2xl overflow-hidden">
-                                <div class="p-6 border-b border-gray-700/50 flex justify-between items-center">
-                                    <h3 class="text-lg font-bold text-white">Holdings</h3>
-                                    <button onclick="openAddPositionModal()"
-                                        class="px-3 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 rounded text-sm font-medium transition-all">
-                                        + Add Position
-                                    </button>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-sm text-left">
-                                        <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
-                                            <tr>
-                                                <th onclick="sortPortfolio('ticker')"
-                                                    class="px-6 py-3 rounded-l-lg cursor-pointer hover:bg-gray-800 transition-colors select-none">
-                                                    Ticker <span class="sort-icon ml-1 opacity-50">↕</span>
-                                                </th>
-                                                <th onclick="sortPortfolio('quantity')"
-                                                    class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
-                                                    Shares <span class="sort-icon ml-1 opacity-50">↕</span>
-                                                </th>
-                                                <th onclick="sortPortfolio('avg_cost')"
-                                                    class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
-                                                    Avg Cost <span class="sort-icon ml-1 opacity-50">↕</span>
-                                                </th>
-                                                <th onclick="sortPortfolio('currentPrice')"
-                                                    class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
-                                                    Current Price <span class="sort-icon ml-1 opacity-50">↕</span>
-                                                </th>
-                                                <th onclick="sortPortfolio('value')"
-                                                    class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
-                                                    Value <span class="sort-icon ml-1 opacity-50">↕</span>
-                                                </th>
-                                                <th onclick="sortPortfolio('gainPct')"
-                                                    class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
-                                                    Gain/Loss <span class="sort-icon ml-1 opacity-50">↕</span>
-                                                </th>
-                                                <th class="px-6 py-3 text-right rounded-r-lg">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="holdings-table-body" class="divide-y divide-gray-800">
-                                            <tr>
-                                                <td colspan="7" class="px-6 py-8 text-center text-gray-500">No
-                                                    positions yet. Add your first position!</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                        <div>
+                            <span
+                                class="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-500/20 text-yellow-400 mb-2 inline-block">BETTER
+                                DIP</span>
+                            <p class="text-xs text-gray-400">Strong setup. RSI is starting to show significant oversold
+                                conditions.</p>
+                        </div>
+                        <div>
+                            <span
+                                class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-400 mb-2 inline-block">BEST
+                                DIP</span>
+                            <p class="text-xs text-gray-400">High conviction zone. Quality fundamentals at historically
+                                deep discounts.</p>
                         </div>
                     </div>
                 </div>
-                </main>
+            </div>
 
-                <!-- Footer -->
-                <footer class="border-t border-gray-800 py-8 mt-8 text-center text-gray-500 text-sm">
-                    <p>Built with ❤️ by Antigravity</p>
-                    <p class="mt-2 text-xs opacity-50">Data provided for educational purposes only. Not financial
-                        advice.</p>
-                </footer>
+            <!-- Economics View -->
+            <div id="economics-view" class="hidden animate-fade-in">
+                <h2 class="text-2xl font-bold text-white mb-6">📊 Economic Indicators</h2>
+                <div id="economics-source" class="text-xs text-gray-500 mb-4">Loading...</div>
 
-                <!-- App Logic -->
-                <script src="/static/portfolio.js?v=2"></script>
-                <script src="/static/app.js"></script>
+                <div id="indicators-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Indicators will be loaded here -->
+                </div>
+
+                <!-- Money Flow Visualizer -->
+                <div class="mt-12">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                            Institutional Money Flow <span
+                                class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-normal uppercase tracking-widest">Live
+                                Volume Analysis</span>
+                        </h3>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-widest">10-Day
+                            Accumulation/Distribution</div>
+                    </div>
+
+                    <div id="money-flow-summary" class="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6 hidden">
+                        <!-- Summary and Best Bets will be loaded here -->
+                    </div>
+
+                    <div id="money-flow-container"
+                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <!-- Money Flow cards will be loaded here -->
+                    </div>
+
+                    <div id="money-flow-notes" class="mt-8 glass-panel p-6 rounded-xl border border-blue-500/20 hidden">
+                        <h4 class="text-sm font-bold text-blue-400 uppercase tracking-widest mb-3">Analysis Guide &
+                            Educational Notes</h4>
+                        <ul id="money-flow-notes-list" class="space-y-2 text-xs text-gray-400 list-disc pl-4">
+                            <!-- Notes will be loaded here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News View -->
+            <!-- Contrarian Edge View -->
+            <div id="contrarian-view" class="hidden animate-fade-in">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                        <span class="text-4xl">🎯</span>
+                        Contrarian Edge
+                    </h2>
+                    <p class="text-gray-400">Data-driven contrarian opportunities where fear
+                        creates value</p>
+                </div>
+
+                <!-- Market Fear Index Card -->
+                <div class="glass-panel p-6 rounded-2xl mb-8 border-l-4 border-orange-500">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-bold text-white mb-2">Market Fear Index</h3>
+                            <p class="text-sm text-gray-400">VIX-based opportunity signal</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-4xl font-black text-orange-400" id="contrarian-vix">--</div>
+                            <div class="text-xs text-gray-500 mt-1" id="contrarian-signal">
+                                Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opportunity Scorecard (3 Cards) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="glass-panel p-5 rounded-xl">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-gray-400 text-sm">Active Opportunities</span>
+                            <span class="text-2xl">🔥</span>
+                        </div>
+                        <div class="text-3xl font-bold text-white" id="total-opportunities">--
+                        </div>
+                        <div class="text-xs text-green-400 mt-1" id="new-this-week">-- new this
+                            week</div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-xl">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-gray-400 text-sm">High Conviction</span>
+                            <span class="text-2xl">⭐</span>
+                        </div>
+                        <div class="text-3xl font-bold text-yellow-400" id="high-conviction">--
+                        </div>
+                        <div class="text-xs text-gray-400 mt-1">Score &gt;70</div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-xl">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-gray-400 text-sm">Avg Score</span>
+                            <span class="text-2xl">📊</span>
+                        </div>
+                        <div class="text-3xl font-bold text-blue-400" id="avg-score">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Out of 100</div>
+                    </div>
+                </div>
+
+                <!-- Signal Category Tabs -->
+                <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+                    <button onclick="filterContrarian('all')" id="contrarian-filter-all"
+                        class="px-4 py-2 rounded-lg text-sm font-medium bg-warren-accent text-white whitespace-nowrap">
+                        All Opportunities
+                    </button>
+                    <button onclick="filterContrarian('fallen_angels')" id="contrarian-filter-fallen_angels"
+                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap">
+                        🔥 Fallen Angels
+                    </button>
+                    <button onclick="filterContrarian('burry_orphans')" id="contrarian-filter-burry_orphans"
+                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap">
+                        🦉 Burry's Orphans
+                    </button>
+                    <button onclick="filterContrarian('insider_confidence')" id="contrarian-filter-insider_confidence"
+                        class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-all whitespace-nowrap">
+                        📈 Insider Buying
+                    </button>
+                </div>
+
+                <!-- Top Contrarian Picks Table -->
+                <div class="glass-panel p-6 rounded-2xl mb-8">
+                    <h3 class="text-xl font-bold text-white mb-4">Top Picks</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-700">
+                                    <th class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
+                                        Rank</th>
+                                    <th class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
+                                        Stock</th>
+                                    <th class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
+                                        Score</th>
+                                    <th class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
+                                        52W Change</th>
+                                    <th class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
+                                        Why Contrarian</th>
+                                    <th class="text-left py-3 px-2 text-xs font-semibold text-gray-400 uppercase">
+                                        Signal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contrarian-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center py-8 text-gray-500">
+                                        Loading contrarian opportunities...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Contrarian Principles (Educational Panel) -->
+                <div class="glass-panel p-6 rounded-2xl border-l-4 border-purple-500">
+                    <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <span>💡</span> Contrarian Investing Principles
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div class="flex gap-3">
+                            <span class="text-green-400 font-bold">✓</span>
+                            <div>
+                                <div class="text-white font-medium">Buy When VIX &gt;25</div>
+                                <div class="text-gray-400 text-xs">Fear spikes create
+                                    opportunities</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-400 font-bold">✓</span>
+                            <div>
+                                <div class="text-white font-medium">Follow Insider Buying</div>
+                                <div class="text-gray-400 text-xs">CEOs know their business best
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-400 font-bold">✓</span>
+                            <div>
+                                <div class="text-white font-medium">Check Fundamentals</div>
+                                <div class="text-gray-400 text-xs">Avoid value traps, verify
+                                    quality</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-400 font-bold">✓</span>
+                            <div>
+                                <div class="text-white font-medium">Size Positions Small</div>
+                                <div class="text-gray-400 text-xs">2-3% max per contrarian bet
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-green-400 font-bold">✓</span>
+                            <div>
+                                <div class="text-white font-medium">Be Patient (6-12 months)
+                                </div>
+                                <div class="text-gray-400 text-xs">Markets stay irrational
+                                    longer than expected
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="text-orange-400 font-bold">⚠</span>
+                            <div>
+                                <div class="text-white font-medium">Use Stop Losses (-25%)</div>
+                                <div class="text-gray-400 text-xs">Exit if thesis breaks</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                        <p class="text-sm italic text-gray-300">
+                            "Be fearful when others are greedy, and greedy when others are
+                            fearful."
+                        </p>
+                        <p class="text-xs text-gray-500 mt-2">— Warren Buffett</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alpha Intelligence View -->
+            <div id="alpha-view" class="hidden animate-fade-in space-y-8">
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Alpha Intelligence 🧠</h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto">Market Cycle analysis and
+                        Institutional Sector Rotation to identify shifts in momentum.</p>
+                </div>
+
+                <!-- Market Phase Control Center -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl col-span-2 border-l-4" id="cycle-phase-border">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">
+                                    Current Economic State</div>
+                                <h3 class="text-3xl font-black text-white" id="cycle-phase-name">Loading Cycle...
+                                </h3>
+                            </div>
+                            <div id="cycle-phase-badge"
+                                class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                --</div>
+                        </div>
+                        <p class="text-gray-400 text-sm leading-relaxed mb-4" id="cycle-phase-desc">Scanning
+                            macro-economic indicators (Rates,
+                            VIX, Spreads)...</p>
+                        <div class="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-800">
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">
+                                    Recommended Focus</div>
+                                <div class="text-sm text-warren-accent font-medium" id="cycle-focus">--</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">Strategy Hint</div>
+                                <div class="text-sm text-white font-medium italic" id="cycle-hint">--</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl flex flex-col justify-center items-center text-center">
+                        <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-4">
+                            Risk Regime</div>
+                        <div id="risk-dial" class="text-5xl mb-4">🛡️</div>
+                        <div class="text-xl font-bold text-white" id="risk-label">Analyzing
+                            Risk...</div>
+                        <div class="text-xs text-gray-500 mt-2">Based on VIX & Yield Trends
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rotation Heatmap -->
+                <div class="glass-panel p-6 rounded-2xl overflow-hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-white">Institutional Sector Rotation
+                        </h3>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-widest">
+                            Weighted 1M Momentum</div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-6 py-4 rounded-l-lg">Sector</th>
+                                    <th class="px-6 py-4 text-center">1D</th>
+                                    <th class="px-6 py-4 text-center">1W</th>
+                                    <th class="px-6 py-4 text-center bg-warren-accent/10">1M Performance</th>
+                                    <th class="px-6 py-4 text-center">6M</th>
+                                    <th class="px-6 py-4 text-center">Rating</th>
+                                    <th class="px-6 py-4">Top Quality Picks</th>
+                                    <th class="px-6 py-4 text-right rounded-r-lg">Alpha Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rotation-table-body" class="divide-y divide-gray-800/50">
+                                <tr>
+                                    <td colspan="6" class="px-6 py-12 text-center text-warren-accent animate-pulse">
+                                        Scanning GICS ETF Data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Alpha Principles -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl border border-gray-800">
+                        <h4 class="text-white font-bold mb-3 flex items-center gap-2">
+                            <span class="text-blue-400">⚡</span> Understanding Rotation
+                        </h4>
+                        <p class="text-xs text-gray-400 leading-relaxed">Institutions move
+                            billions of dollars between sectors as economic conditions change.
+                            <strong>Alpha</strong> is captured by identifying these shifts
+                            *before* they become consensus.
+                        </p>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl border border-gray-800">
+                        <h4 class="text-white font-bold mb-3 flex items-center gap-2">
+                            <span class="text-orange-400">🌊</span> The Cycle Switch
+                        </h4>
+                        <p class="text-xs text-gray-400 leading-relaxed">Every market cycle
+                            eventually flips. Moving from Tech (Mid Cycle) to Staples/Utilities
+                            (Late Cycle) is a primary defensive move used by the best hedge
+                            funds.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- International View -->
+            <div id="international-view" class="hidden animate-fade-in space-y-8">
+                <!-- Content injected via international.js component -->
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2" id="international-title">Loading Global Markets...
+                    </h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto mb-4" id="international-subtitle">Fetching emerging and
+                        developed market picks.</p>
+                </div>
+                <!-- India Section -->
+                <div>
+                    <h3
+                        class="text-2xl font-bold text-white mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
+                        <span class="text-warren-warning">🇮🇳</span> India (Emerging Market)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"
+                        id="india-picks-container">
+                        <!-- Cards here -->
+                    </div>
+                </div>
+                <!-- Canada Section -->
+                <div class="mt-12">
+                    <h3
+                        class="text-2xl font-bold text-white mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
+                        <span class="text-red-500">🇨🇦</span> Canada (Developed Market)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"
+                        id="canada-picks-container">
+                        <!-- Cards here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Portfolio View -->
+            <div id="portfolio-view" class="hidden animate-fade-in">
+                <!-- Portfolio Selector -->
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                        Paper Trading 📈
+                    </h2>
+                    <div class="flex gap-2">
+                        <input type="file" id="pdf-upload" accept=".pdf" class="hidden"
+                            onchange="importWealthSimple(this)">
+                        <button onclick="document.getElementById('pdf-upload').click()"
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
+                                </path>
+                            </svg>
+                            Import PDF
+                        </button>
+                        <input type="file" id="csv-upload" accept=".csv" class="hidden"
+                            onchange="importCSV(this)">
+                        <button onclick="document.getElementById('csv-upload').click()"
+                            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-gray-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
+                                </path>
+                            </svg>
+                            Import CSV
+                        </button>
+                        <button onclick="importFromServerFiles()"
+                            class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-emerald-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12">
+                                </path>
+                            </svg>
+                            Import from Server
+                        </button>
+                        <button onclick="openCreatePortfolioModal()"
+                            class="px-4 py-2 bg-warren-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            New Portfolio
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Portfolio Cards -->
+                <div id="portfolio-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <!-- Populated by JS -->
+                    <div class="glass-panel p-6 rounded-xl text-center">
+                        <div class="text-gray-500 text-sm">Loading portfolios...</div>
+                    </div>
+                </div>
+
+                <!-- Selected Portfolio Details -->
+                <div id="portfolio-details" class="hidden">
+                    <!-- Portfolio Header & Charts -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <!-- Header Info -->
+                        <div class="glass-panel p-6 rounded-2xl col-span-2 flex flex-col justify-between">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-xl font-bold text-white" id="selected-portfolio-name">
+                                        Portfolio Name</h3>
+                                    <p class="text-sm text-gray-400 mb-1" id="selected-portfolio-desc">
+                                        Description</p>
+                                    <p class="text-xs text-gray-500">Last updated: <span
+                                            id="portfolio-updated-at">--</span></p>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs text-gray-500 uppercase">Total Account Value</div>
+                                    <div class="text-3xl font-bold text-white" id="portfolio-total-value">$0.00</div>
+                                    <div class="text-sm" id="portfolio-total-gain">+$0.00 (0%)</div>
+                                    <div class="mt-1 text-[11px]" id="signal-summary"></div>
+
+                                    <div class="mt-4 pt-4 border-t border-gray-800/50">
+                                        <div class="flex justify-end gap-6">
+                                            <div>
+                                                <div class="text-[10px] text-gray-500 uppercase">Cash (USD)</div>
+                                                <div class="text-xl font-bold text-green-400" id="portfolio-cash-usd">
+                                                    $0.00</div>
+                                            </div>
+                                            <div>
+                                                <div class="text-[10px] text-gray-500 uppercase">Cash (CAD)</div>
+                                                <div class="text-xl font-bold text-blue-400" id="portfolio-cash-cad">
+                                                    $0.00</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 flex gap-2">
+                                <button onclick="document.getElementById('pdf-upload').click()"
+                                    class="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1 rounded transition-colors text-white">Import
+                                    More Positions</button>
+                            </div>
+                        </div>
+
+                        <!-- Allocation Chart -->
+                        <div class="glass-panel p-4 rounded-2xl relative flex flex-col">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                    Allocation</h4>
+                                <button id="allocation-toggle-btn" onclick="toggleAllocationMode()"
+                                    class="text-[10px] bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded transition-colors border border-gray-600">
+                                    View by Strategy
+                                </button>
+                            </div>
+                            <div class="flex-grow flex items-center justify-center min-h-[160px]">
+                                <canvas id="allocation-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Holdings Table -->
+                    <div class="glass-panel rounded-2xl overflow-hidden">
+                        <div class="p-6 border-b border-gray-700/50 flex justify-between items-center">
+                            <h3 class="text-lg font-bold text-white">Holdings</h3>
+                            <button onclick="openAddPositionModal()"
+                                class="px-3 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 text-green-400 rounded text-sm font-medium transition-all">
+                                + Add Position
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-3 py-3 rounded-l-lg text-center">Signal</th>
+                                        <th onclick="sortPortfolio('ticker')"
+                                            class="px-6 py-3 cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            Ticker <span class="sort-icon ml-1 opacity-50">↕</span>
+                                        </th>
+                                        <th onclick="sortPortfolio('quantity')"
+                                            class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            Shares <span class="sort-icon ml-1 opacity-50">↕</span>
+                                        </th>
+                                        <th onclick="sortPortfolio('avg_cost')"
+                                            class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            Avg Cost <span class="sort-icon ml-1 opacity-50">↕</span>
+                                        </th>
+                                        <th onclick="sortPortfolio('currentPrice')"
+                                            class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            Current Price <span class="sort-icon ml-1 opacity-50">↕</span>
+                                        </th>
+                                        <th onclick="sortPortfolio('value')"
+                                            class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            Value <span class="sort-icon ml-1 opacity-50">↕</span>
+                                        </th>
+                                        <th onclick="sortPortfolio('gainPct')"
+                                            class="px-6 py-3 text-right cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            Gain/Loss <span class="sort-icon ml-1 opacity-50">↕</span>
+                                        </th>
+                                        <th class="px-6 py-3 text-right rounded-r-lg">Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="holdings-table-body" class="divide-y divide-gray-800">
+                                    <tr>
+                                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">No
+                                            positions yet. Add your first position!</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Trade History Section -->
+                    <div class="glass-panel rounded-2xl overflow-hidden mt-8">
+                        <div class="p-6 border-b border-gray-700/50 flex justify-between items-center bg-gray-900/30">
+                            <h3 class="text-lg font-bold text-white">Trade History</h3>
+                            <button onclick="loadTradeHistory()"
+                                class="text-xs text-warren-accent hover:underline">Refresh History</button>
+                        </div>
+                        <div class="overflow-x-auto max-h-[400px]">
+                            <table class="w-full text-sm text-left">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50 sticky top-0">
+                                    <tr>
+                                        <th class="px-6 py-3">Date</th>
+                                        <th class="px-6 py-3">Ticker</th>
+                                        <th class="px-6 py-3">Type</th>
+                                        <th class="px-6 py-3 text-right">Quantity</th>
+                                        <th class="px-6 py-3 text-right">Price</th>
+                                        <th class="px-6 py-3 text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trade-history-body" class="divide-y divide-gray-800">
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">No trades yet.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Small-Cap Gems View -->
+            <div id="small-caps-view" class="hidden animate-fade-in space-y-8">
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Small-Cap Value Gems 💎</h2>
+                    <p class="text-gray-400 max-w-2xl mx-auto">Discovering underserved, high-growth companies with a
+                        significant margin of safety. Focused on $300M - $3B market caps.</p>
+                </div>
+
+                <!-- Filters -->
+                <div
+                    class="glass-panel p-4 rounded-2xl border border-gray-800 flex flex-wrap items-center gap-6 justify-center">
+                    <div class="flex items-center gap-2">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Rev Growth Min</label>
+                        <select id="small-cap-filter-growth" onchange="loadSmallCaps()"
+                            class="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:border-warren-accent">
+                            <option value="0.05">5%+</option>
+                            <option value="0.15">15%+</option>
+                            <option value="0.25">25%+</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Max PE</label>
+                        <select id="small-cap-filter-pe" onchange="loadSmallCaps()"
+                            class="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:border-warren-accent">
+                            <option value="15">Under 15</option>
+                            <option value="25" selected>Under 25</option>
+                            <option value="40">Under 40</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">ROE Min</label>
+                        <select id="small-cap-filter-roe" onchange="loadSmallCaps()"
+                            class="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:border-warren-accent">
+                            <option value="0.10" selected>10%+</option>
+                            <option value="0.20">20%+</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="small-caps-summary" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Summary stats populated by JS -->
+                </div>
+
+                <div id="small-caps-container"
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <!-- Cards populated by JS -->
+                    <div class="col-span-full py-20 text-center text-warren-accent animate-pulse">
+                        Scanning the Russell 2000 for hidden gems...
+                    </div>
+                </div>
+
+                <div id="small-caps-notes" class="glass-panel p-6 rounded-2xl border border-blue-500/20 hidden">
+                    <h4 class="text-sm font-bold text-blue-400 uppercase tracking-widest mb-3">Small-Cap Strategy Notes
+                    </h4>
+                    <ul id="small-caps-notes-list" class="space-y-2 text-xs text-gray-400 list-disc pl-4">
+                        <!-- Notes populated by JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Technical Zones View -->
+            <div id="technical-zones-view" class="hidden space-y-8 animate-fade-in">
+                <div class="text-center py-8" id="technical-zones-header">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="technical-zones-container">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Momentum View -->
+            <div id="momentum-view" class="hidden space-y-8 animate-fade-in">
+                <div class="text-center py-2" id="momentum-header"></div>
+                <div id="momentum-container"></div>
+            </div>
+
+            <!-- Research Hub View -->
+            <div id="research-view" class="hidden animate-fade-in space-y-6 pb-20">
+                <!-- Search Bar -->
+                <div
+                    class="glass-panel p-6 rounded-2xl flex flex-col md:flex-row items-center gap-4 justify-between bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border border-warren-accent/20">
+                    <div>
+                        <h2 class="text-2xl font-black text-white tracking-tight">Institutional Research Hub</h2>
+                        <p class="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1 opacity-60">
+                            Deep Fundamental & Analyst Consensus</p>
+                    </div>
+                    <div class="flex items-center gap-2 w-full md:w-96">
+                        <input type="text" id="research-ticker-input" placeholder="Enter Ticker (e.g., AAPL)"
+                            class="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white font-mono focus:border-warren-accent outline-none uppercase transition-all"
+                            onkeyup="if(event.key === 'Enter') startResearch()">
+                        <button onclick="startResearch()"
+                            class="bg-warren-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-500/10">Analyze</button>
+                    </div>
+                </div>
+
+                <div id="research-content" class="hidden space-y-8">
+                    <!-- Research data goes here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="research-empty" class="py-32 text-center">
+                    <div class="text-6xl mb-6 opacity-20">🔍</div>
+                    <h3 class="text-xl font-bold text-gray-400">Search for a ticker to begin deep analysis</h3>
+                    <p class="text-sm text-gray-600 mt-2">Aggregating fundamental data, analyst ratings, and macro
+                        context...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compact Footer at Bottom -->
+        <footer class="border-t border-gray-800/30 py-3 text-center text-gray-600 text-xs mt-16">
+            <div class="flex items-center justify-center gap-4 flex-wrap">
+                <p class="opacity-60">Built with ❤️ by Antigravity | Data for educational purposes
+                    only. Not financial
+                    advice.</p>
+                <a href="/admin/db-viewer" target="_blank"
+                    class="hover:text-gray-400 transition-colors underline underline-offset-2">DB Viewer</a>
+                <div class="flex items-center gap-2 opacity-80">
+                    <span class="text-gray-500">Data Source:</span>
+                    <button id="datasource-toggle"
+                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-all"
+                        onclick="toggleDataSource()">
+                        <span id="datasource-label">Loading...</span>
+                    </button>
+                </div>
+            </div>
+        </footer>
+
+        <!-- Trade Modal -->
+        <div id="trade-modal"
+            class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div
+                class="glass-panel w-full max-w-md rounded-3xl overflow-hidden border border-gray-800 animate-slide-up shadow-2xl">
+                <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        Execute Trade <span id="trade-ticker-badge"
+                            class="bg-warren-accent/20 text-warren-accent px-2 py-0.5 rounded text-sm">AAPL</span>
+                    </h3>
+                    <button onclick="closeTradeModal()" class="text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-8">
+                    <div class="flex p-1 bg-gray-900 rounded-xl mb-6 border border-gray-800">
+                        <button id="trade-buy-btn" onclick="setTradeType('BUY')"
+                            class="flex-1 py-3 rounded-lg text-sm font-bold transition-all bg-green-500 text-white shadow-lg shadow-green-900/20">BUY</button>
+                        <button id="trade-sell-btn" onclick="setTradeType('SELL')"
+                            class="flex-1 py-3 rounded-lg text-sm font-bold transition-all text-gray-400 hover:text-white">SELL</button>
+                    </div>
+
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-2 gap-4 text-center pb-4 border-b border-gray-800">
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">Current Price</div>
+                                <div id="trade-current-price" class="text-xl font-mono text-white">$0.00</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] text-gray-500 uppercase mb-1">Available Cash</div>
+                                <div id="trade-available-cash" class="text-xl font-mono text-green-400">$0.00</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Quantity</label>
+                            <input type="number" id="trade-quantity" step="0.01" oninput="updateTradeTotal()"
+                                class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-4 text-white font-mono focus:border-warren-accent outline-none focus:ring-1 focus:ring-warren-accent transition-all"
+                                placeholder="0.00">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Order Price
+                                (Limit)</label>
+                            <input type="number" id="trade-price" step="0.01" oninput="updateTradeTotal()"
+                                class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-4 text-white font-mono focus:border-warren-accent outline-none focus:ring-1 focus:ring-warren-accent transition-all"
+                                placeholder="0.00">
+                        </div>
+
+                        <div class="p-4 bg-warren-accent/5 rounded-2xl border border-warren-accent/10">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-400 uppercase font-bold">Estimated Total</span>
+                                <span id="trade-total"
+                                    class="text-lg font-mono text-warren-accent font-bold">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="submitTrade()"
+                        class="w-full mt-8 py-4 bg-warren-accent hover:bg-blue-600 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2">
+                        Confirm Transaction
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- App Logic -->
+        <script type="module" src="/static/portfolio.js?v=20"></script>
+        <script type="module" src="/static/app.js?v=24"></script>
 </body>
 
 </html>
