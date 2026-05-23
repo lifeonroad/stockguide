@@ -882,6 +882,107 @@ async function importWealthSimple(input) {
     }
 }
 
+// --- Import from Server ---
+async function importFromServerFiles() {
+    if (!currentPortfolioId) {
+        alert('Please create or select a portfolio first!');
+        return;
+    }
+
+    try {
+        const listRes = await fetch(`${API_BASE}/import/portfolio-files`);
+        const listData = await listRes.json();
+        const files = listData.files || [];
+
+        if (files.length === 0) {
+            alert('No portfolio files found on the server.');
+            return;
+        }
+
+        const fileList = files.map(f => `  • ${f.name} (${(f.size_bytes / 1024).toFixed(0)}KB)`).join('\n');
+        if (!confirm(`Found ${files.length} file(s) on server:\n${fileList}\n\nImport positions from these files?`)) return;
+
+        const res = await fetch(`${API_BASE}/import/from-server-files`, { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+
+        const positions = await res.json();
+        if (!positions || positions.length === 0) {
+            alert('No positions found in server files.');
+            return;
+        }
+
+        let successCount = 0;
+        for (const pos of positions) {
+            try {
+                await fetch(`${API_BASE}/portfolios/${currentPortfolioId}/positions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: pos.ticker, quantity: pos.quantity, avg_cost: pos.avg_cost, notes: pos.notes || '' })
+                });
+                successCount++;
+            } catch (e) {
+                console.error(`Failed to import ${pos.ticker}`, e);
+            }
+        }
+
+        alert(`Imported ${successCount} of ${positions.length} positions!`);
+        selectPortfolio(currentPortfolioId);
+    } catch (err) {
+        console.error('Import from server failed:', err);
+        alert('Import failed: ' + err.message);
+    }
+}
+
+async function importCSV(input) {
+    if (!input.files || !input.files[0]) return;
+    if (!currentPortfolioId) {
+        alert('Please create or select a portfolio first!');
+        input.value = '';
+        return;
+    }
+
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch(`${API_BASE}/import/csv`, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error('Failed to parse CSV');
+        const positions = await res.json();
+
+        if (!positions || positions.length === 0) {
+            alert('No positions found in CSV.');
+            return;
+        }
+
+        if (confirm(`Found ${positions.length} positions. Import them?`)) {
+            let successCount = 0;
+            for (const pos of positions) {
+                try {
+                    await fetch(`${API_BASE}/portfolios/${currentPortfolioId}/positions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ticker: pos.ticker, quantity: pos.quantity, avg_cost: pos.avg_cost, notes: pos.notes || '' })
+                    });
+                    successCount++;
+                } catch (e) {
+                    console.error(`Failed to import ${pos.ticker}`, e);
+                }
+            }
+            alert(`Imported ${successCount} positions!`);
+            selectPortfolio(currentPortfolioId);
+        }
+    } catch (err) {
+        console.error('CSV import failed:', err);
+        alert('CSV import failed: ' + err.message);
+    } finally {
+        input.value = '';
+    }
+}
+
 // --- Window Exports ---
 window.openCreatePortfolioModal = openCreatePortfolioModal;
 window.closePortfolioModal = closePortfolioModal;
@@ -900,3 +1001,5 @@ window.sortPortfolio = sortPortfolio;
 window.toggleAllocationMode = toggleAllocationMode;
 window.initPortfolioView = initPortfolioView;
 window.importWealthSimple = importWealthSimple;
+window.importFromServerFiles = importFromServerFiles;
+window.importCSV = importCSV;
