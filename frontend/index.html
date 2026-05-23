@@ -310,6 +310,7 @@
                             <h3 id="si-detail-name" class="text-2xl font-bold text-white">Loading...</h3>
                             <div id="si-detail-firm" class="text-sm text-gray-400"></div>
                             <div id="si-detail-style" class="mt-1 text-xs text-warren-accent font-medium uppercase tracking-wider"></div>
+                            <div id="si-detail-dataroma" class="mt-1.5"></div>
                         </div>
                     </div>
                     <div class="text-right shrink-0">
@@ -564,6 +565,10 @@
                 <button onclick="switchTab('superinvestors')" id="tab-superinvestors"
                     class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all">
                     Superinvestor Radar 📡
+                </button>
+                <button onclick="switchTab('guru-flow')" id="tab-guru-flow"
+                    class="px-5 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-all">
+                    Guru Flow 📈
                 </button>
                 <button id="tab-copycat" onclick="switchTab('copycat')"
                     class="text-gray-400 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -828,6 +833,188 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="superinvestor-container">
                     <!-- Investor Cards injected here -->
+                </div>
+
+                <!-- Guru Consensus Panel -->
+                <div class="glass-panel p-6 rounded-2xl mt-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-xl font-semibold text-white flex items-center gap-3">
+                            Guru Consensus
+                            <span class="text-xs text-gray-500 font-normal">Top superinvestor holdings aggregated from all tracked managers</span>
+                        </h2>
+                        <span id="guru-consensus-badge" class="text-xs text-gray-400"></span>
+                    </div>
+
+                    <!-- View Switcher -->
+                    <div class="flex flex-wrap gap-2 mb-6" id="guru-consensus-filters">
+                        <button onclick="loadGuruConsensus('grand_portfolio')" data-view="grand_portfolio"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-warren-accent text-white">Holdings</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_qtr_buys')" data-view="grand_portfolio_qtr_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Qtr Buys</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_qtr_sells')" data-view="grand_portfolio_qtr_sells"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Qtr Sells</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_6mo_buys')" data-view="grand_portfolio_6mo_buys"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">6mo Buys</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_6mo_sells')" data-view="grand_portfolio_6mo_sells"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">6mo Sells</button>
+                        <button onclick="loadGuruConsensus('grand_portfolio_sector')" data-view="grand_portfolio_sector"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Sector</button>
+                        <button onclick="loadGuruConsensus('consensus_picks')" data-view="consensus_picks"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white">Consensus</button>
+                    </div>
+
+                    <!-- Consensus Content -->
+                    <div id="guru-consensus-content">
+                        <div class="text-center py-8 text-gray-500 text-sm">Select a view to load guru consensus data.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: Guru Flow -->
+            <div id="guru-flow-view" class="hidden animate-fade-in space-y-8">
+                <div class="text-center py-8">
+                    <h2 class="text-3xl font-bold text-white mb-2">Guru Flow 📈</h2>
+                    <p class="text-gray-400 max-w-3xl mx-auto">Aggregate buy/sell activity across all tracked superinvestors. See where the smart money is flowing.</p>
+                </div>
+
+                <!-- Stats row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="guru-flow-stats">
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-white" id="gf-stat-holdings">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Total Holdings</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-green-400" id="gf-stat-buys">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Qtr Buys</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-red-400" id="gf-stat-sells">--</div>
+                        <div class="text-xs text-gray-400 mt-1">Qtr Sells</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center">
+                        <div class="text-2xl font-bold text-purple-400" id="gf-stat-new">--</div>
+                        <div class="text-xs text-gray-400 mt-1">New Positions</div>
+                    </div>
+                </div>
+
+                <!-- Section 1: Most Widely Held -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-white mb-4">Most Widely Held <span class="text-xs text-gray-500 font-normal">— Stocks owned by the most gurus</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-widely-held-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="#">#</th>
+                                    <th class="px-4 py-3" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right" data-sort="max">Max %</th>
+                                    <th class="px-4 py-3 text-right" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-widely-held-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 2: Top Buys & Sells -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold text-green-400 mb-4">🔥 Most Bought <span class="text-xs text-gray-500 font-normal">— By manager count</span></h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="gf-buys-table">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                        <th class="px-4 py-3" data-sort="name">Name</th>
+                                        <th class="px-4 py-3 text-center" data-sort="buying">Buying</th>
+                                        <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                        <th class="px-4 py-3 text-right" data-sort="change">Avg % Chg</th>
+                                        <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gf-buys-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="glass-panel p-6 rounded-2xl">
+                        <h3 class="text-lg font-semibold text-red-400 mb-4">⚠️ Most Sold <span class="text-xs text-gray-500 font-normal">— By manager count</span></h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm text-left" id="gf-sells-table">
+                                <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                    <tr>
+                                        <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                        <th class="px-4 py-3" data-sort="name">Name</th>
+                                        <th class="px-4 py-3 text-center" data-sort="selling">Selling</th>
+                                        <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                        <th class="px-4 py-3 text-right" data-sort="change">Avg % Chg</th>
+                                        <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="gf-sells-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: New Positions -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-purple-400 mb-4">🆕 New Positions <span class="text-xs text-gray-500 font-normal">— Being bought by gurus but not in grand portfolio</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-new-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="gurus">Buying Gurus</th>
+                                    <th class="px-4 py-3 text-center" data-sort="6mo">6mo</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="change">Avg % Chg</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-new-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 4: Single-Manager Heavy Bets -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-white mb-4">🎲 Single-Manager Heavy Bets <span class="text-xs text-gray-500 font-normal">— >30% of one manager's portfolio</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-heavy-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="max">Max %</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-heavy-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 5: Near 52w Low (Opportunities) -->
+                <div class="glass-panel p-6 rounded-2xl">
+                    <h3 class="text-lg font-semibold text-yellow-400 mb-4">📉 Near 52w Low <span class="text-xs text-gray-500 font-normal">— Guru holdings within 10% of 52w low</span></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left" id="gf-near-low-table">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg" data-sort="symbol">Symbol</th>
+                                    <th class="px-4 py-3" data-sort="name">Name</th>
+                                    <th class="px-4 py-3 text-right" data-sort="above">Above 52w Low</th>
+                                    <th class="px-4 py-3 text-center" data-sort="owners">Owners</th>
+                                    <th class="px-4 py-3 text-right" data-sort="pct">% Grand Port</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg" data-sort="price">Current</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gf-near-low-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -1936,8 +2123,8 @@
         </div>
 
         <!-- App Logic -->
-        <script type="module" src="/static/portfolio.js?v=19"></script>
-        <script type="module" src="/static/app.js?v=18"></script>
+        <script type="module" src="/static/portfolio.js?v=20"></script>
+        <script type="module" src="/static/app.js?v=24"></script>
 </body>
 
 </html>

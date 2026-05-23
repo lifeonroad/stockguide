@@ -14,7 +14,7 @@ import sqlite3
 import os
 import json
 import time
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Union
 from datetime import datetime
 import logging
 
@@ -22,64 +22,63 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = os.environ.get("PERSISTENT_DB", os.path.join(os.path.dirname(__file__), "data", "stockguide.db"))
 
-ALL_INVESTOR_CIKS: Dict[str, Dict[str, str]] = {
-    # Original core group - VERIFIED WORKING
+ALL_INVESTOR_CIKS: Dict[str, Dict[str, Optional[str]]] = {
     "buffett": {
         "cik": "0001067983",
         "name": "Warren Buffett",
         "firm": "Berkshire Hathaway",
         "style": "Quality / Long Term",
+        "dataroma_code": "BRK",
     },
     "burry": {
         "cik": "0001649339",
         "name": "Michael Burry",
         "firm": "Scion Asset Management",
         "style": "Deep Value / Contrarian",
+        "dataroma_code": "SAM",
     },
     "druckenmiller": {
         "cik": "0001536411",
         "name": "Stanley Druckenmiller",
         "firm": "Duquesne Family Office",
         "style": "Macro / Trend",
+        "dataroma_code": None,
     },
     "pabrai": {
         "cik": "0001336528",
         "name": "Mohnish Pabrai",
         "firm": "Dalal Street LLC",
         "style": "Cloner / Deep Value",
+        "dataroma_code": "PI",
     },
-    # New additions - VERIFIED WORKING
     "gates": {
         "cik": "0001166559",
         "name": "Bill & Melinda Gates Foundation",
         "firm": "Bill & Melinda Gates Foundation Trust",
         "style": "Long Term / Foundation",
+        "dataroma_code": "GFT",
     },
     "einhorn": {
         "cik": "0001079114",
         "name": "David Einhorn",
         "firm": "Greenlight Capital",
         "style": "Value / Short Bias",
+        "dataroma_code": "GLRE",
     },
-    # New additions - Need CIK verification
-    # "ackman": {
-    #     "cik": "TBD",
-    #     "name": "Bill Ackman",
-    #     "firm": "Pershing Square Capital Management",
-    #     "style": "Activist / Concentrated Value",
-    # },
-    # "icahn": {
-    #     "cik": "TBD",
-    #     "name": "Carl Icahn",
-    #     "firm": "Icahn Capital Management",
-    #     "style": "Activist / Deep Value",
-    # },
-    # "klarman": {
-    #     "cik": "0001061768",
-    #     "name": "Seth Klarman",
-    #     "firm": "Baupost Group",
-    #     "style": "Deep Value / Distressed",
-    # },
+    "jensen": {
+        "cik": "0001106129",
+        "name": "Jensen Investment Management",
+        "firm": "Jensen Investment Management Inc",
+        "style": "Quality Growth / Long Term",
+        "dataroma_code": "JIM",
+    },
+    "aschenbrenner": {
+        "cik": "0002045724",
+        "name": "Leopold Aschenbrenner",
+        "firm": "Situational Awareness LP",
+        "style": "AGI-Focused / Long/Short Equity",
+        "dataroma_code": None,
+    },
 }
 
 

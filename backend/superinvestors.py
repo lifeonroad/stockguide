@@ -285,5 +285,56 @@ def get_superinvestors():
                     }
                 }
             ]
+        },
+        {
+            "id": "jensen",
+            "name": "Jensen Investment Management",
+            "firm": "Jensen Investment Management Inc",
+            "style": "Quality Growth / Long Term",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Focused on high-quality growth companies with sustainable competitive advantages. Concentrated portfolio of ~25 stocks.",
+                    "top_buys": [
+                        {"symbol": "MSFT", "name": "Microsoft", "change": "CORE"},
+                        {"symbol": "GOOGL", "name": "Alphabet", "change": "CORE"},
+                        {"symbol": "AAPL", "name": "Apple", "change": "CORE"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "PEP", "name": "PepsiCo", "change": "REDUCED"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "JPM",
+                        "type": "QUALITY",
+                        "description": "Jensen bought JPMorgan — a rare financials pick for this quality-growth focused manager."
+                    }
+                }
+            ]
+        },
+        {
+            "id": "aschenbrenner",
+            "name": "Leopold Aschenbrenner",
+            "firm": "Situational Awareness LP",
+            "style": "AGI-Focused / Long/Short Equity",
+            "history": [
+                {
+                    "quarter": "Q4 2025",
+                    "summary": "Massive scale-up to $5.5B AUM. Pivoted from chip shorts into energy infrastructure and bitcoin miners.",
+                    "top_buys": [
+                        {"symbol": "BE", "name": "Bloom Energy", "change": "NEW"},
+                        {"symbol": "LITE", "name": "Lumentum Holdings", "change": "NEW"},
+                        {"symbol": "SNDK", "name": "SanDisk", "change": "ADDED"}
+                    ],
+                    "top_sells": [
+                        {"symbol": "VST", "name": "Vistra Corp", "change": "EXIT"},
+                        {"symbol": "NVDA", "name": "Nvidia (PUTS)", "change": "EXIT"}
+                    ],
+                    "weirdest_bet": {
+                        "symbol": "BE",
+                        "type": "ENERGY",
+                        "description": "Bloom Energy as largest holding — betting fuel cells power AI data centers. A $876M conviction."
+                    }
+                }
+            ]
         }
     ]

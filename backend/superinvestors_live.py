@@ -132,6 +132,7 @@ def _fetch_all_investors():
                 "name": meta.get("name", investor_id.title()),
                 "firm": meta.get("firm", ""),
                 "style": meta.get("style", "Value"),
+                "dataroma_code": meta.get("dataroma_code"),
                 "history": [],
             })
 
@@ -142,9 +143,12 @@ def _fetch_all_investors():
 
 def _build_static_fallback_map():
     """Build dict of investor_id -> static data for all tracked investors."""
+    from sec_13f_db import ALL_INVESTOR_CIKS
     fallback = {}
     static_list = get_static_superinvestors()
     for inv in static_list:
+        meta = ALL_INVESTOR_CIKS.get(inv["id"], {})
+        inv["dataroma_code"] = meta.get("dataroma_code")
         fallback[inv["id"]] = inv
     return fallback
 
@@ -183,6 +187,7 @@ def _format_investor_from_sec(result: dict, meta: dict) -> dict:
         "name": meta.get("name", investor_id.title()),
         "firm": meta.get("firm", ""),
         "style": meta.get("style", "Value"),
+        "dataroma_code": meta.get("dataroma_code"),
         "history": base_history,
     }
 
@@ -376,6 +381,7 @@ def get_investor_detail(investor_id: str) -> dict:
                     "name": inv["name"],
                     "firm": inv.get("firm", ""),
                     "style": inv.get("style", ""),
+                    "dataroma_code": meta.get("dataroma_code"),
                     "quarter": (inv.get("history") or [{}])[0].get("quarter", "Unknown"),
                     "holdings": [],
                     "changes": {},
@@ -423,6 +429,7 @@ def get_investor_detail(investor_id: str) -> dict:
         "name": name,
         "firm": firm,
         "style": style,
+        "dataroma_code": meta.get("dataroma_code"),
         "quarter": quarter,
         "holdings": holdings_sorted,
         "changes": changes,

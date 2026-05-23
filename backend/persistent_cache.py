@@ -145,6 +145,13 @@ def init_db():
                 PRIMARY KEY (scan_name, params)
             );
             
+            CREATE TABLE IF NOT EXISTS dataroma_cache (
+                cache_key TEXT PRIMARY KEY,
+                results TEXT NOT NULL,
+                fetched_at REAL NOT NULL,
+                ttl_hours REAL NOT NULL DEFAULT 720.0
+            );
+            
             CREATE INDEX IF NOT EXISTS idx_price_history_symbol ON price_history(symbol);
             CREATE INDEX IF NOT EXISTS idx_price_history_date ON price_history(date);
         """)
@@ -394,6 +401,211 @@ def get_db_stats() -> Dict:
         conn.close()
 
 
+def get_db_viewer_data() -> Dict:
+    """Full DB snapshot for the admin DB viewer page."""
+    init_db()
+    conn = _get_conn()
+    try:
+        now = time.time()
+
+        ticker_count = conn.execute("SELECT COUNT(*) FROM ticker_info").fetchone()[0]
+        price_history_rows = conn.execute("SELECT COUNT(*) FROM price_history").fetchone()[0]
+        symbols_with_history = conn.execute("SELECT COUNT(DISTINCT symbol) FROM price_history").fetchone()[0]
+        scan_cache_entries = conn.execute("SELECT COUNT(*) FROM scan_cache").fetchone()[0]
+
+        tickers_with_price = conn.execute("SELECT COUNT(*) FROM ticker_info WHERE price IS NOT NULL").fetchone()[0]
+        tickers_with_pe = conn.execute("SELECT COUNT(*) FROM ticker_info WHERE trailing_pe IS NOT NULL").fetchone()[0]
+
+        price_ttl = 1800
+        fresh_count = conn.execute(
+            "SELECT COUNT(*) FROM ticker_info WHERE price_fetched_at IS NOT NULL AND ? - price_fetched_at < ?",
+            (now, price_ttl)
+        ).fetchone()[0]
+        stale_count = conn.execute(
+            "SELECT COUNT(*) FROM ticker_info WHERE price_fetched_at IS NOT NULL AND ? - price_fetched_at >= ?",
+            (now, price_ttl)
+        ).fetchone()[0]
+
+        row = conn.execute("SELECT MIN(date) AS oldest, MAX(date) AS newest FROM price_history").fetchone()
+        oldest_history = row["oldest"] if row and row["oldest"] else None
+        newest_history = row["newest"] if row and row["newest"] else None
+
+        overview = {
+            "ticker_count": ticker_count,
+            "tickers_with_price": tickers_with_price,
+            "price_history_rows": price_history_rows,
+            "symbols_with_history": symbols_with_history,
+            "tickers_with_pe": tickers_with_pe,
+            "tickers_fresh": fresh_count,
+            "tickers_stale": stale_count,
+            "oldest_history": oldest_history,
+            "newest_history": newest_history,
+            "scan_cache_entries": scan_cache_entries,
+        }
+
+        coverage = {
+            "with_price": tickers_with_price,
+            "with_pe": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE trailing_pe IS NOT NULL").fetchone()[0],
+            "with_mcap": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE market_cap IS NOT NULL").fetchone()[0],
+            "with_roe": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE roe IS NOT NULL").fetchone()[0],
+            "with_dte": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE debt_to_equity IS NOT NULL").fetchone()[0],
+            "with_beta": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE beta IS NOT NULL").fetchone()[0],
+            "with_dividend": conn.execute("SELECT COUNT(*) FROM ticker_info WHERE dividend_yield IS NOT NULL").fetchone()[0],
+        }
+
+        ticker_sample = []
+        for row in conn.execute(
+            "SELECT symbol, name, sector, price, trailing_pe, market_cap, roe, debt_to_equity, beta, dividend_yield, fetched_at, price_fetched_at FROM ticker_info ORDER BY symbol LIMIT 200"
+        ).fetchall():
+            ticker_sample.append(dict(row))
+
+        history_stats = []
+        for row in conn.execute(
+            "SELECT symbol, COUNT(*) AS rows, MIN(date) AS earliest, MAX(date) AS latest FROM price_history GROUP BY symbol ORDER BY symbol"
+        ).fetchall():
+            history_stats.append(dict(row))
+
+        scan_entries = []
+        for row in conn.execute(
+            "SELECT scan_name, params, fetched_at FROM scan_cache ORDER BY fetched_at DESC"
+        ).fetchall():
+            entry = dict(row)
+            entry["age_seconds"] = now - entry["fetched_at"]
+            scan_entries.append(entry)
+
+        return {
+            "overview": overview,
+            "coverage": coverage,
+            "ticker_sample": ticker_sample,
+            "history_stats": history_stats,
+            "scan_entries": scan_entries,
+        }
+    finally:
+        conn.close()
+
+
+# ─── Dataroma Cache ──────────────────────────────────────────────────────────
+
+DATAROMA_TTL = {
+    "all_managers": 720.0,         # 30 days — static list
+    "grand_portfolio": 720.0,       # 30 days — quarterly data
+    "grand_portfolio_qtr_buys": 720.0,
+    "grand_portfolio_qtr_sells": 720.0,
+    "grand_portfolio_6mo_buys": 720.0,
+    "grand_portfolio_6mo_sells": 720.0,
+    "grand_portfolio_sector": 720.0,
+    "all_activity": 720.0,
+    "holdings": 720.0,
+    "activity": 720.0,
+    "stock_hist": 720.0,
+    "realtime": 24.0,               # 24 hours — insider filings change daily
+}
+
+def dataroma_cache_key(page_type: str, manager: str = "", params: str = "") -> str:
+    parts = [page_type]
+    if manager:
+        parts.append(manager)
+    if params:
+        parts.append(params)
+    return ":".join(parts)
+
+
+def save_dataroma_cache(cache_key: str, results: dict, ttl_hours: float = 720.0):
+    init_db()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO dataroma_cache (cache_key, results, fetched_at, ttl_hours) VALUES (?, ?, ?, ?)",
+                (cache_key, json.dumps(results), time.time(), ttl_hours)
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def get_dataroma_cache(cache_key: str) -> Optional[dict]:
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT results, fetched_at, ttl_hours FROM dataroma_cache WHERE cache_key = ?",
+            (cache_key,)
+        ).fetchone()
+        if not row:
+            return None
+        fetched_at = row["fetched_at"]
+        ttl_hours = row["ttl_hours"]
+        age_hours = (time.time() - fetched_at) / 3600.0
+        if age_hours > ttl_hours:
+            return None
+        return json.loads(row["results"])
+    finally:
+        conn.close()
+
+
+def get_dataroma_cache_info(cache_key: str) -> Optional[dict]:
+    init_db()
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT cache_key, fetched_at, ttl_hours FROM dataroma_cache WHERE cache_key = ?",
+            (cache_key,)
+        ).fetchone()
+        if not row:
+            return None
+        now = time.time()
+        age_hours = (now - row["fetched_at"]) / 3600.0
+        return {
+            "cache_key": row["cache_key"],
+            "fetched_at": row["fetched_at"],
+            "ttl_hours": row["ttl_hours"],
+            "age_hours": round(age_hours, 2),
+            "expired": age_hours > row["ttl_hours"],
+        }
+    finally:
+        conn.close()
+
+
+def clear_dataroma_cache(prefix: str = ""):
+    init_db()
+    with db_write_lock:
+        conn = _get_conn()
+        try:
+            if prefix:
+                conn.execute("DELETE FROM dataroma_cache WHERE cache_key LIKE ?", (prefix + "%",))
+            else:
+                conn.execute("DELETE FROM dataroma_cache")
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def list_dataroma_cache() -> List[dict]:
+    init_db()
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT cache_key, fetched_at, ttl_hours FROM dataroma_cache ORDER BY fetched_at DESC"
+        ).fetchall()
+        now = time.time()
+        result = []
+        for r in rows:
+            age_hours = (now - r["fetched_at"]) / 3600.0
+            result.append({
+                "cache_key": r["cache_key"],
+                "fetched_at": r["fetched_at"],
+                "age_hours": round(age_hours, 2),
+                "ttl_hours": r["ttl_hours"],
+                "expired": age_hours > r["ttl_hours"],
+            })
+        return result
+    finally:
+        conn.close()
+
+
+# ─── End Dataroma Cache ──────────────────────────────────────────────────────
+
 def clear_db():
     """Clear all cached data. Use with caution."""
     init_db()
@@ -402,6 +614,7 @@ def clear_db():
         conn.execute("DELETE FROM ticker_info")
         conn.execute("DELETE FROM price_history")
         conn.execute("DELETE FROM scan_cache")
+        conn.execute("DELETE FROM dataroma_cache")
         conn.commit()
     finally:
         conn.close()

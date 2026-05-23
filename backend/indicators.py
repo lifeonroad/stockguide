@@ -50,6 +50,59 @@ def get_price_history_for_indicators(symbol: str, min_days: int = 200) -> Option
         return None
 
 
+def calculate_roc(prices: pd.Series, period: int = 21) -> Optional[float]:
+    if len(prices) < period + 1:
+        return None
+    current = float(prices.iloc[-1])
+    prev = float(prices.iloc[-1 - period])
+    if prev == 0:
+        return None
+    return ((current - prev) / prev) * 100
+
+
+def calculate_macd(prices: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> Dict:
+    if len(prices) < slow + signal:
+        return {"macd": None, "signal": None, "histogram": None}
+    ema_fast = prices.ewm(span=fast).mean()
+    ema_slow = prices.ewm(span=slow).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal).mean()
+    histogram = macd_line - signal_line
+    return {
+        "macd": float(macd_line.iloc[-1]),
+        "signal": float(signal_line.iloc[-1]),
+        "histogram": float(histogram.iloc[-1]),
+    }
+
+
+def calculate_adx(highs: pd.Series, lows: pd.Series, closes: pd.Series, period: int = 14) -> Dict:
+    if len(highs) < period * 2 or len(lows) < period * 2 or len(closes) < period * 2:
+        return {"adx": None, "plus_di": None, "minus_di": None}
+    high = highs.astype(float)
+    low = lows.astype(float)
+    close = closes.astype(float)
+    plus_dm = high.diff()
+    minus_dm = low.diff()
+    plus_dm[plus_dm < 0] = 0
+    minus_dm[minus_dm > 0] = 0
+    minus_dm = minus_dm.abs()
+    tr = pd.concat([
+        (high - low).abs(),
+        (high - close.shift()).abs(),
+        (low - close.shift()).abs(),
+    ], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+    plus_di = 100 * (plus_dm.rolling(window=period).mean() / atr)
+    minus_di = 100 * (minus_dm.rolling(window=period).mean() / atr)
+    dx = ((plus_di - minus_di) / (plus_di + minus_di).replace(0, float('nan'))).abs() * 100
+    adx = dx.rolling(window=period).mean()
+    return {
+        "adx": float(adx.iloc[-1]) if not pd.isna(adx.iloc[-1]) else None,
+        "plus_di": float(plus_di.iloc[-1]) if not pd.isna(plus_di.iloc[-1]) else None,
+        "minus_di": float(minus_di.iloc[-1]) if not pd.isna(minus_di.iloc[-1]) else None,
+    }
+
+
 def get_research_indicators(symbol: str) -> Dict:
     df = get_price_history_for_indicators(symbol, min_days=200)
     if df is None:

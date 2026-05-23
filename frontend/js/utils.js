@@ -150,6 +150,11 @@ export const renderMetricWithContext = (label, value, contextValue, unit = '') =
     `;
 };
 
+export const linkDataromaManager = (dataromaCode) => {
+    if (!dataromaCode) return '';
+    return `<a href="https://www.dataroma.com/m/holdings.php?m=${dataromaCode}" target="_blank" class="inline-flex items-center gap-1 text-[10px] bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30 transition-colors" title="View on Dataroma">DR</a>`;
+};
+
 export const linkTV = (symbol) => {
     if (!symbol) return '';
     const cleanSymbol = symbol.split(' ')[0].replace(/[^a-zA-Z]/g, '');
@@ -157,6 +162,7 @@ export const linkTV = (symbol) => {
         <div class="inline-flex items-center gap-1 group/ticker">
             <a href="https://www.tradingview.com/symbols/${cleanSymbol}/" target="_blank" class="font-bold hover:text-warren-accent underline decoration-dotted transition-colors" title="View on TradingView">${symbol}</a>
             <div class="flex gap-1 opacity-0 group-hover/ticker:opacity-100 transition-opacity">
+                <a href="https://www.dataroma.com/m/stock.php?sym=${cleanSymbol}" target="_blank" class="text-[10px] bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-1 rounded border border-blue-500/30" title="View on Dataroma">DR</a>
                 <button onclick="if(window.openTradeModal) window.openTradeModal('${cleanSymbol}')" class="text-[10px] bg-green-500/10 text-green-400 hover:bg-green-500/20 px-1 rounded border border-green-500/30" title="Paper Trade">⚡</button>
                 <button onclick="window.switchTab('research'); window.loadResearch('${cleanSymbol}')" class="text-[10px] bg-warren-accent/10 text-warren-accent hover:bg-warren-accent/20 px-1 rounded border border-warren-accent/30 flex items-center gap-1" title="Institutional Deep Research">
                     <span class="text-[8px] font-black uppercase">Research</span> 🔍

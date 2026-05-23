@@ -64,19 +64,7 @@ async def _startup_background_tasks():
     except Exception as exc:
         log.warning("[WARMUP] Could not start memory watcher: %s", exc)
 
-    try:
-        from cache_utils import start_cache_pruner
-        start_cache_pruner(interval_minutes=60)
-        log.info("[WARMUP] Cache pruner started (every 60 min)")
-    except Exception as exc:
-        log.warning("[WARMUP] Could not start cache pruner: %s", exc)
 
-    try:
-        from rate_limiter import start_rate_limiter_cleanup
-        start_rate_limiter_cleanup(interval_hours=12)
-        log.info("[WARMUP] Rate limiter cleanup scheduled (every 12h)")
-    except Exception as exc:
-        log.warning("[WARMUP] Could not start rate limiter cleanup: %s", exc)
 
     async def _delayed_warming():
         await asyncio.sleep(60)
@@ -126,10 +114,15 @@ async def _startup_background_tasks():
                 symbols.update(stocks)
 
             from data_client import warm_db_for_symbols
-            warm_db_for_symbols(list(symbols))
-            log.info("[DB WARMUP] Completed background warming for %d symbols", len(symbols))
+            total = len(symbols)
+            await asyncio.to_thread(warm_db_for_symbols, list(symbols))
+            log.info("[DB WARMUP] Completed background warming for %d symbols", total)
+            if _set_warming:
+                _set_warming(db_warming_done=True, db_warming_success=total, db_warming_failed=0)
         except Exception as exc:
             log.warning("[DB WARMUP] Failed: %s", exc)
+            if _set_warming:
+                _set_warming(db_warming_done=True, db_warming_success=0, db_warming_failed=1)
 
         await asyncio.sleep(10)
 
@@ -302,9 +295,11 @@ async def international_picks():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/research/{symbol}")
-async def research(symbol: str, days: int = 252):
+async def research(symbol: str):
     try:
-        data = await asyncio.to_thread(get_comprehensive_research, symbol, days)
+        data = await _to_thread_with_timeout(
+            get_comprehensive_research, symbol, timeout=SLOW_API_TIMEOUT
+        )
         if isinstance(data, dict) and "error" in data:
             raise HTTPException(status_code=404, detail=data["error"])
         return data
@@ -312,8 +307,10 @@ async def research(symbol: str, days: int = 252):
         raise e
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Research timed out. Try again in a moment.")
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Data temporarily unavailable (rate limited). Please retry in a moment.")
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.get("/api/research/trends/{symbol}")
 async def research_trends(symbol: str, range: str = '5y'):
@@ -749,6 +746,543 @@ def scan_progress():
             "pct": round(info["current"] / max(info["total"], 1) * 100) if info["total"] > 0 else None,
         }
     return result
+
+# ─── Dataroma Scout (exploratory data validation) ─────────────────────────────
+
+_DR_SESSION = None
+
+def _get_dr_session():
+    global _DR_SESSION
+    if _DR_SESSION is None:
+        import requests as req
+        _DR_SESSION = req.Session()
+        _DR_SESSION.headers.update({
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+        })
+    return _DR_SESSION
+
+
+def _dr_parsed_with_cache(fetch_fn, cache_key: str, ttl_hours: float = 720.0):
+    """Fetch from cache if fresh, otherwise call fetch_fn and cache result."""
+    from persistent_cache import get_dataroma_cache, save_dataroma_cache
+    cached = get_dataroma_cache(cache_key)
+    if cached is not None:
+        return cached
+    result = fetch_fn()
+    if "error" not in result:
+        save_dataroma_cache(cache_key, result, ttl_hours)
+    return result
+
+
+@app.get("/api/admin/dataroma/raw")
+def dataroma_raw_fetch(m: str = "BRK", p: str = "holdings", typ: str = "a", L: int = 1, sym: str = "", page: str = ""):
+    """Proxy a raw Dataroma page for manual inspection."""
+    from dataroma_scraper import PAGE_ROUTES, BASE_URL, REFERERS
+
+    route = PAGE_ROUTES.get(p)
+    if not route:
+        return {"error": f"Unknown page type: {p}"}
+
+    if p == "stock_hist":
+        if not sym:
+            return {"error": "sym parameter required for stock_hist"}
+        url = f"{BASE_URL}{route}?f={m}&s={sym.upper()}"
+    elif p in ("activity", "activity_buys", "activity_sells"):
+        typ_map = {"activity": "a", "activity_buys": "b", "activity_sells": "s"}
+        t = typ_map.get(p, "a")
+        url = f"{BASE_URL}{route}?m={m}&typ={t}&L={L}"
+    elif p == "history":
+        url = f"{BASE_URL}{route}?f={m}"
+    elif p == "all_managers":
+        url = f"{BASE_URL}{route}"
+    elif p == "all_activity":
+        t = typ if typ in ("a","b","s") else "a"
+        url = f"{BASE_URL}{route}?typ={t}"
+        if page:
+            url += f"&p={page.upper()}"
+    elif p in ("grand_portfolio", "grand_portfolio_qtr_buys", "grand_portfolio_qtr_sells",
+               "grand_portfolio_6mo_buys", "grand_portfolio_6mo_sells", "grand_portfolio_sector"):
+        from dataroma_scraper import GRAND_PORTFOLIO_VIEWS
+        t_param = GRAND_PORTFOLIO_VIEWS.get(p, "h")
+        url = f"{BASE_URL}{route}?t={t_param}"
+    else:
+        url = f"{BASE_URL}{route}?m={m}"
+
+    referer = REFERERS.get(p, "https://www.dataroma.com/m/")
+    sess = _get_dr_session()
+    try:
+        resp = sess.get(url, headers={"Referer": referer}, timeout=30)
+        resp.raise_for_status()
+    except Exception as exc:
+        return {"error": f"Fetch failed: {exc}", "url": url}
+
+    html = resp.text
+    blocked = "Not Acceptable" in html[:200] or "Mod_Security" in html[:200]
+    return {
+        "url": url,
+        "status": resp.status_code,
+        "size": len(html),
+        "blocked": blocked,
+        "page_type": p,
+        "manager": m or "",
+        "raw_html": html if not blocked else "PAGE_BLOCKED_BY_WAF",
+    }
+
+
+@app.get("/api/admin/dataroma/parsed")
+def dataroma_parsed_fetch(
+    m: str = "BRK", p: str = "holdings",
+    typ: str = "a", L: int = 1, sym: str = "",
+    page: str = "", nocache: bool = False
+):
+    """Fetch and parse a Dataroma page into structured data."""
+    from dataroma_scraper import (
+        fetch_holdings, fetch_activity, fetch_history, fetch_stock_history,
+        fetch_all_managers, fetch_grand_portfolio, fetch_all_activity,
+        GRAND_PORTFOLIO_VIEWS,
+    )
+    from persistent_cache import dataroma_cache_key, get_dataroma_cache, save_dataroma_cache, DATAROMA_TTL, get_dataroma_cache_info
+
+    try:
+        # Determine cache key and TTL
+        ttl_map = DATAROMA_TTL
+        ck = dataroma_cache_key(p, m, f"{typ}:{L}:{sym}:{page}")
+
+        # Check cache unless nocache flag
+        if not nocache:
+            cached = get_dataroma_cache(ck)
+            if cached is not None:
+                return cached
+
+        local_vars = {"m": m, "L": L, "sym": sym, "page": page, "typ": typ}
+
+        # Route to appropriate fetch function
+        if p == "holdings":
+            result = fetch_holdings(m)
+            ttl = ttl_map.get("holdings", 720.0)
+        elif p in ("activity", "activity_buys", "activity_sells"):
+            t = {"activity": "a", "activity_buys": "b", "activity_sells": "s"}.get(p, "a")
+            result = fetch_activity(m, t, L)
+            ttl = ttl_map.get("activity", 720.0)
+        elif p == "history":
+            result = fetch_history(m)
+            ttl = ttl_map.get("holdings", 720.0)
+        elif p == "stock_hist":
+            if not sym:
+                return {"error": "sym parameter required for stock_hist"}
+            result = fetch_stock_history(m, sym)
+            ttl = ttl_map.get("stock_hist", 720.0)
+        elif p == "all_managers":
+            result = fetch_all_managers()
+            ttl = ttl_map.get("all_managers", 720.0)
+        elif p in GRAND_PORTFOLIO_VIEWS:
+            result = fetch_grand_portfolio(p)
+            ttl = ttl_map.get(p, 720.0)
+        elif p == "all_activity":
+            t = typ if typ in ("a","b","s") else "a"
+            result = fetch_all_activity(t, page)
+            ttl = ttl_map.get("all_activity", 720.0)
+        else:
+            return {"error": f"Unknown page type: {p}"}
+
+        # Cache result (only if no error)
+        if "error" not in result:
+            save_dataroma_cache(ck, result, ttl)
+
+        return result
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@app.get("/api/admin/dataroma/cache")
+def dataroma_cache_status():
+    """View Dataroma cache entries and status."""
+    from persistent_cache import list_dataroma_cache, clear_dataroma_cache
+    entries = list_dataroma_cache()
+    return {
+        "entries": entries,
+        "count": len(entries),
+        "fresh": sum(1 for e in entries if not e["expired"]),
+        "expired": sum(1 for e in entries if e["expired"]),
+    }
+
+
+@app.post("/api/admin/dataroma/cache/clear")
+def dataroma_cache_clear(body: dict = None):
+    """Clear Dataroma cache entries. Body: {"prefix": "gp:"} clears only grand portfolio."""
+    from persistent_cache import clear_dataroma_cache
+    prefix = ""
+    if body and "prefix" in body:
+        prefix = body["prefix"]
+    clear_dataroma_cache(prefix)
+    return {"cleared": True, "prefix": prefix}
+
+
+@app.get("/admin/dataroma-scout")
+async def admin_dataroma_scout(v: str = ""):
+    """Serve the Dataroma validation scout page."""
+    import os
+    page_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend', 'admin', 'dataroma-scout.html')
+    if not os.path.exists(page_path):
+        return {"error": "Dataroma scout page not found"}
+    from fastapi.responses import FileResponse
+    return FileResponse(page_path, headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    })
+
+# ─── Guru Consensus (Grand Portfolio) ────────────────────────────────────────
+
+@app.get("/api/guru-consensus")
+def guru_consensus(view: str = "grand_portfolio"):
+    """Public endpoint for guru consensus data from Dataroma Grand Portfolio.
+
+    Views: grand_portfolio (holdings), grand_portfolio_qtr_buys,
+           grand_portfolio_qtr_sells, grand_portfolio_6mo_buys,
+           grand_portfolio_6mo_sells, grand_portfolio_sector,
+           consensus_picks
+    """
+    valid_views = [
+        "grand_portfolio", "grand_portfolio_qtr_buys", "grand_portfolio_qtr_sells",
+        "grand_portfolio_6mo_buys", "grand_portfolio_6mo_sells", "grand_portfolio_sector",
+        "consensus_picks",
+    ]
+    if view not in valid_views:
+        return {"error": f"Invalid view. Choose from: {', '.join(valid_views)}"}
+
+    from dataroma_scraper import fetch_grand_portfolio
+    from persistent_cache import dataroma_cache_key, get_dataroma_cache, save_dataroma_cache, DATAROMA_TTL
+
+    if view == "consensus_picks":
+        return _compute_consensus_picks()
+
+    ck = dataroma_cache_key(view, "", "")
+    cached = get_dataroma_cache(ck)
+    if cached is not None:
+        return cached
+
+    result = fetch_grand_portfolio(view)
+
+    if "error" not in result:
+        # Enrich quarter views with 6-month comparison
+        if view in ("grand_portfolio_qtr_buys", "grand_portfolio_qtr_sells"):
+            sixmo_view = "grand_portfolio_6mo_buys" if view == "grand_portfolio_qtr_buys" else "grand_portfolio_6mo_sells"
+            sixmo_data = fetch_grand_portfolio(sixmo_view)
+            if "error" not in sixmo_data:
+                sixmo_syms = {h.get("symbol") for h in sixmo_data.get("holdings", []) if h.get("symbol")}
+                for h in result.get("holdings", []):
+                    h["in_6mo"] = h.get("symbol") in sixmo_syms
+
+        ttl = DATAROMA_TTL.get(view, 720.0)
+        save_dataroma_cache(ck, result, ttl)
+    return result
+
+# ─── Guru Flow Analytics ──────────────────────────────────────────────────────
+
+def _parse_pct(v):
+    if not v:
+        return 0.0
+    cleaned = v.replace("$", "").replace(",", "").replace("%", "").strip()
+    try:
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return 0.0
+
+def _compute_consensus_picks():
+    """Compute consensus picks by combining signals from all guru data views.
+    Scores stocks on: sustained buying, ownership breadth, net manager activity,
+    proximity to 52w low, and portfolio allocation weight.
+    """
+    from dataroma_scraper import fetch_grand_portfolio, fetch_all_activity
+    from persistent_cache import dataroma_cache_key, get_dataroma_cache, save_dataroma_cache, DATAROMA_TTL
+
+    def _cached(fn, view, suffix=""):
+        ck = dataroma_cache_key(view, suffix, "")
+        cached = get_dataroma_cache(ck)
+        if cached is not None:
+            return cached
+        result = fn()
+        if "error" not in result:
+            save_dataroma_cache(ck, result, DATAROMA_TTL.get(view, 720.0))
+        return result
+
+    holdings_data = _cached(lambda: fetch_grand_portfolio("grand_portfolio"), "grand_portfolio")
+    holdings = holdings_data.get("holdings", []) or []
+
+    gp_6mo_buys = _cached(lambda: fetch_grand_portfolio("grand_portfolio_6mo_buys"), "grand_portfolio_6mo_buys")
+    gp_6mo_sells = _cached(lambda: fetch_grand_portfolio("grand_portfolio_6mo_sells"), "grand_portfolio_6mo_sells")
+    sixmo_buys_syms = {h.get("symbol") for h in gp_6mo_buys.get("holdings", []) if h.get("symbol")}
+    sixmo_sells_syms = {h.get("symbol") for h in gp_6mo_sells.get("holdings", []) if h.get("symbol")}
+
+    all_activity_raw = _cached(lambda: fetch_all_activity("a"), "all_activity", "a")
+
+    buys_agg = {}
+    sells_agg = {}
+    for mgr in all_activity_raw.get("managers", []) or []:
+        for act in mgr.get("activities", []) or []:
+            sym = act.get("symbol", "")
+            if not sym:
+                continue
+            if act.get("activity_type") == "buy":
+                target = buys_agg
+            elif act.get("activity_type") == "sell":
+                target = sells_agg
+            else:
+                continue
+            if sym not in target:
+                target[sym] = {"symbol": sym, "manager_count": 0}
+            target[sym]["manager_count"] += 1
+
+    holdings_by_sym = {h.get("symbol"): h for h in holdings if h.get("symbol")}
+    all_syms = set(holdings_by_sym.keys()) | set(buys_agg.keys()) | set(sells_agg.keys())
+
+    consensus = []
+    for sym in all_syms:
+        h = holdings_by_sym.get(sym, {})
+        buy_count = buys_agg.get(sym, {}).get("manager_count", 0)
+        sell_count = sells_agg.get(sym, {}).get("manager_count", 0)
+        net_count = buy_count - sell_count
+        ownership = int(h.get("ownership_count", "0")) if h.get("ownership_count", "0").isdigit() else 0
+        port_pct = _parse_pct(h.get("portfolio_pct", "0"))
+        above_low = _parse_pct(h.get("above_52w_low_pct", "0"))
+        near_low = above_low < 15
+        in_6mo = sym in sixmo_buys_syms or sym in sixmo_sells_syms
+        sustained = sym in sixmo_buys_syms
+
+        score = 0
+        if in_6mo:
+            score += 25
+        if sustained:
+            score += 25
+        if ownership >= 5:
+            score += 20
+        elif ownership >= 3:
+            score += 10
+        if net_count > 2:
+            score += 20
+        elif net_count > 0:
+            score += 15
+        if near_low:
+            score += 10
+        if port_pct > 2:
+            score += 5
+
+        if score > 0:
+            consensus.append({
+                "symbol": sym,
+                "name": h.get("name", ""),
+                "score": score,
+                "ownership_count": h.get("ownership_count", "0"),
+                "portfolio_pct": h.get("portfolio_pct", ""),
+                "current_price": h.get("current_price", ""),
+                "above_52w_low_pct": h.get("above_52w_low_pct", ""),
+                "in_6mo": in_6mo,
+                "sustained_buy": sustained,
+                "buy_managers": buy_count,
+                "sell_managers": sell_count,
+                "net_managers": net_count,
+                "near_low": near_low,
+            })
+
+    consensus.sort(key=lambda x: x["score"], reverse=True)
+    return {
+        "consensus": consensus[:40],
+        "total_candidates": len(consensus),
+    }
+
+@app.get("/api/guru-flow")
+def guru_flow():
+    """Aggregated guru flow analytics: top holdings, buy/sell activity, momentum."""
+    from dataroma_scraper import fetch_grand_portfolio, fetch_all_activity
+    from persistent_cache import dataroma_cache_key, get_dataroma_cache, save_dataroma_cache, DATAROMA_TTL
+
+    def _cached_fetch(fn, view, cache_key_suffix=""):
+        ck = dataroma_cache_key(view, cache_key_suffix, "")
+        cached = get_dataroma_cache(ck)
+        if cached is not None:
+            return cached
+        result = fn()
+        if "error" not in result:
+            ttl = DATAROMA_TTL.get(view, 720.0)
+            save_dataroma_cache(ck, result, ttl)
+        return result
+
+    # Grand portfolio holdings
+    holdings_data = _cached_fetch(
+        lambda: fetch_grand_portfolio("grand_portfolio"),
+        "grand_portfolio"
+    )
+    holdings = holdings_data.get("holdings", []) or []
+
+    # Sector data
+    sector_data_raw = _cached_fetch(
+        lambda: fetch_grand_portfolio("grand_portfolio_sector"),
+        "grand_portfolio_sector"
+    )
+    sectors = sector_data_raw.get("sector_data", []) or []
+
+    # 6-month grand portfolio data (for comparison)
+    gp_6mo_buys = _cached_fetch(
+        lambda: fetch_grand_portfolio("grand_portfolio_6mo_buys"),
+        "grand_portfolio_6mo_buys"
+    )
+    gp_6mo_sells = _cached_fetch(
+        lambda: fetch_grand_portfolio("grand_portfolio_6mo_sells"),
+        "grand_portfolio_6mo_sells"
+    )
+    six_month_buys_syms = {h.get("symbol") for h in gp_6mo_buys.get("holdings", []) if h.get("symbol")}
+    six_month_sells_syms = {h.get("symbol") for h in gp_6mo_sells.get("holdings", []) if h.get("symbol")}
+
+    # Real buy/sell activity across all managers
+    all_activity_raw = _cached_fetch(
+        lambda: fetch_all_activity("a"),
+        "all_activity", "a"
+    )
+
+    # Aggregate activity: separate buys from sells
+    def aggregate_activity(activity_data, activity_type_filter):
+        agg = {}
+        for mgr in activity_data.get("managers", []) or []:
+            for act in mgr.get("activities", []) or []:
+                if act.get("activity_type") != activity_type_filter:
+                    continue
+                sym = act.get("symbol", "")
+                if not sym:
+                    continue
+                if sym not in agg:
+                    agg[sym] = {
+                        "symbol": sym,
+                        "name": act.get("name", ""),
+                        "manager_count": 0,
+                        "total_pct_change": 0.0,
+                        "managers": [],
+                    }
+                agg[sym]["manager_count"] += 1
+                pct = _parse_pct(act.get("portfolio_pct_change", "0"))
+                agg[sym]["total_pct_change"] += pct
+                mgr_name = mgr.get("manager", "")
+                if mgr_name and mgr_name not in agg[sym]["managers"]:
+                    agg[sym]["managers"].append(mgr_name)
+        return agg
+
+    buys_agg = aggregate_activity(all_activity_raw, "buy")
+    sells_agg = aggregate_activity(all_activity_raw, "sell")
+
+    # Merge grand portfolio price data into activity symbols
+    holdings_by_symbol = {h.get("symbol"): h for h in holdings if h.get("symbol")}
+
+    def enrich(sym, data):
+        h = holdings_by_symbol.get(sym, {})
+        data["portfolio_pct"] = h.get("portfolio_pct", "")
+        data["ownership_count"] = h.get("ownership_count", "0")
+        data["current_price"] = h.get("current_price", "")
+        data["max_pct"] = h.get("max_pct", "")
+        data["week_52_low"] = h.get("week_52_low", "")
+        data["above_52w_low_pct"] = h.get("above_52w_low_pct", "")
+        data["week_52_high"] = h.get("week_52_high", "")
+        # 6-month comparison
+        data["in_6mo"] = sym in six_month_buys_syms or sym in six_month_sells_syms
+        return data
+
+    # 1. Top bought symbols (by manager count)
+    top_buys_list = sorted(buys_agg.values(), key=lambda x: x["manager_count"], reverse=True)[:30]
+    for item in top_buys_list:
+        enrich(item["symbol"], item)
+
+    # 2. Top sold symbols (by manager count)
+    top_sells_list = sorted(sells_agg.values(), key=lambda x: x["manager_count"], reverse=True)[:30]
+    for item in top_sells_list:
+        enrich(item["symbol"], item)
+
+    # 3. Most widely held (by ownership count)
+    widely_held = sorted(
+        [h for h in holdings if h.get("ownership_count")],
+        key=lambda h: int(h["ownership_count"]) if h["ownership_count"].isdigit() else 0,
+        reverse=True
+    )[:20]
+
+    # 4. Highest conviction (highest % of grand portfolio)
+    high_conviction = sorted(
+        [h for h in holdings if h.get("portfolio_pct")],
+        key=lambda h: _parse_pct(h["portfolio_pct"]),
+        reverse=True
+    )[:20]
+
+    # 5. Single-manager heavy bets (max_pct > 30%)
+    single_heavy = [h for h in holdings if _parse_pct(h.get("max_pct", "0")) > 30]
+    single_heavy = sorted(single_heavy, key=lambda h: _parse_pct(h["max_pct"]), reverse=True)[:20]
+
+    # 6. New positions: bought but not in grand portfolio holdings
+    holdings_symbols = {h.get("symbol") for h in holdings if h.get("symbol")}
+    buys_symbols = set(buys_agg.keys())
+    new_symbols = buys_symbols - holdings_symbols
+    new_positions = sorted(
+        [enrich(s, buys_agg[s]) for s in new_symbols if s in buys_agg],
+        key=lambda x: x["manager_count"],
+        reverse=True
+    )[:20]
+
+    # 7. Momentum: bought by many managers + price near 52w low
+    near_low = sorted(
+        [h for h in holdings if h.get("above_52w_low_pct") and _parse_pct(h["above_52w_low_pct"]) < 10],
+        key=lambda h: _parse_pct(h["above_52w_low_pct"]),
+    )[:20]
+
+    # 8. Sector rotation: compare buy vs sell intensity
+    all_symbols = set(buys_symbols) | set(sells_agg.keys())
+    rotation_list = []
+    for sym in all_symbols:
+        b = buys_agg.get(sym, {})
+        s = sells_agg.get(sym, {})
+        buy_count = b.get("manager_count", 0)
+        sell_count = s.get("manager_count", 0)
+        buy_pct = b.get("total_pct_change", 0.0)
+        sell_pct = s.get("total_pct_change", 0.0)
+        net_count = buy_count - sell_count
+        if abs(net_count) > 0:
+            h = holdings_by_symbol.get(sym, {})
+            rotation_list.append({
+                "symbol": sym,
+                "name": h.get("name", b.get("name", s.get("name", ""))),
+                "buy_managers": buy_count,
+                "sell_managers": sell_count,
+                "net_managers": net_count,
+                "buy_pct": round(buy_pct, 2),
+                "sell_pct": round(sell_pct, 2),
+            })
+    rotation_list.sort(key=lambda r: abs(r["net_managers"]), reverse=True)
+
+    # 9. Sustained buys: in both quarterly activity AND 6-month grand portfolio
+    sustained_buys_list = [b for b in top_buys_list if b.get("symbol") in six_month_buys_syms][:20]
+
+    return {
+        "widely_held": widely_held,
+        "high_conviction": high_conviction,
+        "single_heavy_bets": single_heavy,
+        "top_buys": top_buys_list[:20],
+        "top_sells": top_sells_list[:20],
+        "new_positions": new_positions,
+        "sustained_buys": sustained_buys_list,
+        "sector_rotation": rotation_list[:30],
+        "near_low": near_low,
+        "sectors": sectors,
+        "stats": {
+            "total_holdings": len(holdings),
+            "total_buying_managers": sum(m.get("manager_count", 0) for m in top_buys_list),
+            "total_selling_managers": sum(m.get("manager_count", 0) for m in top_sells_list),
+            "new_positions_count": len(new_positions),
+            "sustained_buys_count": len(sustained_buys_list),
+        },
+    }
+
+# ─── End Dataroma Scout ─────────────────────────────────────────────────────
 
 @app.get("/api/admin/data-source")
 def data_source_status():

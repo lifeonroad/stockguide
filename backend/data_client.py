@@ -901,6 +901,14 @@ _warming_status: dict = {
     "phase": "idle",
     "dip_hunter_done": False,
     "dip_hunter_count": 0,
+    "continuous_updater_running": False,
+    "continuous_updater_cycles": 0,
+    "last_cycle_end": None,
+    "last_cycle_warmed": 0,
+    "last_cycle_total": 0,
+    "db_warming_done": False,
+    "db_warming_success": 0,
+    "db_warming_failed": 0,
 }
 
 
@@ -921,6 +929,8 @@ def start_continuous_db_updater(interval_minutes: int = 30):
     Start a background daemon thread that periodically refreshes
     stale DB entries for critically-watched tickers.
     """
+    _warming_status["continuous_updater_running"] = True
+
     def _updater_loop():
         while True:
             time.sleep(interval_minutes * 60)
@@ -934,9 +944,14 @@ def start_continuous_db_updater(interval_minutes: int = 30):
                 stale = [s for s in all_syms if _pdb_needs_refresh(s, "price")]
                 if stale:
                     logger.info("[DB UPDATER] Refreshing %d stale tickers", len(stale))
-                    warm_db_for_symbols(stale[:50])
+                    warmed = warm_db_for_symbols(stale[:50])
+                    _warming_status["last_cycle_warmed"] = len(warmed) if warmed else 0
                 else:
                     logger.info("[DB UPDATER] No stale tickers found")
+                    _warming_status["last_cycle_warmed"] = 0
+                _warming_status["last_cycle_total"] = len(stale)
+                _warming_status["continuous_updater_cycles"] += 1
+                _warming_status["last_cycle_end"] = time.time()
             except Exception as exc:
                 logger.warning("[DB UPDATER] Refresh cycle failed: %s", exc)
 

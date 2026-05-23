@@ -1,5 +1,5 @@
 import { API_BASE } from '../api.js';
-import { renderWithTooltip, linkTV } from '../utils.js';
+import { renderWithTooltip, linkTV, linkDataromaManager } from '../utils.js';
 
 // --- Superinvestor Logic ---
 export async function loadSuperinvestors() {
@@ -49,6 +49,7 @@ export async function loadSuperinvestors() {
                         <div>
                             <h3 class="text-xl font-bold text-white">${investor.name}</h3>
                             <div class="text-xs text-gray-400">${investor.firm}</div>
+                            <div class="mt-0.5">${linkDataromaManager(investor.dataroma_code)}</div>
                         </div>
                     </div>
                     <div class="mt-2 text-xs text-warren-accent font-medium uppercase tracking-wider">${investor.style}</div>
@@ -343,6 +344,7 @@ export async function openSuperinvestorDetail(investorId) {
         document.getElementById('si-detail-name').textContent = data.name;
         document.getElementById('si-detail-firm').textContent = data.firm || '';
         document.getElementById('si-detail-style').textContent = data.style || '';
+        document.getElementById('si-detail-dataroma').innerHTML = linkDataromaManager(data.dataroma_code);
         document.getElementById('si-detail-quarter').textContent = data.quarter || '--';
 
         const initials = (data.name || investorId).split(' ').map(n => n[0]).join('').slice(0, 2);
@@ -440,7 +442,7 @@ export async function openSuperinvestorDetail(investorId) {
                 }">${change}</span>` : '<span class="text-xs text-gray-600">--</span>';
                 tr.innerHTML = `
                     <td class="px-4 py-3 font-bold text-white">${linkTV(ticker)}</td>
-                    <td class="px-4 py-3 text-gray-400 text-xs max-w-[200px] truncate">${name}</td>
+                    <td class="px-4 py-3 text-gray-400 text-xs max-w-[110px] truncate">${name}</td>
                     <td class="px-4 py-3 text-right font-mono text-white">${val.toFixed(1)}</td>
                     <td class="px-4 py-3 text-right font-mono text-gray-400">${weight}%</td>
                     <td class="px-4 py-3">${changeBadge}</td>
@@ -452,6 +454,199 @@ export async function openSuperinvestorDetail(investorId) {
         console.error("Failed to load investor detail", err);
         document.getElementById('si-holdings-body').innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-red-400">${err.message}</td></tr>`;
     }
+}
+
+// --- Guru Consensus (Grand Portfolio) ---
+export async function loadGuruConsensus(view = 'grand_portfolio') {
+    const container = document.getElementById('guru-consensus-content');
+    const badge = document.getElementById('guru-consensus-badge');
+    if (!container) return;
+
+    // Update active filter button
+    document.querySelectorAll('#guru-consensus-filters button').forEach(btn => {
+        if (btn.dataset.view === view) {
+            btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-warren-accent text-white';
+        } else {
+            btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:text-white';
+        }
+    });
+
+    container.innerHTML = '<div class="text-center py-8 text-gray-500 animate-pulse text-sm">Loading guru consensus...</div>';
+
+    try {
+        const res = await fetch(`${API_BASE}/guru-consensus?view=${view}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data.error) {
+            container.innerHTML = `<div class="text-center py-8 text-red-400 text-sm">${data.error}</div>`;
+            return;
+        }
+
+        if (badge) {
+            if (view === 'consensus_picks') {
+                badge.textContent = `${data.total_candidates || 0} candidates → ${(data.consensus || []).length} picks`;
+            } else {
+                const count = data.holdings_count || 0;
+                const sectorCount = data.sector_data ? data.sector_data.length : 0;
+                badge.textContent = count ? `${count} stocks` : sectorCount ? `${sectorCount} sectors` : '';
+            }
+        }
+
+        if (view === 'grand_portfolio_sector') {
+            renderGuruSector(container, data);
+        } else if (view === 'consensus_picks') {
+            renderConsensusPicks(container, data);
+        } else {
+            renderGuruHoldings(container, data, view);
+        }
+    } catch (err) {
+        container.innerHTML = `<div class="text-center py-8 text-red-400 text-sm">Failed: ${err.message}</div>`;
+    }
+}
+
+function renderGuruHoldings(container, data, view) {
+    const holdings = data.holdings || [];
+    if (holdings.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No holdings data available.</div>';
+        return;
+    }
+
+    const isQuarterView = view.startsWith('grand_portfolio_qtr');
+
+    let html = `<div class="overflow-x-auto rounded-lg border border-gray-700">
+        <table class="w-full text-sm text-left">
+            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                <tr>
+                    <th class="px-4 py-3 rounded-l-lg">#</th>
+                    <th class="px-4 py-3">Symbol</th>
+                    <th class="px-4 py-3">Name</th>
+                    <th class="px-4 py-3 text-right">% Port</th>
+                    <th class="px-4 py-3 text-center">Owners</th>
+                    ${isQuarterView ? '<th class="px-4 py-3 text-center">6mo</th>' : ''}
+                    <th class="px-4 py-3 text-right">Reported</th>
+                    <th class="px-4 py-3 text-right">Current</th>
+                    <th class="px-4 py-3 text-right">52w Low</th>
+                    <th class="px-4 py-3 text-right">Above Low</th>
+                    <th class="px-4 py-3 text-right rounded-r-lg">52w High</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">`;
+
+    holdings.forEach((h, i) => {
+        const changeClass = h.above_52w_low_pct && (h.above_52w_low_pct.startsWith('+') || parseFloat(h.above_52w_low_pct) > 0) ? 'text-green-400' :
+            h.above_52w_low_pct && h.above_52w_low_pct.startsWith('-') ? 'text-red-400' : '';
+        const in6mo = h.in_6mo;
+        const sixmoBadge = in6mo ? '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300">6mo</span>' : '<span class="text-gray-600 text-xs">—</span>';
+        html += `<tr class="hover:bg-gray-800/30 transition-colors">
+            <td class="px-4 py-2.5 text-gray-500">${i + 1}</td>
+            <td class="px-4 py-2.5 font-bold text-white">${linkTV(h.symbol || '?')}</td>
+            <td class="px-4 py-2.5 text-gray-400 text-xs max-w-[110px] truncate">${h.name || ''}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-white">${h.portfolio_pct || ''}</td>
+            <td class="px-4 py-2.5 text-center"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">${h.ownership_count || '0'}</span></td>
+            ${isQuarterView ? `<td class="px-4 py-2.5 text-center">${sixmoBadge}</td>` : ''}
+            <td class="px-4 py-2.5 text-right font-mono text-gray-400">${h.reported_price || ''}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-white">${h.current_price || ''}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-gray-400">${h.week_52_low || ''}</td>
+            <td class="px-4 py-2.5 text-right font-mono ${changeClass}">${h.above_52w_low_pct || ''}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-gray-400">${h.week_52_high || ''}</td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+}
+
+function renderConsensusPicks(container, data) {
+    const picks = data.consensus || [];
+    if (picks.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No consensus data available.</div>';
+        return;
+    }
+
+    const maxScore = Math.max(...picks.map(p => p.score));
+
+    let html = `<div class="text-sm text-gray-400 mb-4">${data.total_candidates} candidates scored — showing top ${picks.length}</div>
+    <div class="overflow-x-auto rounded-lg border border-gray-700">
+        <table class="w-full text-sm text-left">
+            <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
+                <tr>
+                    <th class="px-4 py-3 rounded-l-lg">#</th>
+                    <th class="px-4 py-3">Symbol</th>
+                    <th class="px-4 py-3">Name</th>
+                    <th class="px-4 py-3 text-center">Score</th>
+                    <th class="px-4 py-3 text-center">Owners</th>
+                    <th class="px-4 py-3 text-center">Net</th>
+                    <th class="px-4 py-3 text-center">Signals</th>
+                    <th class="px-4 py-3 text-right">% Port</th>
+                    <th class="px-4 py-3 text-right rounded-r-lg">Price</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">`;
+
+    picks.forEach((p, i) => {
+        const pct = maxScore > 0 ? (p.score / maxScore) * 100 : 0;
+        const barColor = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-warren-accent' : pct >= 40 ? 'bg-yellow-500' : 'bg-gray-500';
+        const netClass = p.net_managers > 0 ? 'text-green-400' : p.net_managers < 0 ? 'text-red-400' : 'text-gray-500';
+        const netLabel = p.net_managers > 0 ? `+${p.net_managers}` : p.net_managers === 0 ? '0' : `${p.net_managers}`;
+
+        const signals = [];
+        if (p.sustained_buy) signals.push('<span class="text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">Sustained</span>');
+        if (p.in_6mo) signals.push('<span class="text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">6mo</span>');
+        if (p.near_low) signals.push('<span class="text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">Near Low</span>');
+
+        html += `<tr class="hover:bg-gray-800/30 transition-colors">
+            <td class="px-4 py-2.5 text-gray-500">${i + 1}</td>
+            <td class="px-4 py-2.5 font-bold text-white">${linkTV(p.symbol || '?')}</td>
+            <td class="px-4 py-2.5 text-gray-400 text-xs max-w-[100px] truncate">${p.name || ''}</td>
+            <td class="px-4 py-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-sm text-white w-6 text-right">${p.score}</span>
+                    <div class="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden max-w-[80px]">
+                        <div class="h-full ${barColor} rounded-full transition-all" style="width:${pct}%"></div>
+                    </div>
+                </div>
+            </td>
+            <td class="px-4 py-2.5 text-center"><span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">${p.ownership_count || '0'}</span></td>
+            <td class="px-4 py-2.5 text-center font-mono text-sm font-bold ${netClass}">${netLabel}</td>
+            <td class="px-4 py-2.5"><div class="flex flex-wrap gap-1">${signals.join('') || '<span class="text-gray-600 text-xs">—</span>'}</div></td>
+            <td class="px-4 py-2.5 text-right font-mono text-gray-400">${p.portfolio_pct || ''}</td>
+            <td class="px-4 py-2.5 text-right font-mono text-white">${p.current_price || ''}</td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+}
+
+function renderGuruSector(container, data) {
+    const sectors = data.sector_data || [];
+    if (sectors.length === 0) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500 text-sm">No sector data available.</div>';
+        return;
+    }
+
+    const maxVal = Math.max(...sectors.map(s => {
+        const v = parseFloat((s.value || '').replace(/[^0-9.]/g, ''));
+        return isNaN(v) ? 0 : v;
+    }));
+
+    let html = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
+    sectors.forEach(s => {
+        const v = parseFloat((s.value || '').replace(/[^0-9.]/g, ''));
+        const pct = maxVal > 0 ? Math.max(5, (v / maxVal) * 100) : 5;
+        html += `<div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-sm font-semibold text-white">${s.sector || ''}</span>
+                <span class="text-xs text-gray-400">${s.value || ''}</span>
+            </div>
+            <div class="h-2.5 bg-gray-700 rounded-full overflow-hidden">
+                <div class="h-full bg-warren-accent rounded-full transition-all" style="width:${pct}%"></div>
+            </div>
+        </div>`;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
 }
 
 export function closeSuperinvestorDetail() {
