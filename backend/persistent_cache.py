@@ -32,6 +32,15 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = os.environ.get("PERSISTENT_DB", os.path.join(os.path.dirname(__file__), "data", "stockguide.db"))
 
+# Auto-decompress cached DB snapshot on first run
+_db_gz_path = DB_PATH + ".gz"
+if not os.path.exists(DB_PATH) and os.path.exists(_db_gz_path):
+    import gzip, shutil
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    with gzip.open(_db_gz_path, "rb") as f_in, open(DB_PATH, "wb") as f_out:
+        shutil.copyfileobj(f_in, f_out)
+    logger.info("Decompressed cached DB snapshot: %s", DB_PATH)
+
 # Staleness thresholds (seconds)
 # CONSERVATIVE SETTINGS: Prevent rate limiting
 # Minimum refresh interval per ticker: 30 minutes (1800s)
