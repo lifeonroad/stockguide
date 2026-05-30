@@ -1,0 +1,45 @@
+[0;36m⏱  Session started at: Tue May 12 07:16:31 AM EDT 2026[0m
+[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+✓ Loaded environment variables from .env
+🚀 Starting Rational Equity from /home/kplinux/Downloads/projects/stockguide/stockguide/backend...
+---------------------------------------------------
+INFO:     Will watch for changes in these directories: ['/home/kplinux/Downloads/projects/stockguide/stockguide/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [2544914] using WatchFiles
+INFO:     Started server process [2544916]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🌍 Opening Dashboard at http://localhost:8000
+INFO:     127.0.0.1:49864 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49894 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49864 - "GET /api/market-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49886 - "GET /api/industries/top HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49872 - "GET /api/macro HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54482 - "GET /api/stocks/Communication%20Services HTTP/1.1" 200 OK
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+$DAY: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+INFO:     127.0.0.1:42482 - "GET /api/dip-hunter/etfs HTTP/1.1" 200 OK
+$XSP: possibly delisted; no price data found  (period=1y)
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: KILO"}}}
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: HMMJ"}}}
+$KILO: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$VFV: possibly delisted; no price data found  (period=1y)
+$HMMJ: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$ZSP: possibly delisted; no price data found  (period=1y)
+$XEQT: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$XEG: possibly delisted; no price data found  (period=1y)
+$NPI: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$TA: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$RCI.B: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+
+12 Failed downloads:
+['XSP', 'VFV', 'ZSP', 'XEG', 'NPI', 'XQQ', 'ZEB']: possibly delisted; no price data found  (period=1y)
+['KILO', 'HMMJ', 'XEQT', 'TA', 'RCI.B']: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+WARNING:  WatchFiles detected changes in 'persistent_cache.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for connections to close. (CTRL+C to force quit)

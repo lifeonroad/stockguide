@@ -1,0 +1,21 @@
+Guidance for AI:
+1. Utilize this space to track your development ideas
+2. Move completed tasks to the completed section
+3. When ideal keep working on issues in User reported issues section.
+4. Move fixed issues to Fixed issues section.
+
+
+ToDo:
+1. Add support for Portfolio updates.
+3. Some kind of place where I can get easy view/notification of positions I need to exit or positions that need
+to be added based on watchlist.
+
+
+Completed:
+1. Entry/exit signals card integrated into Research Hub for any ticker search.
+2. Entry/exit signals card integrated into Portfolio view (below holdings table).
+
+User reported Issues:
+
+
+Fixed Issues:

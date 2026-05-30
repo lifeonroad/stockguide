@@ -51,7 +51,7 @@ class RateLimiter:
     """
     
     def __init__(self):
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         # (symbol, data_type) -> last fetch timestamp
         self._last_fetch: Dict[Tuple[str, str], float] = {}
         # (symbol, data_type, date_str) -> count

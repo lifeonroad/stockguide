@@ -1,0 +1,204 @@
+[0;36m⏱  Session started at: Wed May 13 10:25:48 PM EDT 2026[0m
+[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+✓ Loaded environment variables from .env
+🚀 Starting Rational Equity from /home/kplinux/Downloads/projects/stockguide/stockguide/backend...
+---------------------------------------------------
+INFO:     Will watch for changes in these directories: ['/home/kplinux/Downloads/projects/stockguide/stockguide/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [2614354] using WatchFiles
+INFO:     Started server process [2614356]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🌍 Opening Dashboard at http://localhost:8000
+INFO:     127.0.0.1:41344 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41344 - "GET /static/app.js?v=18 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:41344 - "GET /static/js/components/researchUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:41372 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41344 - "GET /api/market-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41364 - "GET /api/industries/top HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41348 - "GET /api/macro HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42286 - "GET /api/analyze/adbe?strategy=buffett HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41878 - "GET /api/research/ADBE HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41890 - "GET /api/research/price-chart/ADBE?days=252 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41878 - "GET /api/research/trends/ADBE?range=5y HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54364 - "GET /api/research/price-chart/ADBE?days=756 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54364 - "GET /api/research/price-chart/ADBE?days=1260 HTTP/1.1" 200 OK
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: WBA"}}}
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+$WBA: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:49456 - "GET /api/research/trends/ADBE?range=5y HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54364 - "GET /api/research/trends/ADBE?range=3y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:49456 - "GET /api/research/trends/ADBE?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:49456 - "GET /api/research/trends/ADBE?range=3y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:49456 - "GET /api/research/trends/ADBE?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:54364 - "GET /api/research/trends/ADBE?range=1y HTTP/1.1" 200 OK
+[Dip Hunter] Scanning 162 tickers (1 bleeding sectors)
+[Dip Hunter] Phase 1/3: Downloading price history for 162 tickers...
+INFO:     127.0.0.1:35640 - "GET /api/research/trends/ADBE?range=max HTTP/1.1" 200 OK
+$MMC: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+$NPI: possibly delisted; no price data found  (period=1y)
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+$VFV: possibly delisted; no price data found  (period=1y)
+$XSP: possibly delisted; no price data found  (period=1y)
+$ZSP: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$XEG: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+
+12 Failed downloads:
+['NPI', 'VFV', 'XSP', 'ZSP', 'ZEB', 'XEG', 'XQQ']: possibly delisted; no price data found  (period=1y)
+['HMMJ', 'RCI.B', 'XEQT', 'TA', 'KILO']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+get_price_history yfinance(PARA) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(WRK) failed: Too Many Requests. Rate limited. Try after a while.
+Background refresh failed: price history for DAY: Too Many Requests. Rate limited. Try after a while.
+WARNING:  WatchFiles detected changes in 'technical_zones.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2614356]
+INFO:     Started server process [2618841]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2618841]
+INFO:     Started server process [2618862]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2618862]
+INFO:     Started server process [2618873]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+
+1 Failed download:
+['^GSPC']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+WARNING:  WatchFiles detected changes in 'tests/comprehensive_test.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2618873]
+INFO:     Started server process [2618920]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/comprehensive_test.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2618920]
+INFO:     Started server process [2618931]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+
+1 Failed download:
+['^GSPC']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+INFO:     127.0.0.1:47242 - "GET /api/market-status HTTP/1.1" 200 OK
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+[RETRY 1/3] <lambda> failed: Too Many Requests. Rate limited. Try after a while.. Retrying in 2.4s …
+[RETRY 1/3] <lambda> failed: Too Many Requests. Rate limited. Try after a while.. Retrying in 1.6s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+[RETRY 1/3] <lambda> failed: Too Many Requests. Rate limited. Try after a while.. Retrying in 2.1s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 2.3s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 1.6s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 1.7s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 2.2s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 2.5s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 2.5s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 2.2s …
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 1.8s …
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+get_price_history yfinance(WRK) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+Background refresh failed: price history for DAY: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(WRK) failed: Too Many Requests. Rate limited. Try after a while.
+WARNING:  WatchFiles detected changes in 'technical_zones.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for background tasks to complete. (CTRL+C to force quit)
+get_price_history yfinance(WBA) failed: Too Many Requests. Rate limited. Try after a while.
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+get_price_history yfinance(WRK) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(MMC) failed: Too Many Requests. Rate limited. Try after a while.
+Background refresh failed: price history for DAY: Too Many Requests. Rate limited. Try after a while.
+$XEG: possibly delisted; no price data found  (period=1y)
+$NPI: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+$VFV: possibly delisted; no price data found  (period=1y)
+$XSP: possibly delisted; no price data found  (period=1y)
+$ZSP: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+
+12 Failed downloads:
+['XEQT', 'RCI.B', 'HMMJ', 'TA', 'KILO']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+['XEG', 'NPI', 'XQQ', 'VFV', 'XSP', 'ZSP', 'ZEB']: possibly delisted; no price data found  (period=1y)
+get_price_history yfinance(WBA) failed: Too Many Requests. Rate limited. Try after a while.
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2618931]
+INFO:     Stopping reloader process [2614354]
+/usr/lib/python3.14/multiprocessing/resource_tracker.py:396: UserWarning: resource_tracker: There appear to be 2 leaked semaphore objects to clean up at shutdown: {'/mp-46uj85uk', '/mp-idvmacrg'}
+  warnings.warn(

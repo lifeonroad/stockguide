@@ -1,6 +1,7 @@
 
 import { API_BASE } from './js/api.js';
 import { linkTV } from './js/utils.js';
+import { loadTickerSignals } from './js/components/tickerSignals.js';
 
 let currentPortfolioId = null;
 let portfolios = [];
@@ -624,8 +625,13 @@ function renderPositionsTable() {
                     ${pos.gain >= 0 ? '+' : ''}${currencySymbol}${pos.gain.toFixed(2)} <span class="opacity-70 text-xs text-gray-400">(${pos.gainPct.toFixed(1)}%)</span>
                 </td>
                 <td class="px-6 py-4 text-right">
-                    <button onclick="deletePosition('${pos.id}')" 
-                            class="text-red-400 hover:text-red-300 text-xs bg-red-900/20 px-2 py-1 rounded border border-red-500/20">Remove</button>
+                    <div class="flex items-center justify-end gap-2">
+                        <button onclick="openSignalPopup('${pos.ticker}')"
+                                class="text-blue-400 hover:text-blue-300 text-xs bg-blue-900/20 px-2 py-1 rounded border border-blue-500/20 hover:border-blue-400/40 transition-all"
+                                title="View Entry/Exit Signals">📊 Signals</button>
+                        <button onclick="deletePosition('${pos.id}')" 
+                                class="text-red-400 hover:text-red-300 text-xs bg-red-900/20 px-2 py-1 rounded border border-red-500/20">Remove</button>
+                    </div>
                 </td>
             `;
             tbody.appendChild(row);
@@ -634,6 +640,9 @@ function renderPositionsTable() {
 
     renderSection(usdPositions, '🇺🇸 USD Assets', '$');
     renderSection(cadPositions, '🇨🇦 CAD Assets', 'C$');
+
+    // Signals are now loaded inline per-ticker row on demand
+    // (toggled by the 📊 Signals button in each row's Actions cell)
 
     // Update headers to show sort direction
     document.querySelectorAll('th[onclick^="sortPortfolio"]').forEach(th => {
@@ -819,7 +828,7 @@ async function importWealthSimple(input) {
 
     if (!currentPortfolioId) {
         alert('Please create or select a portfolio first!');
-        input.value = ''; // Reset
+        input.value = '';
         return;
     }
 
@@ -827,59 +836,60 @@ async function importWealthSimple(input) {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Show loading state
     const btn = document.querySelector('button[onclick*="pdf-upload"]');
     const originalText = btn.innerHTML;
     btn.innerHTML = `Parsing...`;
 
     try {
-        const res = await fetch(`${API_BASE}/import/pdf`, {
-            method: 'POST',
-            body: formData
-        });
-
+        const res = await fetch(`${API_BASE}/import/pdf`, { method: 'POST', body: formData });
         if (!res.ok) throw new Error('Failed to parse PDF');
 
         const positions = await res.json();
-
-        if (positions.length === 0) {
-            alert('No positions found in this PDF.');
-            return;
-        }
-
-        if (confirm(`Found ${positions.length} positions. Import them to current portfolio?`)) {
-            let successCount = 0;
-
-            for (const pos of positions) {
-                try {
-                    await fetch(`${API_BASE}/portfolios/${currentPortfolioId}/positions`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            ticker: pos.ticker,
-                            quantity: pos.quantity,
-                            avg_cost: pos.avg_cost,
-                            notes: pos.notes
-                        })
-                    });
-                    successCount++;
-                } catch (e) {
-                    console.error(`Failed to import ${pos.ticker}`, e);
-                }
-            }
-
-            alert(`Successfully imported ${successCount} positions!`);
-            selectPortfolio(currentPortfolioId); // Reload
-        }
-
+        await _importPositions(positions, 'PDF');
     } catch (error) {
         console.error('Error importing PDF:', error);
         alert('Error importing PDF: ' + error.message);
     } finally {
-        // Reset button and input
-        document.querySelector('button[onclick*="pdf-upload"]').innerHTML = originalText;
+        btn.innerHTML = originalText;
         input.value = '';
     }
+}
+
+async function _importPositions(positions, label) {
+    if (!positions || positions.length === 0) {
+        alert('No positions found.');
+        return;
+    }
+
+    const replace = confirm(`${label}: ${positions.length} positions found.\n\nReplace existing positions? (Yes = overwrite, No = add to existing)`);
+
+    if (replace) {
+        const delRes = await fetch(`${API_BASE}/portfolios/${currentPortfolioId}`);
+        const portfolio = await delRes.json();
+        const existing = portfolio.positions || [];
+        for (const pos of existing) {
+            await fetch(`${API_BASE}/positions/${pos.id}`, { method: 'DELETE' }).catch(() => {});
+        }
+    }
+
+    let successCount = 0;
+    for (const pos of positions) {
+        try {
+            await fetch(`${API_BASE}/portfolios/${currentPortfolioId}/positions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ticker: pos.ticker, quantity: pos.quantity, avg_cost: pos.avg_cost,
+                    notes: pos.notes || '', category: pos.category || 'Stock'
+                })
+            });
+            successCount++;
+        } catch (e) {
+            console.error(`Failed to import ${pos.ticker}`, e);
+        }
+    }
+    alert(`${replace ? 'Replaced with' : 'Added'} ${successCount} of ${positions.length} positions!`);
+    selectPortfolio(currentPortfolioId);
 }
 
 // --- Import from Server ---
@@ -909,27 +919,7 @@ async function importFromServerFiles() {
         }
 
         const positions = await res.json();
-        if (!positions || positions.length === 0) {
-            alert('No positions found in server files.');
-            return;
-        }
-
-        let successCount = 0;
-        for (const pos of positions) {
-            try {
-                await fetch(`${API_BASE}/portfolios/${currentPortfolioId}/positions`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ticker: pos.ticker, quantity: pos.quantity, avg_cost: pos.avg_cost, notes: pos.notes || '' })
-                });
-                successCount++;
-            } catch (e) {
-                console.error(`Failed to import ${pos.ticker}`, e);
-            }
-        }
-
-        alert(`Imported ${successCount} of ${positions.length} positions!`);
-        selectPortfolio(currentPortfolioId);
+        await _importPositions(positions, 'Server files');
     } catch (err) {
         console.error('Import from server failed:', err);
         alert('Import failed: ' + err.message);
@@ -952,34 +942,58 @@ async function importCSV(input) {
         const res = await fetch(`${API_BASE}/import/csv`, { method: 'POST', body: formData });
         if (!res.ok) throw new Error('Failed to parse CSV');
         const positions = await res.json();
-
-        if (!positions || positions.length === 0) {
-            alert('No positions found in CSV.');
-            return;
-        }
-
-        if (confirm(`Found ${positions.length} positions. Import them?`)) {
-            let successCount = 0;
-            for (const pos of positions) {
-                try {
-                    await fetch(`${API_BASE}/portfolios/${currentPortfolioId}/positions`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ticker: pos.ticker, quantity: pos.quantity, avg_cost: pos.avg_cost, notes: pos.notes || '' })
-                    });
-                    successCount++;
-                } catch (e) {
-                    console.error(`Failed to import ${pos.ticker}`, e);
-                }
-            }
-            alert(`Imported ${successCount} positions!`);
-            selectPortfolio(currentPortfolioId);
-        }
+        await _importPositions(positions, 'CSV');
     } catch (err) {
         console.error('CSV import failed:', err);
         alert('CSV import failed: ' + err.message);
     } finally {
         input.value = '';
+    }
+}
+
+// --- Signal Popup (glassmorphism floating dialog) ---
+
+// Cache: ticker -> rendered HTML so we don't re-fetch on re-open
+const _signalCache = {};
+
+function openSignalPopup(ticker) {
+    const dialog  = document.getElementById('signal-popup-dialog');
+    const body    = document.getElementById('signal-popup-body');
+    const badge   = document.getElementById('signal-popup-ticker-badge');
+    const closeBtn = document.getElementById('signal-popup-close');
+    if (!dialog || !body) return;
+
+    // Update header badge
+    badge.textContent = ticker;
+
+    // Show cached content instantly, or show loader and fetch
+    if (_signalCache[ticker]) {
+        body.innerHTML = _signalCache[ticker];
+    } else {
+        body.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;font-size:13px" class="animate-pulse">Loading signals…</div>';
+        loadTickerSignals(ticker, 'signal-popup-body').then(() => {
+            _signalCache[ticker] = body.innerHTML;
+        }).catch(() => {});
+    }
+
+    // Open as modal (top-layer, focus-trapped, Esc closes)
+    dialog.showModal();
+
+    // Close button
+    closeBtn.onclick = () => dialog.close();
+
+    // Light-dismiss fallback for Safari (closedby="any" not yet supported)
+    if (!('closedBy' in HTMLDialogElement.prototype)) {
+        dialog.addEventListener('click', function lightDismiss(e) {
+            if (e.target !== dialog) return;
+            const r = dialog.getBoundingClientRect();
+            const inside = r.top <= e.clientY && e.clientY <= r.top + r.height &&
+                           r.left <= e.clientX && e.clientX <= r.left + r.width;
+            if (!inside) {
+                dialog.close();
+                dialog.removeEventListener('click', lightDismiss);
+            }
+        });
     }
 }
 
@@ -1003,3 +1017,4 @@ window.initPortfolioView = initPortfolioView;
 window.importWealthSimple = importWealthSimple;
 window.importFromServerFiles = importFromServerFiles;
 window.importCSV = importCSV;
+window.openSignalPopup = openSignalPopup;

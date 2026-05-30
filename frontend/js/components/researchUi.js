@@ -1,6 +1,7 @@
 import { API_BASE } from '../api.js';
 import { renderWithTooltip, renderMetricWithContext, linkTV, formatCurrency } from '../utils.js';
 import { MACRO_DATA } from './marketStatus.js';
+import { loadTickerSignals } from './tickerSignals.js';
 
 export async function loadIndustries() {
     try {
@@ -781,6 +782,9 @@ export async function loadResearch(symbol) {
                         </div>
                     </div>
 
+                    <!-- Ticker Signals -->
+                    <div id="research-ticker-signals"></div>
+
                     <!-- Growth Reality Check -->
                     <div class="glass-panel p-6 rounded-2xl bg-gray-900 border border-gray-800">
                         <h3 class="text-sm font-black text-white uppercase tracking-widest mb-4">The Reality Check</h3>
@@ -983,6 +987,7 @@ export async function loadResearch(symbol) {
         // Automatically load trends for 5y and price chart
         setTimeout(() => window.loadTrends(data.symbol, '5y'), 100);
         setTimeout(() => loadPriceChart(data.symbol), 200);
+        setTimeout(() => loadTickerSignals(data.symbol, 'research-ticker-signals'), 300);
 
     } catch (err) {
         console.error("Research Hub Error:", err);

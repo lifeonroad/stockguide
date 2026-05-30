@@ -1,0 +1,195 @@
+[0;36m⏱  Session started at: Fri May 15 06:45:51 PM EDT 2026[0m
+[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+✓ Loaded environment variables from .env
+🚀 Starting Rational Equity from /home/kplinux/Downloads/projects/stockguide/stockguide/backend...
+---------------------------------------------------
+INFO:     Will watch for changes in these directories: ['/home/kplinux/Downloads/projects/stockguide/stockguide/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [2693716] using WatchFiles
+INFO:     Started server process [2693727]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🌍 Opening Dashboard at http://localhost:8000
+INFO:     127.0.0.1:39616 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39646 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+[RETRY 1/3] <lambda> failed: Too Many Requests. Rate limited. Try after a while.. Retrying in 2.1s …
+INFO:     127.0.0.1:39616 - "GET /api/market-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39638 - "GET /api/industries/top HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39632 - "GET /api/macro HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46076 - "GET /api/momentum?min_score=0&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41642 - "GET /api/research/CLX HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41648 - "GET /api/research/price-chart/CLX?days=252 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41642 - "GET /api/research/trends/CLX?range=5y HTTP/1.1" 200 OK
+get_price_history yfinance(MMC) failed: Too Many Requests. Rate limited. Try after a while.
+$ZSP: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$XSP: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+$XEG: possibly delisted; no price data found  (period=1y)
+$NPI: possibly delisted; no price data found  (period=1y)
+$VFV: possibly delisted; no price data found  (period=1y)
+$TA: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+
+12 Failed downloads:
+['ZSP', 'ZEB', 'XSP', 'XQQ', 'XEG', 'NPI', 'VFV']: possibly delisted; no price data found  (period=1y)
+['HMMJ', 'XEQT', 'KILO', 'RCI.B']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+['TA']: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+get_price_history yfinance(PARA) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(PXD) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(WBA) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+[Dip Hunter] Scanning 177 tickers (2 bleeding sectors)
+[Dip Hunter] Phase 1/3: Downloading price history for 177 tickers...
+[Dip Hunter] Phase 1/3: Done in 222.5s (165 tickers cached, saved to DB)
+[Dip Hunter] Phase 2/3: 163 candidates after pre-filter. Fetching fundamentals...
+[Dip Hunter] Phase 2/3: Done in 238.1s (137 fundamentals fetched, saved to DB)
+[Dip Hunter] Phase 3/3: Scoring 163 candidates...
+[Dip Hunter] Complete: 67 opportunities found in 240.7s
+INFO:     127.0.0.1:55306 - "GET /api/research/price-chart/CLX?days=756 HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:55320 - "GET /api/research/price-chart/CLX?days=1260 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55306 - "GET /api/research/price-chart/CLX?days=2520 HTTP/1.1" 200 OK
+get_price_history yfinance(WRK) failed: Too Many Requests. Rate limited. Try after a while.
+$DAY: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:37196 - "GET /api/dip-hunter/etfs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37188 - "GET /api/dip-hunter/summary HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+$ZSP: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$HMMJ: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$XSP: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+$XEG: possibly delisted; no price data found  (period=1y)
+$NPI: possibly delisted; no price data found  (period=1y)
+$TA: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$VFV: possibly delisted; no price data found  (period=1y)
+$RCI.B: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+
+12 Failed downloads:
+['ZSP', 'ZEB', 'XSP', 'XQQ', 'XEG', 'NPI', 'VFV']: possibly delisted; no price data found  (period=1y)
+['HMMJ', 'TA', 'RCI.B']: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+['XEQT', 'KILO']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+[Dip Hunter] Scanning 177 tickers (2 bleeding sectors)
+[Dip Hunter] Phase 1/3: Downloading price history for 177 tickers...
+[Dip Hunter] Phase 1/3: Done in 38.7s (165 tickers cached, saved to DB)
+[Dip Hunter] Phase 2/3: 162 candidates after pre-filter. Fetching fundamentals...
+[Dip Hunter] Phase 2/3: Done in 51.2s (137 fundamentals fetched, saved to DB)
+[Dip Hunter] Phase 3/3: Scoring 162 candidates...
+[Dip Hunter] Complete: 70 opportunities found in 53.3s
+INFO:     127.0.0.1:37188 - "GET /api/opportunities?min_quality=0 HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'analyst.py', 'cache_utils.py', 'copycat.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2693727]
+WARNING:  WatchFiles detected changes in 'data_client.py', 'persistent_cache.py', 'network_client.py', 'market_data.py', 'dip_hunter.py', 'research.py', 'portfolio.py', 'indicators.py', 'screeners.py', 'superinvestors_live.py', 'universe.py', 'rate_limiter.py'. Reloading...
+Process SpawnProcess-2:
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 320, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    ~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "/usr/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/server.py", line 86, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/config.py", line 449, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "/usr/lib/python3.14/importlib/__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1406, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1342, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 938, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 759, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/backend/main.py", line 657, in <module>
+    from data_client import (
+    ...<2 lines>...
+    )
+ImportError: cannot import name 'permanently_skip_ticker' from 'data_client' (/home/kplinux/Downloads/projects/stockguide/stockguide/backend/data_client.py)
+Process SpawnProcess-3:
+Traceback (most recent call last):
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 320, in _bootstrap
+    self.run()
+    ~~~~~~~~^^
+  File "/usr/lib/python3.14/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    ~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+  File "/usr/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/server.py", line 86, in _serve
+    config.load()
+    ~~~~~~~~~~~^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/config.py", line 449, in load
+    self.loaded_app = import_from_string(self.app)
+                      ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+  File "/usr/lib/python3.14/importlib/__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1406, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1342, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 938, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 759, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "/home/kplinux/Downloads/projects/stockguide/stockguide/backend/main.py", line 657, in <module>
+    from data_client import (
+    ...<2 lines>...
+    )
+ImportError: cannot import name 'permanently_skip_ticker' from 'data_client' (/home/kplinux/Downloads/projects/stockguide/stockguide/backend/data_client.py)

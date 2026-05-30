@@ -1857,9 +1857,9 @@
                             <table class="w-full text-sm text-left">
                                 <thead class="text-xs text-gray-400 uppercase bg-gray-900/50">
                                     <tr>
-                                        <th class="px-3 py-3 rounded-l-lg text-center">Signal</th>
+
                                         <th onclick="sortPortfolio('ticker')"
-                                            class="px-6 py-3 cursor-pointer hover:bg-gray-800 transition-colors select-none">
+                                            class="px-6 py-3 rounded-l-lg cursor-pointer hover:bg-gray-800 transition-colors select-none">
                                             Ticker <span class="sort-icon ml-1 opacity-50">↕</span>
                                         </th>
                                         <th onclick="sortPortfolio('quantity')"
@@ -1888,13 +1888,15 @@
                                 </thead>
                                 <tbody id="holdings-table-body" class="divide-y divide-gray-800">
                                     <tr>
-                                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">No
+                                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">No
                                             positions yet. Add your first position!</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
+                    <!-- Entry/Exit Signals: now inline per-ticker row -->
+
                     <!-- Trade History Section -->
                     <div class="glass-panel rounded-2xl overflow-hidden mt-8">
                         <div class="p-6 border-b border-gray-700/50 flex justify-between items-center bg-gray-900/30">
@@ -2123,8 +2125,172 @@
         </div>
 
         <!-- App Logic -->
-        <script type="module" src="/static/portfolio.js?v=21"></script>
-        <script type="module" src="/static/app.js?v=24"></script>
+        <script type="module" src="/static/portfolio.js?v=23"></script>
+        <script type="module" src="/static/app.js?v=25"></script>
+
+        <!-- ── Signal Popup Dialog ─────────────────────────────── -->
+        <dialog id="signal-popup-dialog"
+                closedby="any"
+                aria-labelledby="signal-popup-title"
+                class="signal-popup">
+            <!-- Header -->
+            <div class="signal-popup-header">
+                <div class="signal-popup-title-row">
+                    <span id="signal-popup-ticker-badge" class="signal-popup-ticker"></span>
+                    <h2 id="signal-popup-title" class="signal-popup-heading">Entry / Exit Signals</h2>
+                </div>
+                <button id="signal-popup-close" class="signal-popup-close-btn" aria-label="Close signals">✕</button>
+            </div>
+            <!-- Body: tickerSignals injects here -->
+            <div id="signal-popup-body" class="signal-popup-body"></div>
+        </dialog>
+
+        <style>
+        /* ── Signal Popup ── */
+        .signal-popup {
+            /* Layout */
+            position: fixed;
+            inset: 0;
+            margin: auto;
+            width: min(480px, 92vw);
+            max-height: 80vh;
+            overflow-y: auto;
+            border: none;
+            padding: 0;
+            border-radius: 20px;
+
+            /* Glassmorphism */
+            background: rgba(15, 18, 30, 0.72);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            box-shadow:
+                0 0 0 1px rgba(99, 179, 237, 0.18),
+                0 32px 64px -12px rgba(0, 0, 0, 0.7),
+                0 0 80px -20px rgba(59, 130, 246, 0.15);
+            color: #e2e8f0;
+
+            /* Entry/exit animation — closed/exit state */
+            opacity: 0;
+            transform: scale(0.93) translateY(10px);
+            transition:
+                opacity 0.25s ease-out,
+                transform 0.25s ease-out,
+                display 0.25s allow-discrete,
+                overlay 0.25s allow-discrete;
+        }
+
+        /* Open state */
+        .signal-popup[open] {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        /* Entry starting state */
+        @starting-style {
+            .signal-popup[open] {
+                opacity: 0;
+                transform: scale(0.93) translateY(10px);
+            }
+        }
+
+        /* Backdrop */
+        .signal-popup::backdrop {
+            background: rgba(0, 0, 0, 0);
+            backdrop-filter: blur(0px);
+            transition:
+                background-color 0.25s ease-out,
+                backdrop-filter 0.25s ease-out,
+                display 0.25s allow-discrete,
+                overlay 0.25s allow-discrete;
+        }
+        .signal-popup[open]::backdrop {
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(4px);
+        }
+        @starting-style {
+            .signal-popup[open]::backdrop {
+                background: rgba(0, 0, 0, 0);
+                backdrop-filter: blur(0px);
+            }
+        }
+
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            .signal-popup {
+                transform: none;
+                transition-duration: 0.1s;
+            }
+        }
+
+        /* Inner layout */
+        .signal-popup-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 20px 20px 14px;
+            border-bottom: 1px solid rgba(99, 179, 237, 0.12);
+            position: sticky;
+            top: 0;
+            background: rgba(15, 18, 30, 0.85);
+            backdrop-filter: blur(12px);
+            border-radius: 20px 20px 0 0;
+            z-index: 1;
+        }
+        .signal-popup-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .signal-popup-ticker {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            padding: 3px 10px;
+            border-radius: 99px;
+            background: rgba(59, 130, 246, 0.18);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            color: #93c5fd;
+            text-transform: uppercase;
+        }
+        .signal-popup-heading {
+            font-size: 15px;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin: 0;
+        }
+        .signal-popup-close-btn {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 4px 9px;
+            line-height: 1;
+            transition: background 0.15s, color 0.15s;
+            flex-shrink: 0;
+        }
+        .signal-popup-close-btn:hover {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+        .signal-popup-body {
+            padding: 18px 20px 20px;
+        }
+        /* Style the signal card inside the popup */
+        .signal-popup-body .bg-gray-900\/60 {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+        }
+        /* Scrollbar styling */
+        .signal-popup::-webkit-scrollbar { width: 5px; }
+        .signal-popup::-webkit-scrollbar-track { background: transparent; }
+        .signal-popup::-webkit-scrollbar-thumb { background: rgba(99,179,237,0.25); border-radius: 99px; }
+        </style>
 </body>
+
 
 </html>

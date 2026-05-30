@@ -336,6 +336,20 @@ async def research_price_chart(symbol: str, days: int = 365):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/ticker-signals/{symbol}")
+async def ticker_signals(symbol: str):
+    """Entry/exit value suggestions for any ticker."""
+    from ticker_signals import get_ticker_signals
+    try:
+        data = await asyncio.to_thread(get_ticker_signals, symbol)
+        if isinstance(data, dict) and data.get("error"):
+            raise HTTPException(status_code=404, detail=data["error"])
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/technical/zones")
 async def technical_zones(zone: str = "all", min_data_days: int = 200):
     """Scan universe and classify tickers by technical zone (6-zone system with legacy 3-zone compat)."""

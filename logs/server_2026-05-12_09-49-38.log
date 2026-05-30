@@ -1,0 +1,444 @@
+[0;36m⏱  Session started at: Tue May 12 09:49:38 AM EDT 2026[0m
+[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+✓ Loaded environment variables from .env
+🚀 Starting Rational Equity from /home/kplinux/Downloads/projects/stockguide/stockguide/backend...
+---------------------------------------------------
+INFO:     Will watch for changes in these directories: ['/home/kplinux/Downloads/projects/stockguide/stockguide/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [2551508] using WatchFiles
+INFO:     Started server process [2551510]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🌍 Opening Dashboard at http://localhost:8000
+INFO:     127.0.0.1:50174 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50174 - "GET /static/portfolio.js?v=19 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50174 - "GET /static/js/components/researchUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:50200 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50174 - "GET /api/market-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50186 - "GET /api/industries/top HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50180 - "GET /api/macro HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45718 - "GET /api/research/CNC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45724 - "GET /api/research/price-chart/CNC?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45718 - "GET /api/research/trends/CNC?range=5y HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49924 - "GET /api/admin/failed-tickers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49924 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49930 - "GET /api/admin/invalid-tickers/universe-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60652 - "GET /api/research/CNC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43492 - "GET /api/research/price-chart/CNC?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60652 - "GET /api/research/trends/CNC?range=5y HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43492 - "GET /api/admin/invalid-tickers/DAY/permanent-skip HTTP/1.1" 405 Method Not Allowed
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:49362 - "GET /api/dip-hunter/etfs HTTP/1.1" 200 OK
+$XEG: possibly delisted; no price data found  (period=1y)
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: XEQT"}}}
+$XSP: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$VFV: possibly delisted; no price data found  (period=1y)
+$XEQT: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: RCI.B"}}}
+$NPI: possibly delisted; no price data found  (period=1y)
+$TA: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$XQQ: possibly delisted; no price data found  (period=1y)
+$RCI.B: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$HMMJ: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$ZSP: possibly delisted; no price data found  (period=1y)
+$KILO: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+
+12 Failed downloads:
+['XEG', 'XSP', 'ZEB', 'VFV', 'NPI', 'XQQ', 'ZSP']: possibly delisted; no price data found  (period=1y)
+['XEQT', 'TA', 'RCI.B', 'HMMJ', 'KILO']: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+[Dip Hunter] Scanning 162 tickers (1 bleeding sectors)
+[Dip Hunter] Phase 1/3: Downloading price history for 162 tickers...
+[Dip Hunter] Phase 1/3: Done in 71.7s (150 tickers cached, saved to DB)
+[Dip Hunter] Phase 2/3: 153 candidates after pre-filter. Fetching fundamentals...
+[Dip Hunter] Phase 2/3: Done in 94.8s (138 fundamentals fetched, saved to DB)
+[Dip Hunter] Phase 3/3: Scoring 153 candidates...
+[Dip Hunter] Complete: 62 opportunities found in 96.8s
+INFO:     127.0.0.1:49354 - "GET /api/dip-hunter/summary HTTP/1.1" 504 Gateway Timeout
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+Background refresh failed for LIN: 39 values for 40 columns
+Background refresh failed for STLD: 39 values for 40 columns
+Background refresh failed for HWM: 39 values for 40 columns
+Background refresh failed for GDDY: 39 values for 40 columns
+Background refresh failed for KO: 39 values for 40 columns
+Background refresh failed for PNW: 39 values for 40 columns
+Background refresh failed for CSGP: 39 values for 40 columns
+Background refresh failed for NSC: 39 values for 40 columns
+Background refresh failed for IEX: 39 values for 40 columns
+Background refresh failed for PNR: 39 values for 40 columns
+Background refresh failed for APA: 39 values for 40 columns
+Background refresh failed for MPC: 39 values for 40 columns
+Background refresh failed for SYY: 39 values for 40 columns
+Background refresh failed for SWK: 39 values for 40 columns
+Background refresh failed for LH: 39 values for 40 columns
+Background refresh failed for DPZ: 39 values for 40 columns
+Background refresh failed for LOW: 39 values for 40 columns
+Background refresh failed for CARR: 39 values for 40 columns
+Background refresh failed for ZTS: 39 values for 40 columns
+$XEG: possibly delisted; no price data found  (period=1y)
+$XSP: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$VFV: possibly delisted; no price data found  (period=1y)
+$NPI: possibly delisted; no price data found  (period=1y)
+$HMMJ: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$XQQ: possibly delisted; no price data found  (period=1y)
+$ZSP: possibly delisted; no price data found  (period=1y)
+
+12 Failed downloads:
+['XEG', 'XSP', 'ZEB', 'VFV', 'NPI', 'XQQ', 'ZSP']: possibly delisted; no price data found  (period=1y)
+['XEQT', 'RCI.B', 'TA', 'KILO']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+['HMMJ']: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+Background refresh failed for CB: 39 values for 40 columns
+Background refresh failed for PCAR: 39 values for 40 columns
+Background refresh failed for ISRG: 39 values for 40 columns
+Background refresh failed for NXPI: 39 values for 40 columns
+Background refresh failed for VLO: 39 values for 40 columns
+Background refresh failed for VTR: 39 values for 40 columns
+$WRK: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+[Dip Hunter] Scanning 162 tickers (1 bleeding sectors)
+[Dip Hunter] Phase 1/3: Downloading price history for 162 tickers...
+[Dip Hunter] Phase 1/3: Done in 76.2s (150 tickers cached, saved to DB)
+[Dip Hunter] Phase 2/3: 154 candidates after pre-filter. Fetching fundamentals...
+[Dip Hunter] Phase 2/3: Done in 110.4s (68 fundamentals fetched, saved to DB)
+[Dip Hunter] Phase 3/3: Scoring 154 candidates...
+[Dip Hunter] Complete: 31 opportunities found in 111.2s
+INFO:     127.0.0.1:49354 - "GET /api/opportunities?min_quality=0 HTTP/1.1" 200 OK
+Background refresh failed for OTIS: 39 values for 40 columns
+Background refresh failed for EW: 39 values for 40 columns
+Background refresh failed for VRTX: 39 values for 40 columns
+Background refresh failed for CCI: 39 values for 40 columns
+Background refresh failed for CHTR: 39 values for 40 columns
+Background refresh failed for CI: 39 values for 40 columns
+Background refresh failed for TMO: 39 values for 40 columns
+Background refresh failed for IBKR: 39 values for 40 columns
+Background refresh failed for MOS: 39 values for 40 columns
+Background refresh failed for HON: 39 values for 40 columns
+Background refresh failed for BXP: 39 values for 40 columns
+Background refresh failed for IFF: 39 values for 40 columns
+Background refresh failed for GILD: 39 values for 40 columns
+Background refresh failed for EPAM: 39 values for 40 columns
+Background refresh failed for AMCR: 39 values for 40 columns
+Background refresh failed for PEP: 39 values for 40 columns
+Background refresh failed for CEG: 39 values for 40 columns
+Background refresh failed for WAB: 39 values for 40 columns
+Background refresh failed for PM: 39 values for 40 columns
+Background refresh failed for SYF: 39 values for 40 columns
+get_price_history yfinance(MMC) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+Background refresh failed for GD: 39 values for 40 columns
+Background refresh failed for SYK: 39 values for 40 columns
+Background refresh failed for SHW: 39 values for 40 columns
+Background refresh failed for TYL: 39 values for 40 columns
+Background refresh failed for WMB: 39 values for 40 columns
+Background refresh failed for KMB: 39 values for 40 columns
+Background refresh failed for IDXX: 39 values for 40 columns
+Background refresh failed for KMI: 39 values for 40 columns
+Background refresh failed for MAR: 39 values for 40 columns
+Background refresh failed for HSY: 39 values for 40 columns
+Background refresh failed for AMT: 39 values for 40 columns
+Background refresh failed for OKE: 39 values for 40 columns
+Background refresh failed for MET: 39 values for 40 columns
+Background refresh failed for MAS: 39 values for 40 columns
+Background refresh failed for CF: 39 values for 40 columns
+Background refresh failed for IR: 39 values for 40 columns
+Background refresh failed for MKC: 39 values for 40 columns
+Background refresh failed for COST: 39 values for 40 columns
+Background refresh failed for AXON: 39 values for 40 columns
+Background refresh failed for DOW: 39 values for 40 columns
+Background refresh failed for RHI: 39 values for 40 columns
+Background refresh failed for MNST: 39 values for 40 columns
+Background refresh failed for LRCX: 39 values for 40 columns
+Background refresh failed: price history for DAY: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(PXD) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(PARA) failed: Too Many Requests. Rate limited. Try after a while.
+Background refresh failed for HRL: 39 values for 40 columns
+Background refresh failed for ORCL: 39 values for 40 columns
+Background refresh failed for ZBRA: 39 values for 40 columns
+Background refresh failed for JPM: 39 values for 40 columns
+Background refresh failed for NI: 39 values for 40 columns
+Background refresh failed for TJX: 39 values for 40 columns
+Background refresh failed for EMR: 39 values for 40 columns
+Background refresh failed for JBHT: 39 values for 40 columns
+Background refresh failed for GOOGL: 39 values for 40 columns
+Background refresh failed for CTVA: 39 values for 40 columns
+Background refresh failed for WMT: 39 values for 40 columns
+Background refresh failed for AMD: 39 values for 40 columns
+Background refresh failed for CTAS: 39 values for 40 columns
+Background refresh failed for BKNG: 39 values for 40 columns
+Background refresh failed for PAYX: 39 values for 40 columns
+Background refresh failed for EXPE: 39 values for 40 columns
+Background refresh failed for STZ: 39 values for 40 columns
+Background refresh failed for JBL: 39 values for 40 columns
+Background refresh failed for CHD: 39 values for 40 columns
+Background refresh failed for PANW: 39 values for 40 columns
+Background refresh failed for NDSN: 39 values for 40 columns
+get_price_history yfinance(WBA) failed: Too Many Requests. Rate limited. Try after a while.
+Background refresh failed for NVDA: 39 values for 40 columns
+Background refresh failed for USB: 39 values for 40 columns
+Background refresh failed for DELL: 39 values for 40 columns
+Background refresh failed for AES: 39 values for 40 columns
+Background refresh failed for SNA: 39 values for 40 columns
+Background refresh failed for AVB: 39 values for 40 columns
+Background refresh failed for STX: 39 values for 40 columns
+Background refresh failed for AME: 39 values for 40 columns
+Background refresh failed for LEN: 39 values for 40 columns
+Background refresh failed for KDP: 39 values for 40 columns
+Background refresh failed for CBRE: 39 values for 40 columns
+Background refresh failed for ANET: 39 values for 40 columns
+Background refresh failed for CPRT: 39 values for 40 columns
+Background refresh failed for FCX: 39 values for 40 columns
+Background refresh failed for TT: 39 values for 40 columns
+Background refresh failed for ABT: 39 values for 40 columns
+Background refresh failed for CMI: 39 values for 40 columns
+Background refresh failed for PODD: 39 values for 40 columns
+Background refresh failed for ZION: 39 values for 40 columns
+Background refresh failed for META: 39 values for 40 columns
+Background refresh failed for CRWD: 39 values for 40 columns
+Background refresh failed for BKR: 39 values for 40 columns
+Background refresh failed for PTC: 39 values for 40 columns
+Background refresh failed for CAG: 39 values for 40 columns
+Background refresh failed for HUBB: 39 values for 40 columns
+Background refresh failed for STT: 39 values for 40 columns
+Background refresh failed for DUK: 39 values for 40 columns
+Background refresh failed for GEN: 39 values for 40 columns
+Background refresh failed for MTD: 39 values for 40 columns
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:33834 - "GET /api/research/NFLX HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:33842 - "GET /api/research/price-chart/NFLX?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33834 - "GET /api/research/trends/NFLX?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+get_ticker_info(VISA): skipping DB save — price is 0.0
+$VISA: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+INFO:     127.0.0.1:52550 - "GET /api/research/VISA HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:60704 - "GET /api/research/price-chart/VISA?days=365 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52550 - "GET /api/research/trends/VISA?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:41010 - "GET /api/research/V HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:41016 - "GET /api/research/price-chart/V?days=365 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41010 - "GET /api/research/trends/V?range=5y HTTP/1.1" 200 OK
+Background refresh failed for V: 39 values for 40 columns
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:52020 - "GET /api/research/V HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:52020 - "GET /api/research/trends/V?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:52020 - "GET /api/research/price-chart/V?days=365 HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:60310 - "GET /api/research/V HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:60310 - "GET /api/research/trends/V?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:60310 - "GET /api/research/price-chart/V?days=365 HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:60316 - "GET / HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:60316 - "GET / HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:39404 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39404 - "GET /static/portfolio.js?v=19 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39406 - "GET /static/app.js?v=18 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39406 - "GET /static/js/utils.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39406 - "GET /static/js/components/researchUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39404 - "GET /static/js/components/thematic.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39410 - "GET /static/js/components/screenerUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39420 - "GET /static/js/components/economics.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39434 - "GET /static/js/components/dipHunter.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39450 - "GET /static/js/components/smallCaps.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:39404 - "GET /static/js/components/international.js HTTP/1.1" 304 Not Modified
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:39420 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39404 - "GET /api/market-status HTTP/1.1" 200 OK
+HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"User is unable to access this feature - https://bit.ly/yahoo-finance-api-feedback"}}}
+[RETRY 1/3] <lambda> failed: argument of type 'NoneType' is not a container or iterable. Retrying in 1.6s …
+INFO:     127.0.0.1:39450 - "GET /api/macro HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39434 - "GET /api/industries/top HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:39434 - "GET / HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:39434 - "GET /api/market-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39450 - "GET /api/macro HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39404 - "GET /api/industries/top HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39420 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:58710 - "GET /api/research/ASML HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:58720 - "GET /api/research/price-chart/ASML?days=365 HTTP/1.1" 200 OK
+Background refresh failed for ASML: 39 values for 40 columns
+INFO:     127.0.0.1:58710 - "GET /api/research/trends/ASML?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:36512 - "GET / HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:36512 - "GET /api/market-status HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:36520 - "GET /api/macro HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+INFO:     127.0.0.1:41124 - "GET /api/industries/top HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41138 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:41144 - "GET /api/research/ASML HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:41144 - "GET /api/research/trends/ASML?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:41144 - "GET /api/research/price-chart/ASML?days=365 HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:47914 - "GET /api/research/ASML HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:47914 - "GET /api/research/trends/ASML?range=5y HTTP/1.1" 200 OK
+/home/kplinux/Downloads/projects/stockguide/stockguide/venv/lib/python3.14/site-packages/starlette/_utils.py:42: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return asyncio.iscoroutinefunction(obj) or (
+/usr/lib/python3.14/asyncio/threads.py:25: DeprecationWarning: 'asyncio.iscoroutinefunction' is deprecated and slated for removal in Python 3.16; use inspect.iscoroutinefunction() instead
+  return await loop.run_in_executor(None, func_call)
+INFO:     127.0.0.1:47914 - "GET /api/research/price-chart/ASML?days=365 HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'persistent_cache.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2551510]
+INFO:     Started server process [2585094]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+$PXD: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+$WRK: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+$XSP: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+$ZSP: possibly delisted; no price data found  (period=1y)
+$NPI: possibly delisted; no price data found  (period=1y)
+$XEG: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$VFV: possibly delisted; no price data found  (period=1y)
+
+12 Failed downloads:
+['XSP', 'XQQ', 'ZSP', 'NPI', 'XEG', 'ZEB', 'VFV']: possibly delisted; no price data found  (period=1y)
+['XEQT', 'HMMJ', 'KILO', 'RCI.B', 'TA']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')

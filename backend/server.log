@@ -1,0 +1,81 @@
+[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0;34m   📊 Rational Equity - Dashboard[0m
+[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+
+[0;36m[1/4][0m [0;32m✓ Virtual environment exists[0m
+
+[0;36m[2/4][0m [1;33mActivating environment...[0m
+[0;32m      ✓ Activated[0m
+
+[0;36m[3/4][0m [0;32m✓ Dependencies already installed[0m
+[0;32m      → Skipping installation (everything up to date)[0m
+
+[0;36m[4/4][0m [1;33mChecking configuration...[0m
+[0;32m      ✓ Configuration exists[0m
+
+[0;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[0;32m🚀 Launching Dashboard...[0m
+[0;36m   → Server will start on http://localhost:8000[0m
+[0;36m   → Browser will open automatically[0m
+[0;32m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+
+INFO:     Will watch for changes in these directories: ['/home/kplinux/Downloads/projects/stockguide/stockguide/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [618382] using WatchFiles
+INFO:     Started server process [618514]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:59128 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59128 - "GET /static/portfolio.js?v=14 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59130 - "GET /static/app.js?v=14 HTTP/1.1" 304 Not Modified
+[nltk_data] Downloading package punkt_tab to /tmp/defeatbeta/nltk...
+[nltk_data]   Package punkt_tab is already up-to-date!
+[38;5;10m______      __           _    ______      _        
+|  _  \    / _|         | |   | ___ \    | |       
+| | | |___| |_ ___  __ _| |_  | |_/ / ___| |_ __ _ 
+| | | / _ \  _/ _ \/ _` | __| | ___ \/ _ \ __/ _` |
+| |/ /  __/ ||  __/ (_| | |_  | |_/ /  __/ || (_| |
+|___/ \___|_| \___|\__,_|\__| \____/ \___|\__\__,_|[0m
+[1;38;5;10m📈:: Data Update Time ::[0m	2026-02-20 [1;38;5;10m::[0m
+[1;38;5;10m📈:: Software Version ::[0m	0.0.44      [1;38;5;10m::[0m
+INFO:     127.0.0.1:59168 - "GET /static/js/utils.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59156 - "GET /static/js/api.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59178 - "GET /static/js/components/marketStatus.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59182 - "GET /static/js/components/researchUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59156 - "GET /static/js/components/economics.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59186 - "GET /static/js/components/thematic.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59188 - "GET /static/js/components/dipHunter.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59168 - "GET /static/js/components/screenerUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59178 - "GET /static/js/components/alpha.js HTTP/1.1" 304 Not Modified
+2026-02-22 22:45:54 INFO DuckDBClient ThreadPoolExecutor-1_0 - Cache is up-to-date. Update time: 2026-02-20
+INFO:     127.0.0.1:59182 - "GET /static/js/components/smallCaps.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59186 - "GET /static/js/components/international.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59182 - "GET /static/favicon.png HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:48366 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48366 - "GET /static/portfolio.js?v=14 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:48382 - "GET /static/app.js?v=14 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56576 - "GET /static/js/api.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56586 - "GET /static/js/utils.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56586 - "GET /static/js/components/marketStatus.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56576 - "GET /static/js/components/researchUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56612 - "GET /static/js/components/screenerUi.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56598 - "GET /static/js/components/thematic.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56616 - "GET /static/js/components/dipHunter.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56614 - "GET /static/js/components/economics.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56576 - "GET /static/js/components/alpha.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56586 - "GET /static/js/components/smallCaps.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:56612 - "GET /static/js/components/international.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59140 - "GET /api/international/picks HTTP/1.1" 200 OK
+2026-02-22 22:48:22 INFO dynamic_universe ThreadPoolExecutor-0_0 - [DynUniverse] Momentum fetched in 159.3s (503 tickers)
+INFO:     127.0.0.1:56458 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52096 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44346 - "GET /static/app.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:44346 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:44362 - "GET /index.html HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:33904 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33904 - "GET /static/app.js?v=14 HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:37700 - "GET /index.html HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:37700 - "GET /static/js/components/international.js HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:59430 - "GET /index.html HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:59430 - "GET /index.html HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49206 - "GET / HTTP/1.1" 200 OK

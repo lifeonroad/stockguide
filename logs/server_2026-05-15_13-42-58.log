@@ -1,0 +1,122 @@
+[0;36m⏱  Session started at: Fri May 15 01:42:58 PM EDT 2026[0m
+[0;36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+✓ Loaded environment variables from .env
+🚀 Starting Rational Equity from /home/kplinux/Downloads/projects/stockguide/stockguide/backend...
+---------------------------------------------------
+INFO:     Will watch for changes in these directories: ['/home/kplinux/Downloads/projects/stockguide/stockguide/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [2665856] using WatchFiles
+INFO:     Started server process [2665877]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+🌍 Opening Dashboard at http://localhost:8000
+INFO:     127.0.0.1:58674 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58700 - "GET /api/admin/data-source HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58674 - "GET /api/market-status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58694 - "GET /api/industries/top HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58686 - "GET /api/macro HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48628 - "GET /api/technical/zones?zone=all HTTP/1.1" 200 OK
+$PXD: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: WBA"}}}
+$WBA: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+$NPI: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+$ZSP: possibly delisted; no price data found  (period=1y)
+$ZEB: possibly delisted; no price data found  (period=1y)
+$KILO: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$HMMJ: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$XEG: possibly delisted; no price data found  (period=1y)
+$TA: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$XSP: possibly delisted; no price data found  (period=1y)
+$RCI.B: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$VFV: possibly delisted; no price data found  (period=1y)
+
+12 Failed downloads:
+['NPI', 'XQQ', 'ZSP', 'ZEB', 'XEG', 'XSP', 'VFV']: possibly delisted; no price data found  (period=1y)
+['KILO', 'HMMJ', 'TA', 'RCI.B']: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+['XEQT']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+$DAY: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+get_price_history yfinance(PARA) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(MMC) failed: Too Many Requests. Rate limited. Try after a while.
+get_price_history yfinance(WRK) failed: Too Many Requests. Rate limited. Try after a while.
+WARNING:  WatchFiles detected changes in 'indicators.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2665877]
+INFO:     Started server process [2672111]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'momentum.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2672111]
+INFO:     Started server process [2672144]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+
+1 Failed download:
+['^GSPC']: YFRateLimitError('Too Many Requests. Rate limited. Try after a while.')
+HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: WBA"}}}
+$WBA: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+$MMC: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+$XSP: possibly delisted; no price data found  (period=1y)
+$XEG: possibly delisted; no price data found  (period=1y)
+$XQQ: possibly delisted; no price data found  (period=1y)
+$NPI: possibly delisted; no price data found  (period=1y)
+$TA: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$VFV: possibly delisted; no price data found  (period=1y)
+$HMMJ: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$ZSP: possibly delisted; no price data found  (period=1y)
+$XEQT: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$ZEB: possibly delisted; no price data found  (period=1y)
+$RCI.B: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$KILO: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+
+12 Failed downloads:
+['XSP', 'XEG', 'XQQ', 'NPI', 'VFV', 'ZSP', 'ZEB']: possibly delisted; no price data found  (period=1y)
+['TA', 'HMMJ', 'XEQT', 'RCI.B', 'KILO']: possibly delisted; no price data found  (period=1y) (Yahoo error = "No data found, symbol may be delisted")
+$PARA: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+get_price_history yfinance(MRO) failed: Too Many Requests. Rate limited. Try after a while.
+$PXD: possibly delisted; no price data found  (period=252d) (Yahoo error = "No data found, symbol may be delisted")
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2672144]
+INFO:     Started server process [2673797]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2673797]
+INFO:     Started server process [2673813]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/comprehensive_test.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2673813]
+INFO:     Started server process [2673840]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/comprehensive_test.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2673840]
+INFO:     Started server process [2673853]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [2673853]
+INFO:     Stopping reloader process [2665856]
+/usr/lib/python3.14/multiprocessing/resource_tracker.py:396: UserWarning: resource_tracker: There appear to be 2 leaked semaphore objects to clean up at shutdown: {'/mp-5mbn2iyd', '/mp-_dwap95r'}
+  warnings.warn(

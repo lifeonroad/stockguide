@@ -337,36 +337,37 @@ class PortfolioManager:
 
     def add_position(self, portfolio_id: str, ticker: str, quantity: float, 
                       avg_cost: float, purchase_date: Optional[str] = None, notes: str = "", category: str = "Stock") -> Dict:
-        """Add a position to a portfolio (Legacy support)."""
-        position_id = str(uuid.uuid4())
-        
-        if purchase_date is None:
-            purchase_date = datetime.now().isoformat()
-        
+        """Add or update a position (upsert by ticker). If the ticker exists, updates quantity with weighted average cost."""
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        cursor.execute('''
-            INSERT INTO positions (id, portfolio_id, ticker, quantity, avg_cost, purchase_date, notes, category)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (position_id, portfolio_id, ticker.upper(), quantity, avg_cost, purchase_date, notes, category))
+        ticker = ticker.upper()
+        if purchase_date is None:
+            purchase_date = datetime.now().isoformat()
         
-        # Update portfolio updated_at
+        # Check if position already exists
+        cursor.execute("SELECT id, quantity, avg_cost FROM positions WHERE portfolio_id = ? AND ticker = ?", (portfolio_id, ticker))
+        existing = cursor.fetchone()
+        
+        if existing:
+            position_id, cur_qty, cur_avg = existing
+            new_qty = cur_qty + quantity
+            new_avg = (cur_qty * cur_avg + quantity * avg_cost) / new_qty if new_qty > 0 else avg_cost
+            cursor.execute('''
+                UPDATE positions SET quantity = ?, avg_cost = ?, notes = ?, category = ?, purchase_date = ? WHERE id = ?
+            ''', (new_qty, round(new_avg, 2), notes, category, purchase_date, position_id))
+        else:
+            position_id = str(uuid.uuid4())
+            cursor.execute('''
+                INSERT INTO positions (id, portfolio_id, ticker, quantity, avg_cost, purchase_date, notes, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (position_id, portfolio_id, ticker, quantity, avg_cost, purchase_date, notes, category))
+        
         cursor.execute('UPDATE portfolios SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', (portfolio_id,))
-        
         conn.commit()
         conn.close()
         
-        return {
-            "id": position_id,
-            "portfolio_id": portfolio_id,
-            "ticker": ticker.upper(),
-            "quantity": quantity,
-            "avg_cost": avg_cost,
-            "purchase_date": purchase_date,
-            "notes": notes,
-            "category": category
-        }
+        return {"id": position_id, "portfolio_id": portfolio_id, "ticker": ticker, "quantity": quantity, "avg_cost": avg_cost}
     
     def update_position(self, position_id: str, quantity: Optional[float] = None, 
                        avg_cost: Optional[float] = None, notes: Optional[str] = None) -> bool:

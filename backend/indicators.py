@@ -40,7 +40,14 @@ def get_price_history_for_indicators(symbol: str, min_days: int = 200) -> Option
         df = get_price_history(symbol, days=max(min_days, 252))
         if df is None or df.empty:
             return None
-        if 'close' not in df.columns:
+        # Use adjusted close for SMA calculations if present
+        if 'adj_close' in df.columns:
+            df['close'] = df['adj_close']
+        elif 'adjclose' in df.columns:
+            df['close'] = df['adjclose']
+        elif 'Adj Close' in df.columns:
+            df['close'] = df['Adj Close']
+        elif 'close' not in df.columns:
             return None
         if 'date' in df.columns and 'report_date' not in df.columns:
             df = df.rename(columns={'date': 'report_date'})
